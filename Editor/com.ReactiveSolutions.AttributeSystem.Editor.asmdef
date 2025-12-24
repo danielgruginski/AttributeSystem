@@ -1,0 +1,18 @@
+{
+    "name": "com.reactivesolutions.AttributeSystem.Editor",
+    "rootNamespace": "ReactiveSolutions.AttributeSystem.Editor",
+    "references": [
+        "com.reactivesolutions.AttributeSystem"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,21 @@
+{
+  "name": "com.reactivesolutions.attributesystem",
+  "version": "0.1.0",
+  "displayName": "Attribute System",
+  "description": "A reactive attribute management system for Unity. Designed for RPGs and shooters, it supports complex modifier chains and data-driven StatBlocks via JSON. Built on UniRx for loose coupling and event-driven state updates. Currently has little support for multiple AttributeSystems inside a same scene (it is possible, but they do not interact out of the box)",
+  "unity": "2021.3",
+  "author": {
+    "name": "Daniel Gruginski",
+    "url": "https://github.com/danielgruginski"
+  },
+  "dependencies": {
+    "com.neuecc.unirx": "7.1.0"
+  },
+  "keywords": [
+    "attributes",
+    "stats",
+    "rpg",
+    "unirx",
+    "reactive"
+  ]
+}
