@@ -4,14 +4,15 @@ using System.Linq;
 using UniRx;
 using UnityEngine;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core
 {
     /// <summary>
     /// The central manager for character attributes.
     /// Handles storage, retrieval, and modification of attributes.
     /// </summary>
-    public class AttributeController : MonoBehaviour
+    public class AttributeProcessor
     {
+        
         // The core storage. ReactiveDictionary allows other systems to listen for adds/removes.
         private readonly ReactiveDictionary<string, Attribute> _attributes = new();
         public IReadOnlyReactiveDictionary<string, Attribute> Attributes => _attributes;

@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using UnityEditor;
 using System.Linq;
-using ReactiveSolutions.AttributeSystem;
+using ReactiveSolutions.AttributeSystem.Core;
 
 namespace ReactiveSolutions.AttributeSystem.Editor
 {

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core
 {
     public class DiminishingReturnsAttributeModifier : BaseAttributeModifier
     {
@@ -18,13 +18,13 @@ namespace ReactiveSolutions.AttributeSystem
             _softCap = softCap;
         }
 
-        public override void OnAttach(Attribute target, AttributeController controller)
+        public override void OnAttach(Attribute target, AttributeProcessor controller)
         {
             base.OnAttach(target, controller);
             WatchDependency(controller, _inputAttr);
         }
 
-        protected override float CalculateMagnitude(AttributeController controller)
+        protected override float CalculateMagnitude(AttributeProcessor controller)
         {
             float result;
             float input = Mathf.Max(0, controller.GetOrCreateAttribute(_inputAttr)?.Value ?? 0f);

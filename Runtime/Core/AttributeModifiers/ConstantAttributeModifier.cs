@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core
 {
     public sealed class ConstantAttributeModifier : BaseAttributeModifier
     {
@@ -15,7 +15,7 @@ namespace ReactiveSolutions.AttributeSystem
             _amount = amount;
         }
 
-        protected override float CalculateMagnitude(AttributeController controller) => _amount;
+        protected override float CalculateMagnitude(AttributeProcessor controller) => _amount;
     }
 
     public class ConstantFactory : IModifierFactory

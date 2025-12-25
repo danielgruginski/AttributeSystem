@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core
 {
     public sealed class ExponentialAttributeModifier : BaseAttributeModifier
     {
@@ -16,13 +16,13 @@ namespace ReactiveSolutions.AttributeSystem
             _baseValue = baseValue;
         }
 
-        public override void OnAttach(Attribute target, AttributeController controller)
+        public override void OnAttach(Attribute target, AttributeProcessor controller)
         {
             base.OnAttach(target, controller);
             WatchDependency(controller, _exponentSource);
         }
 
-        protected override float CalculateMagnitude(AttributeController controller)
+        protected override float CalculateMagnitude(AttributeProcessor controller)
         {
             float exponent = _exponentSource.GetValue(controller);
             return Mathf.Pow(_baseValue, exponent);

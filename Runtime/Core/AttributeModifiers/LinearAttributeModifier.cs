@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core
 {
     public sealed class LinearAttributeModifier : BaseAttributeModifier
     {
@@ -18,14 +18,14 @@ namespace ReactiveSolutions.AttributeSystem
             _addend = addend;
         }
 
-        public override void OnAttach(Attribute target, AttributeController controller)
+        public override void OnAttach(Attribute target, AttributeProcessor controller)
         {
             base.OnAttach(target, controller);
             // AUTOMATIC BINDING HERE
             WatchDependency(controller, _source);
         }
 
-        protected override float CalculateMagnitude(AttributeController controller)
+        protected override float CalculateMagnitude(AttributeProcessor controller)
         {
             float input = _source.GetValue(controller);
             return (input * _coeff) + _addend;

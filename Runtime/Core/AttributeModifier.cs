@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System;
 using UnityEngine;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core
 {
     // 1. HOW applied: How does this modifier combine with the previous value?
     public enum AttributeMergeMode
@@ -48,13 +48,13 @@ namespace ReactiveSolutions.AttributeSystem
         /// <summary>
         /// Applies the modification to the current value.
         /// </summary>
-        float Apply(float currentValue, AttributeController controller);
+        float Apply(float currentValue, AttributeProcessor controller);
 
         /// <summary>
         /// Called when the modifier is added to an Attribute.
         /// Use this to subscribe to other attributes (dependencies).
         /// </summary>
-        void OnAttach(Attribute targetAttribute, AttributeController controller);
+        void OnAttach(Attribute targetAttribute, AttributeProcessor controller);
 
         /// <summary>
         /// Called when the modifier is removed. 
@@ -72,7 +72,7 @@ namespace ReactiveSolutions.AttributeSystem
         public float ConstantValue;
         public string AttributeName;
 
-        public float GetValue(AttributeController controller)
+        public float GetValue(AttributeProcessor controller)
         {
             return Type switch
             {

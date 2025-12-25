@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core
 {
     public class SegmentedMultiplierAttributeModifier : BaseAttributeModifier
     {
@@ -16,13 +16,13 @@ namespace ReactiveSolutions.AttributeSystem
             _breakpoints = breakpoints;
         }
 
-        public override void OnAttach(Attribute target, AttributeController controller)
+        public override void OnAttach(Attribute target, AttributeProcessor controller)
         {
             base.OnAttach(target, controller);
             WatchDependency(controller, _inputAttr);
         }
 
-        protected override float CalculateMagnitude(AttributeController controller)
+        protected override float CalculateMagnitude(AttributeProcessor controller)
         {
             if (_breakpoints == null || _breakpoints.Count == 0) return 0f; // Or 1f depending on logic, keeping 0 to respect merge
 

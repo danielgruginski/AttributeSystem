@@ -6,7 +6,7 @@ using UniRx;
 using UnityEngine;
 using UnityEngine.Assertions;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core
 {
     public struct ModifierContribution
     {
@@ -25,10 +25,10 @@ namespace ReactiveSolutions.AttributeSystem
 
         private float _baseValue;
         private readonly List<IAttributeModifier> _mods = new();
-        private readonly AttributeController _owner; // A reference to the controller this attribute belongs to
+        private readonly AttributeProcessor _owner; // A reference to the controller this attribute belongs to
         private bool _isDirtySort = false;
 
-        public Attribute(string name, float baseValue, AttributeController owner)
+        public Attribute(string name, float baseValue, AttributeProcessor owner)
         {
             Assert.IsNotNull(owner, $"Attribute '{name}' cannot be created with a null owner controller.");
             Name = name;

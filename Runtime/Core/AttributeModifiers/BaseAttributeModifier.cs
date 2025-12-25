@@ -2,7 +2,7 @@
 using UniRx;
 using System;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core
 {
     /// <summary>
     /// Base class for all Attribute Modifiers.
@@ -27,7 +27,7 @@ namespace ReactiveSolutions.AttributeSystem
 
         // --- LIFECYCLE ---
 
-        public virtual void OnAttach(Attribute targetAttribute, AttributeController controller)
+        public virtual void OnAttach(Attribute targetAttribute, AttributeProcessor controller)
         {
             _targetAttribute = targetAttribute;
             // Concrete classes override this to call WatchDependency()
@@ -51,7 +51,7 @@ namespace ReactiveSolutions.AttributeSystem
         /// Template Method: Calculates the raw value based on the concrete implementation,
         /// then merges it with the current value based on MergeMode.
         /// </summary>
-        public virtual float Apply(float currentValue, AttributeController controller)
+        public virtual float Apply(float currentValue, AttributeProcessor controller)
         {
             // 1. Calculate the modification (e.g., return 5 for a +5 sword)
             float calculatedValue = CalculateMagnitude(controller);
@@ -70,14 +70,14 @@ namespace ReactiveSolutions.AttributeSystem
         /// Concrete classes implement the math here. 
         /// E.g., return Input * Coeff + Addend;
         /// </summary>
-        protected abstract float CalculateMagnitude(AttributeController controller);
+        protected abstract float CalculateMagnitude(AttributeProcessor controller);
 
         // --- REACTIVITY HELPERS ---
 
         /// <summary>
         /// Helper to easily bind this modifier to another attribute's changes.
         /// </summary>
-        protected void WatchDependency(AttributeController controller, string dependencyAttributeName)
+        protected void WatchDependency(AttributeProcessor controller, string dependencyAttributeName)
         {
             if (string.IsNullOrEmpty(dependencyAttributeName)) return;
 
@@ -96,7 +96,7 @@ namespace ReactiveSolutions.AttributeSystem
         /// <summary>
         /// Helper for ValueSource structs
         /// </summary>
-        protected void WatchDependency(AttributeController controller, ValueSource source)
+        protected void WatchDependency(AttributeProcessor controller, ValueSource source)
         {
             if (source.Type == ValueSource.SourceType.Attribute)
             {

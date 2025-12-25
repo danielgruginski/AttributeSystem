@@ -3,7 +3,7 @@ using UnityEditor;
 using System.IO;
 using System;
 using System.Collections.Generic;
-using ReactiveSolutions.AttributeSystem;
+using ReactiveSolutions.AttributeSystem.Core;
 
 namespace ReactiveSolutions.AttributeSystem.Editor
 {

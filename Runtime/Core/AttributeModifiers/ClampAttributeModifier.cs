@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core
 {
 
     // Clamp acts ON the value, it doesn't merge WITH the value in a standard way.
@@ -18,10 +18,10 @@ namespace ReactiveSolutions.AttributeSystem
             _max = max;
         }
 
-        protected override float CalculateMagnitude(AttributeController controller) => 0; // Unused
+        protected override float CalculateMagnitude(AttributeProcessor controller) => 0; // Unused
 
         // Override Apply completely because Clamp logic is unique (Transformation vs Combination)
-        public override float Apply(float currentValue, AttributeController controller)
+        public override float Apply(float currentValue, AttributeProcessor controller)
         {
             return Mathf.Clamp(currentValue, _min, _max);
         }

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core
 {
     public class RatioAttributeModifier : BaseAttributeModifier
     {
@@ -16,14 +16,14 @@ namespace ReactiveSolutions.AttributeSystem
             _divisor = divisor;
         }
 
-        public override void OnAttach(Attribute target, AttributeController controller)
+        public override void OnAttach(Attribute target, AttributeProcessor controller)
         {
             base.OnAttach(target, controller);
             WatchDependency(controller, _dividend);
             WatchDependency(controller, _divisor);
         }
 
-        protected override float CalculateMagnitude(AttributeController controller)
+        protected override float CalculateMagnitude(AttributeProcessor controller)
         {
             float divVal = controller.GetOrCreateAttribute(_dividend)?.Value ?? 0f;
             float sorVal = controller.GetOrCreateAttribute(_divisor)?.Value ?? 1f;

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core
 {
     /// <summary>
     /// Calculates a scaled triangular root.
@@ -21,13 +21,13 @@ namespace ReactiveSolutions.AttributeSystem
             _scale = Mathf.Max(0.0001f, scale); // Prevent division by zero
         }
 
-        public override void OnAttach(Attribute target, AttributeController controller)
+        public override void OnAttach(Attribute target, AttributeProcessor controller)
         {
             base.OnAttach(target, controller);
             WatchDependency(controller, _inputAttr);
         }
 
-        protected override float CalculateMagnitude(AttributeController controller)
+        protected override float CalculateMagnitude(AttributeProcessor controller)
         {
             float input = Mathf.Max(0, controller.GetOrCreateAttribute(_inputAttr)?.Value ?? 0f);
 
