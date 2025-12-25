@@ -75,7 +75,7 @@ namespace ReactiveSolutions.AttributeSystem
             Register("DiminishingReturns", new DiminishingReturnsFactory());
             Register("Clamp", new ClampFactory());
             Register("Product", new ProductAsLinearFactory());
-            Register("TriangularBonus", new TriangularBonusFactory());
+            Register("ScaledTriangular", new ScaledTriangularFactory());
         }
     }
 

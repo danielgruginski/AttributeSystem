@@ -212,11 +212,11 @@ namespace ReactiveSolutions.AttributeSystem
             AddModifier(sourceId, mod, targetAttr);
         }
 
-        internal void SetupTriangularBonus(string sourceID, string attributeName)
+        internal void SetupTriangularBonus(string sourceID, string attributeName, float scale)
         {
             var attributeBonusName = attributeName + "Bonus";
             SetOrUpdateBaseValue(attributeBonusName, 0);
-            var triangularBonusMod = new TriangularBonusAttributeModifier(attributeName, AttributeMergeMode.Add, sourceID, 10);
+            var triangularBonusMod = new ScaledTriangularAttributeModifier(attributeName, scale, AttributeMergeMode.Add, sourceID, 10);
             AddModifier(sourceID, triangularBonusMod, attributeBonusName);
         }
     }
