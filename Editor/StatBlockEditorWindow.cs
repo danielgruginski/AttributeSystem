@@ -2,25 +2,28 @@ using UnityEngine;
 using UnityEditor;
 using System.IO;
 using System;
-using System.Collections.Generic;
-using ReactiveSolutions.AttributeSystem.Core;
+using System.Reflection;
+using ReactiveSolutions.AttributeSystem.Core.Data;
 
 namespace ReactiveSolutions.AttributeSystem.Editor
 {
-
-    // Wrapper needed for SerializedObject to work on pure classes
-    [Serializable]
-    public class StatBlockWrapper : ScriptableObject
-    {
-        public StatBlock DataBlock = new StatBlock();
-    }
-
     public class StatBlockEditorWindow : EditorWindow
     {
-        private StatBlockWrapper _wrapper;
+        // -----------------------------------------------------------
+        // Helper Container: Bridges POCO StatBlock -> Unity Inspector
+        // -----------------------------------------------------------
+        public class StatBlockContainer : ScriptableObject
+        {
+            public StatBlock Data = new StatBlock();
+        }
+        // -----------------------------------------------------------
+
+        private StatBlockContainer _container; // Replaces _currentBlock
         private SerializedObject _serializedObject;
         private const string JSON_PATH = "Resources/Data/StatBlocks";
-        private string _currentFilePath;
+
+        private string _currentFileName = "NewStatBlock";
+        private string _fullFilePath;
         private Vector2 _scroll;
 
         [MenuItem("Window/Attributes/Stat Block Editor (Unified)")]
@@ -29,61 +32,90 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         private void OnEnable()
         {
             EnsureDirectory();
-            if (_wrapper == null) CreateNewWrapper();
+            if (_container == null) CreateNewContainer();
         }
 
         private void OnDisable()
         {
-            if (_wrapper != null) DestroyImmediate(_wrapper);
+            if (_container != null) DestroyImmediate(_container);
         }
 
         private void OnGUI()
         {
-            if (_wrapper == null || _serializedObject == null) CreateNewWrapper();
-
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            GUILayout.Label("Unified StatBlock Editor", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField("File:", _currentFilePath != null ? Path.GetFileName(_currentFilePath) : "Unsaved");
-            EditorGUILayout.EndVertical();
-
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("New")) CreateNewWrapper();
-            if (GUILayout.Button("Load")) LoadJson();
-            if (GUILayout.Button("Save")) SaveJson();
-            EditorGUILayout.EndHorizontal();
-
-            // --- NEW: BATCH FIXER ---
-            GUI.backgroundColor = new Color(1f, 0.7f, 0.7f); // Reddish tint
-            if (GUILayout.Button("Batch Fix All Legacy Files"))
+            if (_container == null || _serializedObject == null || _serializedObject.targetObject == null)
             {
-                if (EditorUtility.DisplayDialog("Batch Fix", "This will scan ALL json files in the folder. If 'OperationType' is missing, it will set it to 'Constant'. Proceed?", "Yes", "Cancel"))
-                {
-                    BatchSanitizeFiles();
-                }
+                CreateNewContainer();
             }
-            GUI.backgroundColor = Color.white;
-            // ------------------------
+
+            DrawHeader();
 
             EditorGUILayout.Space();
 
-            // DRAW THE INSPECTOR
             _scroll = EditorGUILayout.BeginScrollView(_scroll);
             _serializedObject.Update();
 
-            SerializedProperty blockProp = _serializedObject.FindProperty("DataBlock");
-            EditorGUILayout.PropertyField(blockProp, true); // True = Draw Children
+            // Access the 'Data' field of our container
+            SerializedProperty dataProp = _serializedObject.FindProperty("Data");
+
+            // Draw the children of 'Data' (BaseValues, Modifiers) directly
+            // This skips drawing the "Data" foldout itself for a cleaner look
+            SerializedProperty iterator = dataProp.Copy();
+            SerializedProperty endProperty = iterator.GetEndProperty();
+
+            // Enter the 'Data' object
+            if (iterator.NextVisible(true))
+            {
+                do
+                {
+                    if (SerializedProperty.EqualContents(iterator, endProperty)) break;
+                    EditorGUILayout.PropertyField(iterator, true);
+                }
+                while (iterator.NextVisible(false)); // Don't enter children of lists automatically
+            }
 
             _serializedObject.ApplyModifiedProperties();
             EditorGUILayout.EndScrollView();
         }
 
-        private void CreateNewWrapper()
+        private void DrawHeader()
         {
-            if (_wrapper != null) DestroyImmediate(_wrapper);
-            _wrapper = ScriptableObject.CreateInstance<StatBlockWrapper>();
-            _wrapper.DataBlock.BlockName = "NewStatBlock";
-            _serializedObject = new SerializedObject(_wrapper);
-            _currentFilePath = null;
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            GUILayout.Label("Unified StatBlock Editor", EditorStyles.boldLabel);
+
+            // Filename editing
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("Filename (No ext):", GUILayout.Width(110));
+            _currentFileName = EditorGUILayout.TextField(_currentFileName);
+            EditorGUILayout.LabelField(".json", GUILayout.Width(40));
+            EditorGUILayout.EndHorizontal();
+
+            if (!string.IsNullOrEmpty(_fullFilePath))
+            {
+                EditorGUILayout.HelpBox($"Editing: {_fullFilePath}", MessageType.Info);
+            }
+            else
+            {
+                EditorGUILayout.HelpBox("Unsaved New Block", MessageType.Warning);
+            }
+
+            EditorGUILayout.EndVertical();
+
+            // Toolbar
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button("New")) CreateNewContainer();
+            if (GUILayout.Button("Load")) LoadJson();
+            if (GUILayout.Button("Save")) SaveJson();
+            EditorGUILayout.EndHorizontal();
+        }
+
+        private void CreateNewContainer()
+        {
+            if (_container != null) DestroyImmediate(_container);
+            _container = ScriptableObject.CreateInstance<StatBlockContainer>();
+            _serializedObject = new SerializedObject(_container);
+
+            _currentFileName = "NewStatBlock";
+            _fullFilePath = null;
         }
 
         private void EnsureDirectory()
@@ -98,42 +130,45 @@ namespace ReactiveSolutions.AttributeSystem.Editor
 
         private void SaveJson()
         {
-            // 1. Sanitize Data before saving
-            SanitizeBlock(_wrapper.DataBlock);
+            if (string.IsNullOrEmpty(_currentFileName))
+            {
+                EditorUtility.DisplayDialog("Error", "Please enter a filename.", "OK");
+                return;
+            }
 
-            // 2. Prepare Path
             string path = Path.Combine(Application.dataPath, JSON_PATH);
-            string fileName = _wrapper.DataBlock.BlockName.Replace(" ", "_") + ".json";
+            string fileName = _currentFileName.Replace(" ", "_") + ".json";
             string fullPath = Path.Combine(path, fileName);
 
-            // 3. Serialize and Write
-            string json = JsonUtility.ToJson(_wrapper.DataBlock, true);
+            // Serialize the POCO directly
+            string json = JsonUtility.ToJson(_container.Data, true);
             File.WriteAllText(fullPath, json);
 
-            _currentFilePath = fullPath;
             AssetDatabase.Refresh();
-            Debug.Log($"Saved (and sanitized) to {fileName}");
+            ClearDrawerCaches();
+            _fullFilePath = fullPath;
+            Debug.Log($"Saved StatBlock to {fileName}");
         }
 
         private void LoadJson()
         {
             string path = Path.Combine(Application.dataPath, JSON_PATH);
-            string filePath = EditorUtility.OpenFilePanel("Load JSON", path, "json");
+            if (!Directory.Exists(path)) Directory.CreateDirectory(path);
 
+            string filePath = EditorUtility.OpenFilePanel("Load JSON", path, "json");
             if (string.IsNullOrEmpty(filePath)) return;
 
             try
             {
                 string json = File.ReadAllText(filePath);
-                StatBlock loaded = JsonUtility.FromJson<StatBlock>(json);
 
-                if (loaded != null)
-                {
-                    CreateNewWrapper();
-                    _wrapper.DataBlock = loaded;
-                    _serializedObject = new SerializedObject(_wrapper); // Rebind
-                    _currentFilePath = filePath;
-                }
+                CreateNewContainer();
+                // Overwrite the POCO inside the container
+                JsonUtility.FromJsonOverwrite(json, _container.Data);
+                _serializedObject.Update();
+
+                _fullFilePath = filePath;
+                _currentFileName = Path.GetFileNameWithoutExtension(filePath);
             }
             catch (Exception e)
             {
@@ -141,80 +176,21 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             }
         }
 
-        // --- HELPER LOGIC ---
-
-        /// <summary>
-        /// Ensures valid defaults for legacy data (e.g. converting "" to "Constant")
-        /// </summary>
-        private void SanitizeBlock(StatBlock block)
+        private void ClearDrawerCaches()
         {
-            if (block.Modifiers == null) return;
-
-            // We use a for-loop to modify structs in the list
-            for (int i = 0; i < block.Modifiers.Count; i++)
+            var idDrawerType = Type.GetType("ReactiveSolutions.AttributeSystem.Editor.StatBlockIDDrawer");
+            if (idDrawerType != null)
             {
-                var mod = block.Modifiers[i];
-
-                // If OperationType is empty, default to Constant
-                if (string.IsNullOrEmpty(mod.OperationType))
-                {
-                    mod.OperationType = "Constant";
-
-                    // Optional: Force a default param if none exist
-                    if (mod.Params == null || mod.Params.Count == 0)
-                    {
-                        mod.Params = new List<ModifierParam>();
-                        mod.Params.Add(new ModifierParam
-                        {
-                            Name = "Value",
-                            Value = new ValueSourceSpec { Type = ValueSource.SourceType.Constant, ConstantValue = 0f }
-                        });
-                    }
-                }
-
-                block.Modifiers[i] = mod; // Write back struct
-            }
-        }
-
-        private void BatchSanitizeFiles()
-        {
-            string path = Path.Combine(Application.dataPath, JSON_PATH);
-            string[] files = Directory.GetFiles(path, "*.json");
-            int fixedCount = 0;
-
-            foreach (var file in files)
-            {
-                try
-                {
-                    string json = File.ReadAllText(file);
-                    StatBlock block = JsonUtility.FromJson<StatBlock>(json);
-
-                    if (block != null)
-                    {
-                        // Check if modification is needed
-                        bool neededFix = false;
-                        foreach (var mod in block.Modifiers)
-                        {
-                            if (string.IsNullOrEmpty(mod.OperationType)) { neededFix = true; break; }
-                        }
-
-                        if (neededFix)
-                        {
-                            SanitizeBlock(block);
-                            string newJson = JsonUtility.ToJson(block, true);
-                            File.WriteAllText(file, newJson);
-                            fixedCount++;
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError($"Batch fix error on {Path.GetFileName(file)}: {e.Message}");
-                }
+                var field = idDrawerType.GetField("_availableOptions", BindingFlags.Static | BindingFlags.NonPublic);
+                if (field != null) field.SetValue(null, null);
             }
 
-            AssetDatabase.Refresh();
-            Debug.Log($"Batch Complete. Fixed {fixedCount} files.");
+            var listDrawerType = Type.GetType("ReactiveSolutions.AttributeSystem.Editor.StatBlockIDListDrawer");
+            if (listDrawerType != null)
+            {
+                var field = listDrawerType.GetField("_availableIDs", BindingFlags.Static | BindingFlags.NonPublic);
+                if (field != null) field.SetValue(null, null);
+            }
         }
     }
 }

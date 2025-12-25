@@ -1,91 +1,46 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
-using System.Linq;
-using ReactiveSolutions.AttributeSystem.Core;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core.Data
 {
-    [Serializable]
+    /// <summary>
+    /// A pure data class representing an entity's statistics.
+    /// Because this is a plain class (POCO), it is garbage collected automatically
+    /// and perfect for deserializing from JSON at runtime.
+    /// </summary>
+    [System.Serializable]
     public class StatBlock
     {
-        public string BlockName;
+        [System.Serializable]
+        public struct BaseValueEntry
+        {
+            [AttributeName] public string Name;
+            public float Value;
+        }
+
+        public List<BaseValueEntry> BaseValues = new List<BaseValueEntry>();
         public List<AttributeModifierSpec> Modifiers = new List<AttributeModifierSpec>();
-    }
 
-    [Serializable]
-    public struct AttributeModifierSpec
-    {
-        public string AttributeName;
-        public int Priority;
-
-        [Tooltip("The ID of the operation (e.g., 'Linear', 'Ratio', 'Exponential'). Case-insensitive.")]
-        public string OperationType;
-
-        public AttributeMergeMode MergeMode;
-
-        [Tooltip("Dynamic list of inputs required by the selected Operation.")]
-        public List<ModifierParam> Params;
-
-        public IAttributeModifier ToModifier(string sourceId)
+        /// <summary>
+        /// Populates a processor with the data from this block.
+        /// </summary>
+        public void ApplyToProcessor(AttributeProcessor processor)
         {
-            // Construct useful context info for debugging
-            string debugContext = $"SourceID: '{sourceId}' | Attribute: '{AttributeName}'";
-
-            // 1. Get Factory (Passing context so we know which file failed)
-            var factory = ModifierFactoryRegistry.Get(OperationType, debugContext);
-
-            // 2. Prepare Dictionary for O(1) lookup
-            var paramDict = new Dictionary<string, ValueSource>();
-
-            if (Params != null)
+            // 1. Set Base Values
+            foreach (var entry in BaseValues)
             {
-                foreach (var p in Params)
+                if (!string.IsNullOrEmpty(entry.Name))
                 {
-                    string key = ModifierFactoryRegistry.NormalizeKey(p.Name);
-                    paramDict[key] = p.Value.ToValueSource();
+                    processor.SetOrUpdateBaseValue(entry.Name, entry.Value);
                 }
             }
 
-            // 3. Build Logic
-            return factory.Create(sourceId, Priority, MergeMode, paramDict);
-        }
-
-        public IEnumerable<string> GetDependencyNames()
-        {
-            if (Params == null) yield break;
-
-            foreach (var p in Params)
+            // 2. Apply Modifiers
+            foreach (var spec in Modifiers)
             {
-                if (p.Value.Type == ValueSource.SourceType.Attribute && !string.IsNullOrEmpty(p.Value.AttributeName))
-                {
-                    yield return p.Value.AttributeName;
-                }
+                var modifier = spec.CreateModifier();
+                processor.AddModifier(spec.SourceId, modifier, spec.TargetAttribute);
             }
         }
-    }
-
-    [Serializable]
-    public struct ModifierParam
-    {
-        public string Name;
-        public ValueSourceSpec Value;
-    }
-
-    [Serializable]
-    public struct ValueSourceSpec
-    {
-        public ValueSource.SourceType Type;
-        public float ConstantValue;
-        public string AttributeName;
-
-        public ValueSource ToValueSource() => new ValueSource
-        {
-            Type = Type,
-            ConstantValue = ConstantValue,
-            AttributeName = AttributeName
-        };
     }
 }
-
-    

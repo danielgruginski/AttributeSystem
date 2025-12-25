@@ -1,60 +1,45 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System;
+using UniRx;
 using UnityEngine;
 
-namespace ReactiveSolutions.AttributeSystem.Core
+namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
 {
-    public sealed class LinearAttributeModifier : BaseAttributeModifier
+    /// <summary>
+    /// A reactive modifier that applies a linear transformation: (Source * Coeff) + Addend.
+    /// Includes a SourceId to allow for explicit removal by the AttributeProcessor.
+    /// </summary>
+    [Serializable]
+    public class LinearAttributeModifier : IAttributeModifier
     {
-        private readonly ValueSource _source;
-        private readonly float _coeff;
-        private readonly float _addend;
+        [SerializeField] private string _sourceId;
+        [SerializeField] private ModifierType _type = ModifierType.Additive;
+        [SerializeField] private int _priority = 0;
 
-        public LinearAttributeModifier(ValueSource source, float coeff, float addend, AttributeMergeMode mode, string sourceId, int priority)
-            : base(sourceId, priority, mode)
+        [Header("Math: (Source * Coeff) + Addend")]
+        [SerializeField] private ValueSource _source;
+        [SerializeField] private float _coeff = 1.0f;
+        [SerializeField] private float _addend = 0.0f;
+
+        public string SourceId => _sourceId;
+        public ModifierType Type => _type;
+        public int Priority => _priority;
+
+        public LinearAttributeModifier(string sourceId, ModifierType type, int priority, ValueSource source, float coeff, float addend)
         {
+            _sourceId = sourceId;
+            _type = type;
+            _priority = priority;
             _source = source;
             _coeff = coeff;
             _addend = addend;
         }
 
-        public override void OnAttach(Attribute target, AttributeProcessor controller)
+        public IObservable<float> GetMagnitude(AttributeProcessor processor)
         {
-            base.OnAttach(target, controller);
-            // AUTOMATIC BINDING HERE
-            WatchDependency(controller, _source);
-        }
-
-        protected override float CalculateMagnitude(AttributeProcessor controller)
-        {
-            float input = _source.GetValue(controller);
-            return (input * _coeff) + _addend;
+            // We take the reactive stream from the ValueSource and 
+            // apply our linear math to every emitted value.
+            return _source.GetObservable(processor)
+                .Select(input => (input * _coeff) + _addend);
         }
     }
-
-    public class LinearFactory : IModifierFactory
-    {
-        public ModifierSchema GetSchema() => new ModifierSchema { RequiredParams = new[] { "Input", "Coefficient", "Addend" } };
-
-        public IAttributeModifier Create(string src, int prio, AttributeMergeMode mode, Dictionary<string, ValueSource> p)
-        {
-            var input = p.ContainsKey("input") ? p["input"] : new ValueSource();
-            float coeff = p.ContainsKey("coefficient") ? p["coefficient"].ConstantValue : 1f;
-            float addend = p.ContainsKey("addend") ? p["addend"].ConstantValue : 0f;
-            return new LinearAttributeModifier(input, coeff, addend, mode, src, prio);
-        }
-    }
-
-
-    public class ProductAsLinearFactory : IModifierFactory
-    {
-        public ModifierSchema GetSchema() => new ModifierSchema { RequiredParams = new[] { "Multiplier" } };
-
-        public IAttributeModifier Create(string src, int prio, AttributeMergeMode mode, Dictionary<string, ValueSource> p)
-        {
-            var input = p.ContainsKey("multiplier") ? p["multiplier"] : new ValueSource();
-            return new LinearAttributeModifier(input, 1f, 0f, mode, src, prio);
-        }
-    }
-
 }

@@ -12,47 +12,42 @@ namespace ReactiveSolutions.AttributeSystem.Core
     /// </summary>
     public class AttributeProcessor
     {
-        
+        private const char SEPARATOR = '.';
+
         // The core storage. ReactiveDictionary allows other systems to listen for adds/removes.
         private readonly ReactiveDictionary<string, Attribute> _attributes = new();
         public IReadOnlyReactiveDictionary<string, Attribute> Attributes => _attributes;
 
+        private readonly Dictionary<string, AttributeProcessor> _externalProviders = new();
+        private readonly Subject<string> _onProviderRegistered = new();
         /// <summary>
-        /// A reactive stream that fires whenever a new Attribute is added.
-        /// Bridges can use this to subscribe to attributes that may not exist yet.
+        /// Links an external processor to a key (e.g., Registering the Player as 'Owner' for a Sword).
         /// </summary>
-        public IObservable<Attribute> OnAttributeAdded => _attributes.ObserveAdd().Select(evt => evt.Value);
-
-        /// <summary>
-        /// Retrieves an attribute if it exists, otherwise returns null.
-        /// Use this for read-only checks where creating a new attribute is unintended.
-        /// </summary>
-        public Attribute GetAttribute(string name)
+        public void RegisterExternalProvider(string key, AttributeProcessor processor)
         {
-            return _attributes.TryGetValue(name, out var attr) ? attr : null;
+            Debug.Assert(processor != null, $"[AttributeProcessor] Trying to register a null provider for key: {key}");
+            _externalProviders[key] = processor;
+            _onProviderRegistered.OnNext(key);
         }
-
         /// <summary>
-        /// Safely gets an attribute, creating it with a default base value if it's missing.
-        /// This is ideal for consumers (bridges, UI) that need to read an attribute's final value
-        /// without necessarily setting its base.
+        /// Gets an observable for an attribute. Supports dot notation (e.g., "Owner.Strength").
         /// </summary>
-        public Attribute GetOrCreateAttribute(string name, float defaultBaseIfMissing = 0f)
+        public IObservable<Attribute> GetAttributeObservable(string fullName)
         {
-            if (!_attributes.TryGetValue(name, out var attr))
+            if (fullName.Contains(SEPARATOR))
             {
-                attr = new Attribute(name, defaultBaseIfMissing, this);
-                _attributes[name] = attr;
+                var parts = fullName.Split(SEPARATOR);
+                if (parts.Length == 2)
+                {
+                    return GetExternalAttributeObservable(parts[0], parts[1]);
+                }
+                Debug.LogError($"[AttributeProcessor] Invalid attribute format: {fullName}. Expected 'Provider.Attribute'");
             }
-            return attr;
+
+            return GetLocalAttributeObservable(fullName);
         }
 
-        /// <summary>
-        /// Provides an observable stream for a specific attribute. If the attribute doesn't
-        /// exist, the stream will wait until it's added. This is the safest way for
-        /// systems to react to attribute changes.
-        /// </summary>
-        public IObservable<Attribute> GetAttributeObservable(string name)
+        private IObservable<Attribute> GetLocalAttributeObservable(string name)
         {
             return Observable.Create<Attribute>(observer =>
             {
@@ -70,6 +65,58 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 }
                 return Disposable.Empty;
             });
+        }
+
+        private IObservable<Attribute> GetExternalAttributeObservable(string providerKey, string attributeName)
+        {
+            return _onProviderRegistered
+                .StartWith(_externalProviders.ContainsKey(providerKey) ? providerKey : null)
+                .Where(k => k == providerKey)
+                .Take(1)
+                .SelectMany(_ => _externalProviders[providerKey].GetAttributeObservable(attributeName));
+        }
+
+        /// <summary>
+        /// A reactive stream that fires whenever a new Attribute is added.
+        /// Bridges can use this to subscribe to attributes that may not exist yet.
+        /// </summary>
+        public IObservable<Attribute> OnAttributeAdded => _attributes.ObserveAdd().Select(evt => evt.Value);
+
+        /// <summary>
+        /// Retrieves an attribute if it exists, otherwise returns null.
+        /// Use this for read-only checks where creating a new attribute is unintended.
+        /// Will attempt to search external providers if dot notation is used.
+        /// </summary>
+        public Attribute GetAttribute(string name)
+        {
+            if (name.Contains(SEPARATOR))
+            {
+                var parts = name.Split(SEPARATOR);
+                if (_externalProviders.TryGetValue(parts[0], out var provider))
+                {
+                    return provider.GetAttribute(parts[1]);
+                }
+                return null;
+            }
+            return _attributes.TryGetValue(name, out var attr) ? attr : null;
+        }
+
+        /// <summary>
+        /// Safely gets an attribute, creating it with a default base value if it's missing.
+        /// This is ideal for consumers (bridges, UI) that need to read an attribute's final value
+        /// without necessarily setting its base.
+        /// </summary>
+        public Attribute GetOrCreateAttribute(string name, float defaultBaseIfMissing = 0f)
+        {
+            // We cannot 'Create' an attribute on an external provider remotely
+            if (name.Contains(SEPARATOR)) return GetAttribute(name);
+
+            if (!_attributes.TryGetValue(name, out var attr))
+            {
+                attr = new Attribute(name, defaultBaseIfMissing, this);
+                _attributes[name] = attr;
+            }
+            return attr;
         }
 
         /// <summary>
@@ -96,12 +143,8 @@ namespace ReactiveSolutions.AttributeSystem.Core
             Debug.Assert(!string.IsNullOrEmpty(attributeName), "Target attribute name cannot be null or empty.");
 
             var attr = GetOrCreateAttribute(attributeName, 0f);
-
             // 1. Add to internal list
             attr.AddModifier(modifier);
-
-            // 2. Trigger Lifecycle (Self-Managed Dependency Binding)
-            modifier.OnAttach(attr, this);
         }
 
         /// <summary>
@@ -109,116 +152,15 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// </summary>
         public void RemoveModifiersBySource(string sourceId)
         {
-            foreach (var attr in _attributes.Values)
+            foreach (var attribute in _attributes.Values)
             {
-                // We need to get the specific modifiers to dispose them
-                var removedMods = attr.RemoveModifiersBySource(sourceId);
-
-                foreach (var mod in removedMods)
+                // We find all modifiers matching the ID and remove them
+                var toRemove = attribute.Modifiers.Where(m => m.SourceId == sourceId).ToList();
+                foreach (var mod in toRemove)
                 {
-                    mod.OnDetach(); // Or Dispose()
+                    attribute.RemoveModifier(mod);
                 }
             }
-        }
-
-        /// <summary>
-        /// Applies a complete StatBlock (JSON Template) to this controller.
-        /// Handles both modifier creation AND reactive dependency binding.
-        /// </summary>
-        public void ApplyStatBlock(StatBlock block, string sourceId = null)
-        {
-            if (block == null) return;
-
-            // If no source ID provided, use the block's name
-            string effectiveSourceId = string.IsNullOrEmpty(sourceId) ? block.BlockName : sourceId;
-
-            foreach (var spec in block.Modifiers)
-            {
-                // 1. Create Modifier
-                var modifier = spec.ToModifier(effectiveSourceId);
-
-                // 2. Add (OnAttach is called inside AddModifier)
-                AddModifier(effectiveSourceId, modifier, spec.AttributeName);
-            }
-        }
-
-
-        public void AddFlatMod(string sourceId, string targetAttr, float value, AttributeMergeMode mode = AttributeMergeMode.Add, int priority = 10)
-        {
-            var mod = new ConstantAttributeModifier(value, mode, sourceId, priority);
-            AddModifier(sourceId, mod, targetAttr);
-        }
-
-        public void AddLinearScaling(string sourceId, string targetAttr, string sourceAttr, float coefficient, AttributeMergeMode mode = AttributeMergeMode.Add, int priority = 10, float addend = 0f)
-        {
-            var source = new ValueSource { Type = ValueSource.SourceType.Attribute, AttributeName = sourceAttr };
-            var mod = new LinearAttributeModifier(source, coefficient, addend, mode, sourceId, priority);
-            AddModifier(sourceId, mod, targetAttr);
-        }
-
-
-        public void AddExponentialScaling(string sourceId, string targetAttr, string exponentAttr, float baseK, AttributeMergeMode mode = AttributeMergeMode.Multiply, int priority = 100)
-        {
-            var source = new ValueSource { Type = ValueSource.SourceType.Attribute, AttributeName = exponentAttr };
-            var mod = new ExponentialAttributeModifier(source, baseK, mode, sourceId, priority);
-
-            AddModifier(sourceId, mod, targetAttr);
-        }
-
-                public void AddClamp(string sourceId, string targetAttr, float min, float max, int priority = 1000)
-        {
-            var mod = new ClampAttributeModifier(min, max, sourceId, priority);
-            AddModifier(sourceId, mod, targetAttr);
-        }
-
-
-        // --- NEW HELPERS (Fixing your previous errors) ---
-
-        /// <summary>
-        /// Calculates [Target] = [Dividend] / [Divisor].
-        /// </summary>
-        public void AddRatio(string sourceId, string targetAttr, string dividendAttr, string divisorAttr, AttributeMergeMode mode = AttributeMergeMode.Multiply, int priority = 100)
-        {
-            var mod = new RatioAttributeModifier(dividendAttr, divisorAttr, mode, sourceId, priority);
-            AddModifier(sourceId, mod, targetAttr);
-        }
-
-
-
-
-        /// <summary>
-        /// Multiplies [Target] by [MultiplierAttribute].
-        /// </summary>
-        // UPDATED: Re-implemented using Linear logic to deprecate ProductAttributeModifier
-        public void AddProduct(string sourceId, string targetAttr, string multiplierAttr, AttributeMergeMode mode = AttributeMergeMode.Multiply, int priority = 100)
-        {
-            // Replaces ProductAttributeModifier with LinearAttributeModifier
-            // Logic: Target = Target * (Multiplier * 1 + 0)
-            AddLinearScaling(sourceId, targetAttr, multiplierAttr, 1f, mode, priority, 0f);
-        }
-
-        public void AddDiminishingReturns(string sourceId, string targetAttr, string inputAttr, float maxBonus, float softCapN, AttributeMergeMode mode = AttributeMergeMode.Add, int priority = 500)
-        {
-            var mod = new DiminishingReturnsAttributeModifier(inputAttr, maxBonus, softCapN, mode, sourceId, priority);
-            AddModifier(sourceId, mod, targetAttr);
-        }
-
-        public void AddSegmentedMultiplier(string sourceId, string targetAttr, string inputAttr, Dictionary<float, float> breakpoints, AttributeMergeMode mode = AttributeMergeMode.Multiply, int priority = 400)
-        {
-            // Convert Dictionary to List<Vector2> for the Modifier storage
-            // This ensures code compatibility with your existing Dictionary-based calls
-            List<Vector2> points = breakpoints.Select(kvp => new Vector2(kvp.Key, kvp.Value)).OrderBy(v => v.x).ToList();
-
-            var mod = new SegmentedMultiplierAttributeModifier(inputAttr, points, mode, sourceId, priority);
-            AddModifier(sourceId, mod, targetAttr);
-        }
-
-        internal void SetupTriangularBonus(string sourceID, string attributeName, float scale)
-        {
-            var attributeBonusName = attributeName + "Bonus";
-            SetOrUpdateBaseValue(attributeBonusName, 0);
-            var triangularBonusMod = new ScaledTriangularAttributeModifier(attributeName, scale, AttributeMergeMode.Add, sourceID, 10);
-            AddModifier(sourceID, triangularBonusMod, attributeBonusName);
         }
     }
 }

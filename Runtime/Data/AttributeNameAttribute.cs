@@ -1,7 +1,7 @@
 ﻿using System.Collections;
 using UnityEngine;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core.Data
 {
     /// <summary>
     /// Place this attribute on any string field to turn it into a dropdown

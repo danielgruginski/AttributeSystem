@@ -1,52 +1,58 @@
-﻿using System.Collections;
+﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using UniRx;
 using UnityEngine;
 
-namespace ReactiveSolutions.AttributeSystem.Core
+namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
 {
-    public class SegmentedMultiplierAttributeModifier : BaseAttributeModifier
+    /// <summary>
+    /// A modifier that returns a different multiplier based on which threshold a source value meets.
+    /// Useful for RPG 'Breakpoints' or tiered bonuses.
+    /// </summary>
+    [Serializable]
+    public class SegmentedMultiplierAttributeModifier : IAttributeModifier
     {
-        private readonly string _inputAttr;
-        private readonly List<Vector2> _breakpoints;
-
-        public SegmentedMultiplierAttributeModifier(string inputAttr, List<Vector2> breakpoints, AttributeMergeMode mode, string sourceId, int priority)
-            : base(sourceId, priority, mode)
+        [Serializable]
+        public struct MultiplierSegment
         {
-            _inputAttr = inputAttr;
-            _breakpoints = breakpoints;
+            [Tooltip("The minimum value required to use this multiplier.")]
+            public float Threshold;
+            [Tooltip("The multiplier value (e.g., 1.5 for +50%).")]
+            public float Multiplier;
         }
 
-        public override void OnAttach(Attribute target, AttributeProcessor controller)
+        [SerializeField] private ModifierType _type = ModifierType.Multiplicative;
+        [SerializeField] private int _priority = 10;
+        [SerializeField] private string _sourceID;
+
+        [Header("Source & Segments")]
+        [SerializeField] private ValueSource _source;
+        [SerializeField] private float _defaultMultiplier = 1.0f;
+        [SerializeField] private List<MultiplierSegment> _segments = new();
+
+        public ModifierType Type => _type;
+        public int Priority => _priority;
+
+        public string SourceId => _sourceID;
+
+        public IObservable<float> GetMagnitude(AttributeProcessor processor)
         {
-            base.OnAttach(target, controller);
-            WatchDependency(controller, _inputAttr);
-        }
+            // Sort segments by threshold descending so we find the highest met threshold first
+            var sortedSegments = _segments.OrderByDescending(s => s.Threshold).ToList();
 
-        protected override float CalculateMagnitude(AttributeProcessor controller)
-        {
-            if (_breakpoints == null || _breakpoints.Count == 0) return 0f; // Or 1f depending on logic, keeping 0 to respect merge
-
-            float input = controller.GetOrCreateAttribute(_inputAttr)?.Value ?? 0f;
-            return EvaluatePiecewise(input);
-        }
-
-        private float EvaluatePiecewise(float input)
-        {
-            if (input <= _breakpoints[0].x) return _breakpoints[0].y;
-            if (input >= _breakpoints[^1].x) return _breakpoints[^1].y;
-
-            for (int i = 0; i < _breakpoints.Count - 1; i++)
-            {
-                Vector2 p1 = _breakpoints[i];
-                Vector2 p2 = _breakpoints[i + 1];
-
-                if (input >= p1.x && input <= p2.x)
+            return _source.GetObservable(processor)
+                .Select(input =>
                 {
-                    float t = (input - p1.x) / (p2.x - p1.x);
-                    return Mathf.Lerp(p1.y, p2.y, t);
-                }
-            }
-            return _breakpoints[0].y;
+                    foreach (var segment in sortedSegments)
+                    {
+                        if (input >= segment.Threshold)
+                        {
+                            return segment.Multiplier;
+                        }
+                    }
+                    return _defaultMultiplier;
+                });
         }
     }
 }
