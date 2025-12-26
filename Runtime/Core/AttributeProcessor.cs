@@ -7,21 +7,23 @@ using UnityEngine;
 namespace ReactiveSolutions.AttributeSystem.Core
 {
     /// <summary>
-    /// The central manager for character attributes.
-    /// Handles storage, retrieval, and modification of attributes.
+    /// The core logic engine that manages local attributes and links to external providers.
+    /// Supports dot notation (e.g., "Owner.Strength") for cross-referencing stats.
     /// </summary>
-    public class AttributeProcessor
+    public class AttributeProcessor : IDisposable
     {
-        private const char SEPARATOR = '.';
-
-        // The core storage. ReactiveDictionary allows other systems to listen for adds/removes.
         private readonly ReactiveDictionary<string, Attribute> _attributes = new();
-        public IReadOnlyReactiveDictionary<string, Attribute> Attributes => _attributes;
-
         private readonly Dictionary<string, AttributeProcessor> _externalProviders = new();
         private readonly Subject<string> _onProviderRegistered = new();
+
+        // Tracks pending modifier additions for external targets to prevent leaks
+        private readonly CompositeDisposable _pendingModifiers = new();
+
+        private const char SEPARATOR = '.';
+
         /// <summary>
-        /// Links an external processor to a key (e.g., Registering the Player as 'Owner' for a Sword).
+        /// Registers a foreign processor under a specific alias (e.g., "Owner").
+        /// This resolves any pending reactive searches for that alias.
         /// </summary>
         public void RegisterExternalProvider(string key, AttributeProcessor processor)
         {
@@ -29,8 +31,10 @@ namespace ReactiveSolutions.AttributeSystem.Core
             _externalProviders[key] = processor;
             _onProviderRegistered.OnNext(key);
         }
+
         /// <summary>
-        /// Gets an observable for an attribute. Supports dot notation (e.g., "Owner.Strength").
+        /// Returns an observable that emits the Attribute once it is available.
+        /// Handles the "wait" logic for external providers automatically.
         /// </summary>
         public IObservable<Attribute> GetAttributeObservable(string fullName)
         {
@@ -76,16 +80,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 .SelectMany(_ => _externalProviders[providerKey].GetAttributeObservable(attributeName));
         }
 
-        /// <summary>
-        /// A reactive stream that fires whenever a new Attribute is added.
-        /// Bridges can use this to subscribe to attributes that may not exist yet.
-        /// </summary>
+        public IReadOnlyReactiveDictionary<string, Attribute> Attributes => _attributes;
         public IObservable<Attribute> OnAttributeAdded => _attributes.ObserveAdd().Select(evt => evt.Value);
 
         /// <summary>
-        /// Retrieves an attribute if it exists, otherwise returns null.
-        /// Use this for read-only checks where creating a new attribute is unintended.
-        /// Will attempt to search external providers if dot notation is used.
+        /// Synchronously attempts to find an attribute. 
+        /// Returns null if local attribute is missing or external provider is not linked.
         /// </summary>
         public Attribute GetAttribute(string name)
         {
@@ -102,13 +102,13 @@ namespace ReactiveSolutions.AttributeSystem.Core
         }
 
         /// <summary>
-        /// Safely gets an attribute, creating it with a default base value if it's missing.
-        /// This is ideal for consumers (bridges, UI) that need to read an attribute's final value
-        /// without necessarily setting its base.
+        /// Returns a local attribute, creating it if it doesn't exist.
+        /// Does NOT create attributes for external paths (returns current state instead).
         /// </summary>
         public Attribute GetOrCreateAttribute(string name, float defaultBaseIfMissing = 0f)
         {
-            // We cannot 'Create' an attribute on an external provider remotely
+            // If the name points to an external target, we cannot "Create" it locally.
+            // We return whatever GetAttribute finds (which might be null).
             if (name.Contains(SEPARATOR)) return GetAttribute(name);
 
             if (!_attributes.TryGetValue(name, out var attr))
@@ -119,49 +119,75 @@ namespace ReactiveSolutions.AttributeSystem.Core
             return attr;
         }
 
-        /// <summary>
-        /// Explicitly sets or updates the base value of an attribute. This is the designated
-        /// method for establishing a character's foundational stats.
-        /// Currently GetAttribute(...) will autogenerate the Attribute if missing.
-        /// </summary>
         public void SetOrUpdateBaseValue(string attributeName, float newBase)
         {
             var attr = GetOrCreateAttribute(attributeName);
-            attr.SetBaseValue(newBase);
+            if (attr != null)
+            {
+                attr.SetBaseValue(newBase);
+            }
         }
 
         /// <summary>
-        /// Adds a modifier to an attribute, creating the attribute if it doesn't exist.
+        /// Adds a modifier to an attribute. If the target is external, 
+        /// it waits reactively for the provider to be registered.
         /// </summary>
-        /// <param name="sourceId">The ID of the source adding the modifier (e.g., "SwordOfThePhoenix").</param>
-        /// <param name="modifier">The IAttributeModifier instance (Flat, Formulaic, Clamp, etc.).</param>
-        /// <param name="attributeName">The name of the attribute to modify (e.g., "AttackDamage").</param>
         public void AddModifier(string sourceId, IAttributeModifier modifier, string attributeName)
         {
-            Debug.Assert(!string.IsNullOrEmpty(sourceId), "Modifier source ID cannot be null or empty.");
-            Debug.Assert(modifier != null, "Modifier object cannot be null.");
-            Debug.Assert(!string.IsNullOrEmpty(attributeName), "Target attribute name cannot be null or empty.");
+            if (modifier == null)
+            {
+                Debug.LogError($"[AttributeProcessor] Attempted to add a null modifier for '{attributeName}' from source '{sourceId}'.");
+                return;
+            }
+
+            // Fix for NRE: If the target is external, use the reactive search instead of GetOrCreate.
+            if (attributeName.Contains(SEPARATOR))
+            {
+                GetAttributeObservable(attributeName)
+                    .Take(1) // We only need the reference once to attach the modifier
+                    .Subscribe(attr => attr.AddModifier(modifier))
+                    .AddTo(_pendingModifiers);
+                return;
+            }
 
             var attr = GetOrCreateAttribute(attributeName, 0f);
-            // 1. Add to internal list
             attr.AddModifier(modifier);
         }
 
         /// <summary>
-        /// Removes modifiers and triggers their Detach/Dispose lifecycle.
+        /// Removes all modifiers matching the SourceId from local attributes 
+        /// and propagates the request to linked external providers.
         /// </summary>
         public void RemoveModifiersBySource(string sourceId)
         {
+            // 1. Clean local attributes
             foreach (var attribute in _attributes.Values)
             {
-                // We find all modifiers matching the ID and remove them
                 var toRemove = attribute.Modifiers.Where(m => m.SourceId == sourceId).ToList();
                 foreach (var mod in toRemove)
                 {
                     attribute.RemoveModifier(mod);
                 }
             }
+
+            // 2. Propagate to external providers to ensure modifiers we "pushed" to them are removed
+            foreach (var provider in _externalProviders.Values)
+            {
+                provider.RemoveModifiersBySource(sourceId);
+            }
+        }
+
+        public void Dispose()
+        {
+            _pendingModifiers.Dispose();
+            _onProviderRegistered.OnCompleted();
+            _onProviderRegistered.Dispose();
+
+            foreach (var attr in _attributes.Values)
+            {
+                attr.Dispose();
+            }
+            _attributes.Clear();
         }
     }
 }
-
