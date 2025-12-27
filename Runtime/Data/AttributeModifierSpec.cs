@@ -1,5 +1,6 @@
 ﻿using Mono.Cecil;
 using ReactiveSolutions.AttributeSystem.Core.Modifiers;
+using SemanticKeys;
 using System;
 using UnityEngine;
 
@@ -15,7 +16,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         public enum ModifierCategory { Linear, SegmentedMultiplier }
 
         [Header("Identity")]
-        [AttributeName] public string TargetAttribute;
+        public SemanticKey TargetAttribute;
         public string SourceId;
 
         [Header("Pipeline Settings")]
@@ -26,7 +27,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         [Header("Value Source Data")]
         public ValueSource.SourceMode SourceMode = ValueSource.SourceMode.Constant;
         public float ConstantValue;
-        public string AttributePath;
+        public SemanticKey AttributePath;
 
         [Header("Linear Math Parameters")]
         public float Coeff = 1f;
@@ -66,7 +67,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         {
             return new AttributeModifierSpec
             {
-                TargetAttribute = "",
+                TargetAttribute = SemanticKey.None,
                 SourceId = "NewSource",
                 Category = ModifierCategory.Linear,
                 Type = ModifierType.Additive,

@@ -2,7 +2,8 @@
     "name": "com.reactivesolutions.AttributeSystem",
     "rootNamespace": "ReactiveSolutions.AttributeSystem",
     "references": [
-        "UniRx"
+        "UniRx",
+        "com.reactivesolutions.semantickeys"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

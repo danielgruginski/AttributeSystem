@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using ReactiveSolutions.AttributeSystem.Core.Data;
+using SemanticKeys;
 
 namespace ReactiveSolutions.AttributeSystem.Unity
 {
@@ -16,7 +17,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         [System.Serializable]
         public struct BaseAttributeEntry
         {
-            [AttributeName] public string Name;
+            public SemanticKey Name;
             public float BaseValue;
         }
 
