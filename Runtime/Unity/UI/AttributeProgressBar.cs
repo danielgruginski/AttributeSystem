@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using ReactiveSolutions.AttributeSystem.Core.Data;
+using UnityEngine;
 using UnityEngine.UI;
 
 namespace ReactiveSolutions.AttributeSystem.Unity.UI

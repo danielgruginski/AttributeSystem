@@ -1,12 +1,11 @@
 using UnityEngine;
-using ReactiveSolutions.AttributeSystem.Core;
-
+using ReactiveSolutions.AttributeSystem.Core.Data;
 
 namespace ReactiveSolutions.AttributeSystem.Unity
 {
     /// <summary>
     /// A bridge component that applies a StatBlock's initial values to an AttributeController.
-    /// This gives users explicit control over when and how stats are initialized.
+    /// Loads the JSON definition from Resources and applies it at runtime.
     /// </summary>
     [AddComponentMenu("Attribute System/Stat Block Linker")]
     public class StatBlockLinker : MonoBehaviour
@@ -38,19 +37,34 @@ namespace ReactiveSolutions.AttributeSystem.Unity
                 return;
             }
 
-            if (_statBlock == null || string.IsNullOrEmpty(_statBlock.ID))
+            if (string.IsNullOrEmpty(_statBlock.ID))
             {
                 Debug.LogWarning($"[StatBlockLinker] No StatBlock ID assigned on {gameObject.name}");
                 return;
             }
 
-            // Retrieve the StatBlock data (usually loaded via StatBlockJsonLoader or manual registry)
-            // Note: In a production environment, you might use a central StatBlockRegistry here.
-            // For now, we assume the user provides the data or the controller is ready to receive definitions.
+            // 1. Construct the Resource path
+            // Note: Resources.Load paths must not include the extension or "Resources/" prefix
+            string resourcePath = $"Data/StatBlocks/{_statBlock.ID}";
+            TextAsset jsonFile = Resources.Load<TextAsset>(resourcePath);
 
-            // This is where you would call: _targetController.InitializeFromStatBlock(...)
-            // If that method doesn't exist yet, we can add a helper to the Controller.
-            Debug.Log($"[StatBlockLinker] Linking {_statBlock.ID} to {_targetController.name}");
+            if (jsonFile == null)
+            {
+                Debug.LogError($"[StatBlockLinker] Could not find JSON file at: Resources/{resourcePath}.json");
+                return;
+            }
+
+            // 2. Create a temporary ScriptableObject to hold the data
+            // We use CreateInstance so we can use the StatBlock's own ApplyToProcessor method logic
+            StatBlock tempBlock = new StatBlock();
+
+            // 3. Load Data
+            StatBlockJsonLoader.LoadIntoStatBlock(jsonFile.text, tempBlock);
+
+            // 4. Apply to the Processor
+            tempBlock.ApplyToProcessor(_targetController.Processor);
+
+            Debug.Log($"[StatBlockLinker] Successfully applied '{_statBlock.ID}' to '{_targetController.name}'");
         }
 
         public void SetTarget(AttributeController controller) => _targetController = controller;

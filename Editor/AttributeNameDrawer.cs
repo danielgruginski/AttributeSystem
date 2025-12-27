@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
+using ReactiveSolutions.AttributeSystem.Core.Data;
 
 namespace ReactiveSolutions.AttributeSystem.Editor
 {

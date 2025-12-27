@@ -1,10 +1,12 @@
-﻿using UnityEditor;
+﻿using ReactiveSolutions.AttributeSystem;
+using ReactiveSolutions.AttributeSystem.Core;
+using ReactiveSolutions.AttributeSystem.Core.Data;
+using UnityEditor;
 using UnityEngine;
-using ReactiveSolutions.AttributeSystem;
 
 namespace ReactiveSolutions.AttributeSystem.Editor
 {
-    [CustomPropertyDrawer(typeof(ValueSourceSpec))]
+    [CustomPropertyDrawer(typeof(ValueSource))]
     public class ValueSourceSpecDrawer : PropertyDrawer
     {
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)

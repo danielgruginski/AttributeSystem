@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core.Data
 {
     /// <summary>
     /// Marker attribute used on a List<string> to tell the custom property drawer

@@ -1,124 +1,59 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System;
-using System.Linq;
 
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
-
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core.Data
 {
     /// <summary>
-    /// Static utility to load all StatBlocks from JSON files in the Resources folder.
+    /// Utility to bridge raw JSON strings into the StatBlock data structure.
+    /// Uses a wrapper class to comply with Unity's JsonUtility limitations.
     /// </summary>
     public static class StatBlockJsonLoader
     {
-        private const string JSON_PATH = "Data/StatBlocks";
-
-        private static readonly Dictionary<string, StatBlock> _loadedBlocks = new();
-        private static bool _isLoaded = false;
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        public static void LoadAllStatBlocks()
+        [Serializable]
+        private class StatBlockWrapper
         {
-            if (_isLoaded) return;
-            _loadedBlocks.Clear();
-
-            TextAsset[] jsonFiles = Resources.LoadAll<TextAsset>(JSON_PATH);
-
-            if (jsonFiles.Length == 0)
-            {
-                Debug.LogWarning($"StatBlockLoader found no JSON files in Resources/{JSON_PATH}.");
-                return;
-            }
-
-            foreach (var jsonAsset in jsonFiles)
-            {
-                try
-                {
-                    StatBlock block = JsonUtility.FromJson<StatBlock>(jsonAsset.text);
-                    string blockId = jsonAsset.name;
-
-                    if (block == null)
-                    {
-                        Debug.LogError($"Failed to deserialize '{blockId}'.");
-                        continue;
-                    }
-
-                    // --- DIAGNOSTIC CHECKS & SANITIZATION ---
-
-                    // 1. Check for Overwrites (Duplicate Files)
-                    if (_loadedBlocks.ContainsKey(blockId))
-                    {
-                        string pathMsg = "";
-#if UNITY_EDITOR
-                        pathMsg = $" (Path: {AssetDatabase.GetAssetPath(jsonAsset)})";
-#endif
-                        Debug.LogError($"[StatBlockLoader] DUPLICATE DETECTED: A StatBlock named '{blockId}' was already loaded! This file is overwriting the previous one.{pathMsg}");
-                    }
-
-                    bool hasFixedData = false;
-                    // 2. Validate & Fix Modifiers
-                    // We use a FOR loop because Modifiers are Structs. 
-                    // Modifying 'mod' in a foreach loop would not change the data in the list.
-                    for (int i = 0; i < block.Modifiers.Count; i++)
-                    {
-                        var mod = block.Modifiers[i];
-
-                        if (string.IsNullOrEmpty(mod.OperationType))
-                        {
-                            // AUTO-FIX: Default to Constant so the game doesn't break
-                            mod.OperationType = "Constant";
-                            block.Modifiers[i] = mod; // Write struct back to list
-                            hasFixedData = true;
-
-                            // Log Warning (Instead of Error) with RAW JSON check
-                            string fullPath = "Unknown (Build)";
-#if UNITY_EDITOR
-                            fullPath = AssetDatabase.GetAssetPath(jsonAsset);
-#endif
-
-                            Debug.LogWarning($"[StatBlockLoader] JSON MISSING DATA in '{blockId}' -> Attribute '{mod.AttributeName}'.\n" +
-                                           $"Missing 'OperationType'. Auto-fixing to 'Constant'.\n" +
-                                           $"File: {fullPath}\n" +
-                                           $"Raw JSON Content Seen by Unity: {jsonAsset.text}");
-                            // ^ Check this log! If 'OperationType' is missing here, Unity isn't seeing your file edits.
-                        }
-                    }
-
-                    if (hasFixedData)
-                    {
-                        Debug.Log($"[StatBlockLoader] Auto-corrected legacy/broken data in '{blockId}'.");
-                    }
-
-                    block.BlockName = blockId;
-                    _loadedBlocks[blockId] = block;
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError($"Failed to load {jsonAsset.name}: {e.Message}");
-                }
-            }
-            _isLoaded = true;
-            Debug.Log($"[StatBlockLoader] Loaded {_loadedBlocks.Count} stat blocks.");
+            public List<StatBlock.BaseValueEntry> BaseValues;
+            public List<AttributeModifierSpec> Modifiers;
         }
 
-        public static StatBlock GetStatBlock(string blockName)
+        public static void LoadIntoStatBlock(string json, StatBlock target)
         {
-            if (!_isLoaded || _loadedBlocks.Count == 0)
+            try
             {
-                Debug.LogWarning($"[StatBlockLoader] Lazy loading triggered for '{blockName}'.");
-                LoadAllStatBlocks();
-            }
+                var data = JsonUtility.FromJson<StatBlockWrapper>(json);
 
-            if (_loadedBlocks.TryGetValue(blockName, out var block))
+                if (data == null)
+                {
+                    Debug.LogError("[StatBlockLoader] Failed to parse JSON. Data is null.");
+                    return;
+                }
+
+                target.BaseValues = data.BaseValues ?? new List<StatBlock.BaseValueEntry>();
+                target.Modifiers = data.Modifiers ?? new List<AttributeModifierSpec>();
+            }
+            catch (Exception e)
             {
-                return block;
+                Debug.LogError($"[StatBlockLoader] JSON Exception: {e.Message}");
             }
-
-            Debug.LogError($"StatBlock '{blockName}' not found. Check Resources/{JSON_PATH}.");
-            return null;
         }
+
+        /// <summary>
+        /// Example JSON structure expected:
+        /// {
+        ///   "BaseValues": [ { "Name": "Health", "Value": 100 } ],
+        ///   "Modifiers": [ 
+        ///     { 
+        ///       "TargetAttribute": "Damage", 
+        ///       "SourceId": "Weapon_01",
+        ///       "Category": 0, 
+        ///       "SourceMode": 1, 
+        ///       "AttributePath": "Owner.Strength", 
+        ///       "Coeff": 1.5 
+        ///     } 
+        ///   ]
+        /// }
+        /// </summary>
+        public static string GetSchemaHint() => "Check the internal StatBlockWrapper for the expected JSON structure.";
     }
 }

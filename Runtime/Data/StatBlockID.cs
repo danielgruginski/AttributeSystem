@@ -1,7 +1,7 @@
 using UnityEngine;
 using System;
 
-namespace ReactiveSolutions.AttributeSystem
+namespace ReactiveSolutions.AttributeSystem.Core.Data
 {
 
     /// <summary>

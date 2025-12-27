@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using ReactiveSolutions.AttributeSystem.Core.Data;
 
 namespace ReactiveSolutions.AttributeSystem.Unity
 {

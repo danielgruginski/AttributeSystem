@@ -12,7 +12,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity.UI
     [RequireComponent(typeof(TMP_Text))]
     public class AttributeDisplayText : AttributeUIBehaviour
     {
-        [AttributeName]
+        //[AttributeName]
         [SerializeField] private string _attributeName;
 
         [Header("Formatting")]
