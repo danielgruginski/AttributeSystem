@@ -11,73 +11,70 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         private const float ModeWidth = 80f;
         private const float Padding = 5f;
 
+        public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
+        {
+            var modeProp = property.FindPropertyRelative("Mode");
+
+            // If in Attribute mode, the height depends on the AttributeReference drawer
+            if (modeProp != null && modeProp.enumValueIndex == (int)ValueSource.SourceMode.Attribute)
+            {
+                var attrRefProp = property.FindPropertyRelative("AttributeRef");
+                if (attrRefProp != null)
+                {
+                    // Add a tiny bit of padding for the mode dropdown line
+                    // Actually, AttributeReferenceDrawer handles its own height, 
+                    // but we draw the Mode dropdown on the same line as the "Name" part of the ref.
+                    // Let's defer to the AttributeReference height.
+                    return EditorGUI.GetPropertyHeight(attrRefProp, true);
+                }
+            }
+
+            // Default single line for Constant mode
+            return EditorGUIUtility.singleLineHeight;
+        }
+
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             EditorGUI.BeginProperty(position, label, property);
 
-            // 1. Fetch Properties (Safe Checks)
             var modeProp = property.FindPropertyRelative("Mode");
             var constantProp = property.FindPropertyRelative("ConstantValue");
-            var attrNameProp = property.FindPropertyRelative("AttributeName");
-            var providerPathProp = property.FindPropertyRelative("ProviderPath");
+            var attrRefProp = property.FindPropertyRelative("AttributeRef");
 
-            if (modeProp == null)
-            {
-                EditorGUI.LabelField(position, "Error: ValueSource fields not found.");
-                EditorGUI.EndProperty();
-                return;
-            }
+            // 1. Draw Label
+            Rect contentPosition = EditorGUI.PrefixLabel(position, GUIUtility.GetControlID(FocusType.Passive), label);
 
-            // 2. Draw Label (if inside a list, this is "Element X" or our custom label)
-            position = EditorGUI.PrefixLabel(position, GUIUtility.GetControlID(FocusType.Passive), label);
-
-            // 3. Draw Mode Dropdown
-            var modeRect = new Rect(position.x, position.y, ModeWidth, position.height);
+            // 2. Draw Mode Dropdown (Fixed Width)
+            Rect modeRect = new Rect(contentPosition.x, contentPosition.y, ModeWidth, EditorGUIUtility.singleLineHeight);
             EditorGUI.PropertyField(modeRect, modeProp, GUIContent.none);
 
-            // 4. Draw Context-Specific Field
-            var valueRect = new Rect(position.x + ModeWidth + Padding, position.y, position.width - ModeWidth - Padding, position.height);
+            // 3. Draw Content
+            Rect valueRect = new Rect(contentPosition.x + ModeWidth + Padding, contentPosition.y, contentPosition.width - ModeWidth - Padding, position.height);
 
-            int modeIndex = modeProp.enumValueIndex;
-            // Assuming Enum Order: 0 = Constant, 1 = Attribute (Check your Enum definition!)
+            int modeIndex = modeProp.enumValueIndex; // 0 = Constant, 1 = Attribute
 
             if (modeIndex == (int)ValueSource.SourceMode.Constant)
             {
-                if (constantProp != null)
-                    EditorGUI.PropertyField(valueRect, constantProp, GUIContent.none);
+                // Just draw the float field
+                // Ensure height is single line for the float field even if 'position' is tall
+                Rect floatRect = new Rect(valueRect.x, valueRect.y, valueRect.width, EditorGUIUtility.singleLineHeight);
+                EditorGUI.PropertyField(floatRect, constantProp, GUIContent.none);
             }
-            else // Attribute Mode
+            else
             {
-                // Draw Attribute Name and potentially Provider Path
-
-                float halfWidth = valueRect.width * 0.5f;
-                var attrRect = new Rect(valueRect.x, valueRect.y, halfWidth, valueRect.height);
-                var pathRect = new Rect(valueRect.x + halfWidth, valueRect.y, halfWidth, valueRect.height);
-
-                if (attrNameProp != null)
+                if (attrRefProp != null)
                 {
-                    // FIX: Use PropertyField directly. 
-                    // Since 'attrNameProp' is a SemanticKey, Unity will automatically invoke SemanticKeyDrawer.
-                    // This replaces the manual TextField logic that was breaking things.
-                    EditorGUI.PropertyField(attrRect, attrNameProp, GUIContent.none);
-                }
+                    // Pass drawing to AttributeReferenceDrawer.
+                    // IMPORTANT: AttributeReferenceDrawer expects to draw the label. 
+                    // We pass GUIContent.none because we already drew our main label (e.g. "Input").
+                    // However, AttributeReferenceDrawer starts with the "Name" field.
+                    // We need to ensure it draws within 'valueRect'.
 
-                // Optional: Show Provider Path count or simplified view
-                if (providerPathProp != null)
-                {
-                    // Draw a label showing path count, or ideally a foldout if space permitted.
-                    // For a single line drawer, a label is safest.
-                    string pathInfo = providerPathProp.arraySize > 0 ? $" [{providerPathProp.arraySize} Path Nodes]" : " [Local]";
-                    EditorGUI.LabelField(pathRect, pathInfo, EditorStyles.miniLabel);
+                    EditorGUI.PropertyField(valueRect, attrRefProp, GUIContent.none, true);
                 }
             }
 
             EditorGUI.EndProperty();
-        }
-
-        public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-        {
-            return EditorGUIUtility.singleLineHeight;
         }
     }
 }

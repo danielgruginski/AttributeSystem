@@ -181,8 +181,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var source = new ValueSource
             {
                 Mode = ValueSource.SourceMode.Attribute,
-                AttributeName = TestKeys.Mock("Strength"),
-                ProviderPath = new List<SemanticKey> { TestKeys.Mock("Owner") }
+                AttributeRef = new AttributeReference(TestKeys.Mock("Strength"), new List<SemanticKey> { TestKeys.Mock("Owner") })              
             };
 
             // NEW ARCHITECTURE: Use LinearModifier and ModifierArgs

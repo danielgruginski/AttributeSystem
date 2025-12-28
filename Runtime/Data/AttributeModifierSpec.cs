@@ -20,6 +20,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         public int Priority = 0;
 
         [Header("Logic")]
+        //[SemanticKeyFilter("Modifiers")]
         public SemanticKey LogicType;
 
         [Header("Unified Arguments")]

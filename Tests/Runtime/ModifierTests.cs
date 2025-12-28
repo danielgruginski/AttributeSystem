@@ -18,7 +18,13 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             => new ValueSource { Mode = ValueSource.SourceMode.Constant, ConstantValue = val };
 
         private ValueSource Attr(string name)
-            => new ValueSource { Mode = ValueSource.SourceMode.Attribute, AttributeName = TestKeys.Mock(name) };
+        {
+            return new ValueSource
+            {
+                Mode = ValueSource.SourceMode.Attribute,
+                AttributeRef = new AttributeReference(TestKeys.Mock(name))
+            };
+        }
 
         private ModifierArgs Args(string id, params ValueSource[] args)
         {

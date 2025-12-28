@@ -33,6 +33,20 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 new List<ValueSource> { input, ValueSource.Const(1f), ValueSource.Const(0f) }
             );
         }
+
+        private ValueSource AttrSource(string attributeName, List<SemanticKey> providerPath = null)
+        {
+            return new ValueSource
+            {
+                Mode = ValueSource.SourceMode.Attribute,
+                AttributeRef = new AttributeReference
+                {
+                    Name = TestKeys.Mock(attributeName),
+                    Path = providerPath ?? new List<SemanticKey>()
+                }
+            };
+        }
+
         [SetUp]
         public void Setup()
         {
@@ -61,12 +75,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         {
             // CRITICAL NOTE: This modifier lives on the WEAPON (the target).
             // Therefore, it must find CasterLevel via the "Owner" link, not directly.
-            var source = new ValueSource
-            {
-                Mode = ValueSource.SourceMode.Attribute,
-                AttributeName = TestKeys.Mock("CasterLevel"),
-                ProviderPath = new List<SemanticKey> { TestKeys.Mock("Owner") }
-            };
+
+            var source = AttrSource("CasterLevel", new List<SemanticKey> { TestKeys.Mock("Owner") });
 
 
             var mod = new LinearModifier(CreateLinearArgs("CasterScaling", source));
@@ -102,12 +112,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // Let's assume standard reactive flow: The Character pulls value from the Weapon.
             // So the ValueSource is "EquippedWeapon.ItemLevel" relative to the Character.
 
-            var source = new ValueSource
-            {
-                Mode = ValueSource.SourceMode.Attribute,
-                AttributeName = TestKeys.Mock("ItemLevel"),
-                ProviderPath = new List<SemanticKey> { TestKeys.Mock("EquippedWeapon") }
-            };
+
+            var source = AttrSource("ItemLevel", new List<SemanticKey> { TestKeys.Mock("EquippedWeapon") });
 
             var mod = new LinearModifier(CreateLinearArgs("ItemScaling", source));
 
@@ -201,11 +207,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             // Mod A: Self Damage += Self CasterLevel
             // Source: CasterLevel (Local/Baked to MagicSword context)
-            var sourceA = new ValueSource
-            {
-                Mode = ValueSource.SourceMode.Attribute,
-                AttributeName = TestKeys.Mock("CasterLevel")
-            };
+            var sourceA = AttrSource("CasterLevel");
+
             sourceA.BakeContext(magicSword); // Explicitly bake context so it finds CasterLevel on MagicSword
 
             // Manual Arg construction
@@ -217,11 +220,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             )); magicSword.AddModifier("SelfBuff", modA, TestKeys.Mock("Damage"));
 
             // Mod B: Owner->Hireling->EquippedWeapon->Damage += Self CasterLevel
-            var sourceB = new ValueSource
-            {
-                Mode = ValueSource.SourceMode.Attribute,
-                AttributeName = TestKeys.Mock("CasterLevel")
-            };
+            var sourceB = AttrSource("CasterLevel");
+
             sourceB.BakeContext(magicSword); // Source is still MagicSword.CasterLevel
 
             string shareBuffId = "MagicSwordShareBuff";

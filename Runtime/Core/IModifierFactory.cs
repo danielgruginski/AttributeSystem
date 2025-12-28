@@ -6,9 +6,9 @@ namespace ReactiveSolutions.AttributeSystem.Core
 {
     public interface IModifierFactory
     {
-        void Register(SemanticKey id, ModifierBuilder builder);
-        IAttributeModifier Create(SemanticKey id, ModifierArgs args);
-        IEnumerable<SemanticKey> GetAvailableTypes();
+        void Register(string id, ModifierBuilder builder);
+        IAttributeModifier Create(string id, ModifierArgs args);
+        IEnumerable<string> GetAvailableTypes();
     }
 
     /// <summary>

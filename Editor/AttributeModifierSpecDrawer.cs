@@ -14,10 +14,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
     public class AttributeModifierSpecDrawer : PropertyDrawer
     {
         private float LineH => EditorGUIUtility.singleLineHeight;
-        private float Spacing => EditorGUIUtility.standardVerticalSpacing+8;
-
-        // Cache for finding real GUIDs from KeyDomains
-        private static Dictionary<string, string> _logicGuidCache;
+        private float Spacing => EditorGUIUtility.standardVerticalSpacing;
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
@@ -26,21 +23,19 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             // 1. Header "Modifier Spec"
             h += LineH + Spacing;
 
-            // 2. Logic Type Dropdown (MOVED TO TOP)
-            h += LineH + Spacing;
+            // 2. Logic Type (SemanticKey)
+            var logicProp = property.FindPropertyRelative("LogicType");
+            h += (logicProp != null ? EditorGUI.GetPropertyHeight(logicProp) : LineH) + Spacing;
 
-            // 3. Target Section (Attribute + Path)
+            // 3. Target Section
             var targetProp = property.FindPropertyRelative("TargetAttribute");
-            h += EditorGUI.GetPropertyHeight(targetProp) + Spacing;
+            h += (targetProp != null ? EditorGUI.GetPropertyHeight(targetProp) : LineH) + Spacing;
 
             var targetPathProp = property.FindPropertyRelative("TargetPath");
             if (targetPathProp != null)
-            {
-                // We always draw the path property (it handles its own expansion)
                 h += EditorGUI.GetPropertyHeight(targetPathProp, true) + Spacing;
-            }
 
-            // 4. Priority & Type Row
+            // 4. Priority & Type
             h += LineH + Spacing;
 
             // 5. Arguments (Always Expanded)
@@ -49,11 +44,37 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             var argsProp = property.FindPropertyRelative("Arguments");
             if (argsProp != null)
             {
-                // We draw the elements manually, so we sum their heights
-                for (int i = 0; i < argsProp.arraySize; i++)
+                // To safely calculate height, we need to know the *intended* size.
+                // We peek at the LogicType to see what it *should* be.
+                var logicTypeProp = property.FindPropertyRelative("LogicType");
+                string currentLogic = "Static";
+                if (logicTypeProp != null)
                 {
-                    var element = argsProp.GetArrayElementAtIndex(i);
-                    h += EditorGUI.GetPropertyHeight(element, true) + Spacing;
+                    var logicValueProp = logicTypeProp.FindPropertyRelative("_value");
+                    if (logicValueProp != null) currentLogic = logicValueProp.stringValue;
+                }
+                if (string.IsNullOrEmpty(currentLogic)) currentLogic = "Static";
+
+                string[] paramNames = ModifierFactory.GetParameterNames(currentLogic);
+                int expectedSize = paramNames != null ? paramNames.Length : 0;
+
+                // We use the MAX of current or expected to reserve enough space to avoid overlap
+                // if resizing hasn't happened yet. OnGUI will handle the actual resize.
+                // This prevents "next element draws on top of list" during the resize frame.
+                int displayCount = Mathf.Max(argsProp.arraySize, expectedSize);
+
+                for (int i = 0; i < displayCount; i++)
+                {
+                    // If the element exists, measure it. If not (virtual), assume default height.
+                    if (i < argsProp.arraySize)
+                    {
+                        var element = argsProp.GetArrayElementAtIndex(i);
+                        h += (element != null ? EditorGUI.GetPropertyHeight(element, true) : LineH) + Spacing;
+                    }
+                    else
+                    {
+                        h += LineH + Spacing; // Fallback for pending elements
+                    }
                 }
             }
 
@@ -81,140 +102,115 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             // --- 1. Header ---
             EditorGUI.LabelField(NextRect(LineH), "Modifier Spec", EditorStyles.boldLabel);
 
-            // --- 2. Logic Selection (MOVED TO TOP) ---
+            // --- 2. Logic Type (SemanticKey) ---
             var logicTypeProp = property.FindPropertyRelative("LogicType");
-            var logicValueProp = logicTypeProp.FindPropertyRelative("_value");
-            var logicGuidProp = logicTypeProp.FindPropertyRelative("_guid");
+            string currentLogic = "Static";
 
-            string currentLogic = logicValueProp.stringValue;
-            //if (string.IsNullOrEmpty(currentLogic)) currentLogic = "Static";
-
-            var availableTypes = ModifierFactory.GetAllKeys().ToArray();
-            int currentIndex = System.Array.IndexOf(availableTypes, currentLogic);
-            if (currentIndex == -1) currentIndex = 0;
-
-            Rect logicRect = NextRect(LineH);
-
-            // Explicitly handle control ID to avoid focus stealing
-            int logicControlID = GUIUtility.GetControlID(FocusType.Keyboard, logicRect);
-            int newIndex = EditorGUI.Popup(logicRect, "Logic Operation", currentIndex, availableTypes);
-
-            if (newIndex != currentIndex && newIndex >= 0 && newIndex < availableTypes.Length)
+            if (logicTypeProp != null)
             {
-                string newSelection = availableTypes[newIndex];
-                logicValueProp.stringValue = newSelection;
+                float logicH = EditorGUI.GetPropertyHeight(logicTypeProp);
 
-                // Attempt to find the REAL guid from the project's KeyDomains
-                string realGuid = FindGuidForLogic(newSelection);
-                logicGuidProp.stringValue = realGuid;
+                EditorGUI.BeginChangeCheck();
+                // This invokes SemanticKeyDrawer (Dropdown) automatically
+                EditorGUI.PropertyField(NextRect(logicH), logicTypeProp, new GUIContent("Logic Operation"));
+
+                if (EditorGUI.EndChangeCheck())
+                {
+                    // CRITICAL FIX: Flush changes immediately so we can read the new value below
+                    property.serializedObject.ApplyModifiedProperties();
+                    // Force update of the SerializedObject we are drawing to reflect the change in this frame
+                    property.serializedObject.Update();
+                }
+
+                // Read the string value from the inner field to drive the parameter list
+                var logicValueProp = logicTypeProp.FindPropertyRelative("_value");
+                if (logicValueProp != null)
+                {
+                    currentLogic = logicValueProp.stringValue;
+                }
+                if (string.IsNullOrEmpty(currentLogic)) currentLogic = "Static";
             }
 
             // --- 3. Target Section ---
             var targetProp = property.FindPropertyRelative("TargetAttribute");
-            float targetH = EditorGUI.GetPropertyHeight(targetProp);
-            EditorGUI.PropertyField(NextRect(targetH), targetProp);
+            if (targetProp != null)
+                EditorGUI.PropertyField(NextRect(EditorGUI.GetPropertyHeight(targetProp)), targetProp);
 
             var targetPathProp = property.FindPropertyRelative("TargetPath");
             if (targetPathProp != null)
             {
-                float pathH = EditorGUI.GetPropertyHeight(targetPathProp, true);
-                EditorGUI.PropertyField(NextRect(pathH), targetPathProp, new GUIContent("Target Path"), true);
+                EditorGUI.PropertyField(NextRect(EditorGUI.GetPropertyHeight(targetPathProp, true)), targetPathProp, new GUIContent("Target Path"), true);
             }
 
             // --- 4. Configuration Row (Type | Priority) ---
             var priorityProp = property.FindPropertyRelative("Priority");
             var modTypeProp = property.FindPropertyRelative("Type");
 
-            Rect rowRect = NextRect(LineH);
-            float colW = rowRect.width / 2f;
+            if (priorityProp != null && modTypeProp != null)
+            {
+                Rect rowRect = NextRect(LineH);
+                float colW = rowRect.width / 2f;
 
-            Rect typeRect = new Rect(rowRect.x, rowRect.y, colW - 2, rowRect.height);
-            Rect priRect = new Rect(rowRect.x + colW + 2, rowRect.y, colW - 2, rowRect.height);
+                Rect typeRect = new Rect(rowRect.x, rowRect.y, colW - 2, rowRect.height);
+                Rect priRect = new Rect(rowRect.x + colW + 2, rowRect.y, colW - 2, rowRect.height);
 
-            float oldLabelW = EditorGUIUtility.labelWidth;
+                float oldLabelW = EditorGUIUtility.labelWidth;
 
-            // Type
-            EditorGUIUtility.labelWidth = 40;
-            EditorGUI.PropertyField(typeRect, modTypeProp, new GUIContent("Type"));
+                // Type
+                EditorGUIUtility.labelWidth = 40;
+                EditorGUI.PropertyField(typeRect, modTypeProp, new GUIContent("Type"));
 
-            // Priority
-            EditorGUIUtility.labelWidth = 30;
-            EditorGUI.PropertyField(priRect, priorityProp, new GUIContent("Pri"));
+                // Priority
+                EditorGUIUtility.labelWidth = 30;
+                EditorGUI.PropertyField(priRect, priorityProp, new GUIContent("Pri"));
 
-            EditorGUIUtility.labelWidth = oldLabelW;
+                EditorGUIUtility.labelWidth = oldLabelW;
+            }
 
             // --- 5. Arguments List (Fixed / Always Expanded) ---
             var argsProp = property.FindPropertyRelative("Arguments");
-
-            // Sync list size to Logic Type requirements
-            string[] paramNames = ModifierFactory.GetParameterNames(currentLogic);
-            if (argsProp.arraySize != paramNames.Length)
+            if (argsProp != null)
             {
-                argsProp.arraySize = paramNames.Length;
-            }
+                string[] paramNames = ModifierFactory.GetParameterNames(currentLogic);
+                if (paramNames == null) paramNames = new string[0];
 
-            // Header for parameters
-            EditorGUI.LabelField(NextRect(LineH), "Parameters", EditorStyles.boldLabel);
-
-            // Draw Elements
-            EditorGUI.indentLevel++;
-            for (int i = 0; i < argsProp.arraySize; i++)
-            {
-                var element = argsProp.GetArrayElementAtIndex(i);
-                string paramLabel = (i < paramNames.Length) ? paramNames[i] : $"Arg {i}";
-
-                float elHeight = EditorGUI.GetPropertyHeight(element, true);
-                EditorGUI.PropertyField(NextRect(elHeight), element, new GUIContent(paramLabel), true);
-            }
-            EditorGUI.indentLevel--;
-
-            EditorGUI.EndProperty();
-        }
-
-        /// <summary>
-        /// Scans project KeyDomains to find a matching GUID for the logic name.
-        /// Prioritizes domains named 'Modifiers' if multiple matches exist.
-        /// </summary>
-        private string FindGuidForLogic(string logicName)
-        {
-            if (_logicGuidCache == null)
-            {
-                _logicGuidCache = new Dictionary<string, string>();
-                // Find all KeyDomain assets
-                string[] guids = AssetDatabase.FindAssets("t:KeyDomain");
-                foreach (var g in guids)
+                // --- SAFE RESIZING LOGIC ---
+                if (argsProp.arraySize != paramNames.Length)
                 {
-                    string path = AssetDatabase.GUIDToAssetPath(g);
-                    var domain = AssetDatabase.LoadAssetAtPath<KeyDomain>(path);
-                    if (domain != null)
+                    argsProp.arraySize = paramNames.Length;
+
+                    // We apply properties to commit the size change.
+                    property.serializedObject.ApplyModifiedProperties();
+                    property.serializedObject.Update();
+
+                    // Note: We do NOT exit here. We continue drawing with the new size.
+                    // Since GetPropertyHeight reserved space for the *max* of old/new size, 
+                    // we should have enough room to draw without overlap.
+                }
+
+                EditorGUI.LabelField(NextRect(LineH), "Parameters", EditorStyles.boldLabel);
+
+                EditorGUI.indentLevel++;
+                for (int i = 0; i < argsProp.arraySize; i++)
+                {
+                    // Safety break
+                    if (i >= paramNames.Length) break;
+
+                    var element = argsProp.GetArrayElementAtIndex(i);
+                    if (element != null)
                     {
-                        foreach (var key in domain.Keys)
-                        {
-                            // If we have a collision, prioritize "Modifiers" domain
-                            if (_logicGuidCache.ContainsKey(key.Name))
-                            {
-                                if (domain.DomainName == "Modifiers")
-                                {
-                                    _logicGuidCache[key.Name] = key.Guid;
-                                }
-                            }
-                            else
-                            {
-                                _logicGuidCache[key.Name] = key.Guid;
-                            }
-                        }
+                        string paramLabel = paramNames[i];
+                        float elHeight = EditorGUI.GetPropertyHeight(element, true);
+
+                        // We use PropertyField, which invokes ValueSourceSpecDrawer
+                        // This uses the specific label from paramNames instead of "Element X"
+                        EditorGUI.PropertyField(NextRect(elHeight), element, new GUIContent(paramLabel), true);
                     }
                 }
+                EditorGUI.indentLevel--;
             }
 
-            if (_logicGuidCache.TryGetValue(logicName, out string guid))
-            {
-                return guid;
-            }
-
-            // Fallback: If not in domain, return Empty. 
-            // Warning: If you rely on 'IsValid', this will be false. 
-            return string.Empty;
+            EditorGUI.EndProperty();
         }
     }
 }

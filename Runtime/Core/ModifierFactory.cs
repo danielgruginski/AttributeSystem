@@ -8,7 +8,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
 {
     public class ModifierFactory : IModifierFactory
     {
-        private readonly Dictionary<SemanticKey, ModifierBuilder> _registry = new();
+        private readonly Dictionary<string, ModifierBuilder> _registry = new();
 
         // --- METADATA REGISTRY (Static for Editor Access) ---
         // Maps "LogicType" -> ["Arg Name 1", "Arg Name 2", ...]
@@ -47,7 +47,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 "Edge Threshold", "Input Value");
         }
 
-        public void Register(SemanticKey id, ModifierBuilder builder, params string[] paramNames)
+        public void Register(string id, ModifierBuilder builder, params string[] paramNames)
         {
             if (_registry.ContainsKey(id))
             {
@@ -57,9 +57,9 @@ namespace ReactiveSolutions.AttributeSystem.Core
             _parameterMetadata[id] = paramNames;
         }
         // Keep the interface implementation
-        public void Register(SemanticKey id, ModifierBuilder builder) => Register(id, builder, "Value"); // Default fallback
+        public void Register(string id, ModifierBuilder builder) => Register(id, builder, "Value"); // Default fallback
 
-        public IAttributeModifier Create(SemanticKey id, ModifierArgs args)
+        public IAttributeModifier Create(string id, ModifierArgs args)
         {
             if (string.IsNullOrEmpty(id) || !_registry.TryGetValue(id, out var builder))
             {
@@ -69,7 +69,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             return builder(args);
         }
 
-        public IEnumerable<SemanticKey> GetAvailableTypes() => _registry.Keys;
+        public IEnumerable<string> GetAvailableTypes() => _registry.Keys;
 
         public static string[] GetParameterNames(string id)
         {
