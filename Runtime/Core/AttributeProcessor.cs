@@ -22,15 +22,17 @@ namespace ReactiveSolutions.AttributeSystem.Core
         private readonly Dictionary<string, AttributeProcessor> _externalProviders = new();
         private readonly Subject<string> _onProviderRegistered = new();
 
-        // --- NEW: Pending Queue ---
+
         // Stores modifiers waiting for a specific provider (Key = ProviderName)
+        // Key: The NEXT provider in the chain we are waiting for.
         private readonly Dictionary<string, List<PendingModifier>> _pendingModifiers = new();
 
         private struct PendingModifier
         {
             public string SourceId;
             public IAttributeModifier Modifier;
-            public string AttributeName; // The target attribute name on that provider
+            public string TargetAttribute;
+            public List<string> RemainingPath; // The rest of the path after the current step
         }
         // --------------------------
 
@@ -43,34 +45,37 @@ namespace ReactiveSolutions.AttributeSystem.Core
             _externalProviders[key] = processor;
             _onProviderRegistered.OnNext(key);
 
-            // Check if anyone was waiting for this provider
+            // Flush pending modifiers waiting for this provider
             if (_pendingModifiers.TryGetValue(key, out var pendingList))
             {
                 foreach (var req in pendingList)
                 {
-                    // Apply to the newly registered processor
-                    processor.AddModifier(req.SourceId, req.Modifier, req.AttributeName);
+                    // Forward the modifier to the next step
+                    // If RemainingPath is empty, it adds locally on that processor.
+                    // If not, that processor will route it or queue it again.
+                    processor.AddModifier(req.SourceId, req.Modifier, req.TargetAttribute, req.RemainingPath);
                 }
                 _pendingModifiers.Remove(key);
             }
         }
 
-        /// <summary>
-        /// Gets an observable for an attribute. Supports dot notation (e.g., "Owner.Strength").
-        /// </summary>
-        public IObservable<Attribute> GetAttributeObservable(string fullName)
+        public IObservable<Attribute> GetAttributeObservable(string attributeName, List<string> providerPath = null)
         {
-            if (fullName.Contains(SEPARATOR))
+            // Base Case: No path means local attribute
+            if (providerPath == null || providerPath.Count == 0)
             {
-                var parts = fullName.Split(SEPARATOR);
-                if (parts.Length == 2)
-                {
-                    return GetExternalAttributeObservable(parts[0], parts[1]);
-                }
-                Debug.LogError($"[AttributeProcessor] Invalid attribute format: {fullName}. Expected 'Provider.Attribute'");
+                return GetLocalAttributeObservable(attributeName);
             }
 
-            return GetLocalAttributeObservable(fullName);
+            // Recursive Step: Look for the first provider in the list
+            string nextProviderKey = providerPath[0];
+            var remainingPath = providerPath.Count > 1 ? providerPath.GetRange(1, providerPath.Count - 1) : new List<string>();
+
+            return _onProviderRegistered
+                .StartWith(_externalProviders.ContainsKey(nextProviderKey) ? nextProviderKey : null)
+                .Where(k => k == nextProviderKey)
+                .Take(1)
+                .SelectMany(_ => _externalProviders[nextProviderKey].GetAttributeObservable(attributeName, remainingPath));
         }
 
         private IObservable<Attribute> GetLocalAttributeObservable(string name)
@@ -93,14 +98,14 @@ namespace ReactiveSolutions.AttributeSystem.Core
             });
         }
 
-        private IObservable<Attribute> GetExternalAttributeObservable(string providerKey, string attributeName)
+        /*private IObservable<Attribute> GetExternalAttributeObservable(string providerKey, string attributeName)
         {
             return _onProviderRegistered
                 .StartWith(_externalProviders.ContainsKey(providerKey) ? providerKey : null)
                 .Where(k => k == providerKey)
                 .Take(1)
                 .SelectMany(_ => _externalProviders[providerKey].GetAttributeObservable(attributeName));
-        }
+        }*/
 
         /// <summary>
         /// A reactive stream that fires whenever a new Attribute is added.
@@ -108,23 +113,22 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// </summary>
         public IObservable<Attribute> OnAttributeAdded => _attributes.ObserveAdd().Select(evt => evt.Value);
 
-        /// <summary>
-        /// Retrieves an attribute if it exists, otherwise returns null.
-        /// Use this for read-only checks where creating a new attribute is unintended.
-        /// Will attempt to search external providers if dot notation is used.
-        /// </summary>
-        public Attribute GetAttribute(string name)
+        public Attribute GetAttribute(string name) => GetAttribute(name, null);
+
+        public Attribute GetAttribute(string name, List<string> providerPath)
         {
-            if (name.Contains(SEPARATOR))
+            if (providerPath == null || providerPath.Count == 0)
             {
-                var parts = name.Split(SEPARATOR);
-                if (_externalProviders.TryGetValue(parts[0], out var provider))
-                {
-                    return provider.GetAttribute(parts[1]);
-                }
-                return null;
+                return _attributes.TryGetValue(name, out var attr) ? attr : null;
             }
-            return _attributes.TryGetValue(name, out var attr) ? attr : null;
+
+            string nextKey = providerPath[0];
+            if (_externalProviders.TryGetValue(nextKey, out var provider))
+            {
+                var remaining = providerPath.Count > 1 ? providerPath.GetRange(1, providerPath.Count - 1) : null;
+                return provider.GetAttribute(name, remaining);
+            }
+            return null;
         }
 
         /// <summary>
@@ -134,10 +138,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// </summary>
         public Attribute GetOrCreateAttribute(string name, float defaultBaseIfMissing = 0f)
         {
-            // We cannot 'Create' an attribute on an external provider remotely unless we own it.
-            // But usually, GetOrCreate is called for local attributes or read operations.
-            if (name.Contains(SEPARATOR)) return GetAttribute(name);
-
+            // GetOrCreate only works locally for safety
             if (!_attributes.TryGetValue(name, out var attr))
             {
                 attr = new Attribute(name, defaultBaseIfMissing, this);
@@ -157,58 +158,51 @@ namespace ReactiveSolutions.AttributeSystem.Core
             attr.SetBaseValue(newBase);
         }
 
-        /// <summary>
-        /// Adds a modifier to an attribute, creating the attribute if it doesn't exist.
-        /// Now handles External Paths ("Owner.Strength") by queuing if the provider is missing.
-        /// </summary>
-        /// <param name="sourceId">The ID of the source adding the modifier (e.g., "SwordOfThePhoenix").</param>
-        /// <param name="modifier">The IAttributeModifier instance (Flat, Formulaic, Clamp, etc.).</param>
-        /// <param name="attributeName">The name of the attribute to modify (e.g., "AttackDamage").</param>
         public void AddModifier(string sourceId, IAttributeModifier modifier, string attributeName)
+            => AddModifier(sourceId, modifier, attributeName, null);
+
+        /// <summary>
+        /// Adds a modifier, traversing the provider path if necessary.
+        /// Handles queuing for missing providers automatically.
+        /// </summary>
+        public void AddModifier(string sourceId, IAttributeModifier modifier, string attributeName, List<string> providerPath)
         {
-            Debug.Assert(!string.IsNullOrEmpty(sourceId), "Modifier source ID cannot be null or empty.");
-            Debug.Assert(modifier != null, "Modifier object cannot be null.");
-            Debug.Assert(!string.IsNullOrEmpty(attributeName), "Target attribute name cannot be null or empty.");
-
-            // 1. Check for External Path (e.g. "Owner.Strength")
-            if (attributeName.Contains(SEPARATOR))
+            // Base Case: Local Add
+            if (providerPath == null || providerPath.Count == 0)
             {
-                var parts = attributeName.Split(SEPARATOR);
-                string providerKey = parts[0];
-                string targetAttr = parts[1];
-
-                if (_externalProviders.TryGetValue(providerKey, out var provider))
-                {
-                    // Provider exists, forward the call
-                    provider.AddModifier(sourceId, modifier, targetAttr);
-                }
-                else
-                {
-                    // Provider MISSING! Queue it.
-                    if (!_pendingModifiers.ContainsKey(providerKey))
-                        _pendingModifiers[providerKey] = new List<PendingModifier>();
-
-                    _pendingModifiers[providerKey].Add(new PendingModifier
-                    {
-                        SourceId = sourceId,
-                        Modifier = modifier,
-                        AttributeName = targetAttr
-                    });
-
-                    //Debug.Log($"[AttributeProcessor] Queued modifier for missing provider: {providerKey}");
-                }
+                var attr = GetOrCreateAttribute(attributeName, 0f);
+                attr.AddModifier(modifier);
                 return;
             }
 
-            // 2. Standard Local Add
-            var attr = GetOrCreateAttribute(attributeName, 0f);
-            attr.AddModifier(modifier);
+            // Recursive Step
+            string nextKey = providerPath[0];
+            var remaining = providerPath.Count > 1 ? providerPath.GetRange(1, providerPath.Count - 1) : new List<string>();
+
+            if (_externalProviders.TryGetValue(nextKey, out var provider))
+            {
+                provider.AddModifier(sourceId, modifier, attributeName, remaining);
+            }
+            else
+            {
+                // Queue it
+                if (!_pendingModifiers.ContainsKey(nextKey))
+                    _pendingModifiers[nextKey] = new List<PendingModifier>();
+
+                _pendingModifiers[nextKey].Add(new PendingModifier
+                {
+                    SourceId = sourceId,
+                    Modifier = modifier,
+                    TargetAttribute = attributeName,
+                    RemainingPath = remaining
+                });
+            }
         }
 
         /// <summary>
         /// Removes modifiers and triggers their Detach/Dispose lifecycle.
         /// </summary>
-        public void RemoveModifiersBySource(string sourceId)
+        /*public void RemoveModifiersBySource(string sourceId)
         {
             foreach (var attribute in _attributes.Values)
             {
@@ -225,6 +219,6 @@ namespace ReactiveSolutions.AttributeSystem.Core
             {
                 _pendingModifiers[key].RemoveAll(p => p.SourceId == sourceId);
             }
-        }
+        }*/
     }
 }

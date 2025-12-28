@@ -1,6 +1,7 @@
 ﻿using Mono.Cecil;
 using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace ReactiveSolutions.AttributeSystem.Core.Data
@@ -14,8 +15,12 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
     {
         public enum ModifierCategory { Linear, SegmentedMultiplier }
 
-        [Header("Identity")]
-        [AttributeName] public string TargetAttribute;
+        [Header("Target Identity")]
+        [Tooltip("The name of the attribute to modify.")]
+        public string TargetAttribute;
+        [Tooltip("Path to the provider hosting the target attribute. Empty = Local.")]
+        public List<string> TargetPath = new List<string>(); // New Field for Target Path
+
         public string SourceId;
 
         [Header("Pipeline Settings")]
@@ -26,7 +31,9 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         [Header("Value Source Data")]
         public ValueSource.SourceMode SourceMode = ValueSource.SourceMode.Constant;
         public float ConstantValue;
-        public string AttributePath;
+
+        public string AttributeName; // Was 'AttributePath'
+        public List<string> ProviderPath = new List<string>(); // New field
 
         [Header("Linear Math Parameters")]
         public float Coeff = 1f;
@@ -37,17 +44,17 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         /// Converts this data spec into a functional reactive modifier.
         /// Optionally accepts a 'context' (the processor creating this modifier) to bake into the source.
         /// </summary>
+
         public IAttributeModifier CreateModifier(AttributeProcessor context = null)
         {
-            // Build the ValueSource from the flat fields
             var source = new ValueSource
             {
                 Mode = SourceMode,
                 ConstantValue = ConstantValue,
-                AttributePath = AttributePath
+                AttributeName = AttributeName,
+                ProviderPath = new List<string>(ProviderPath) // Deep copy
             };
 
-            // CRITICAL: Bind the source to the creator context
             if (context != null)
             {
                 source.BakeContext(context);
@@ -58,10 +65,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
                 case ModifierCategory.Linear:
                     return new LinearAttributeModifier(SourceId, Type, Priority, source, Coeff, Addend);
 
-                // Note: If you have Segmented or other types, ensure they use 'source' correctly.
-
                 default:
-                    // Fallback for safety
                     return new LinearAttributeModifier(SourceId, Type, Priority, source, 1f, 0f);
             }
         }

@@ -1,4 +1,6 @@
-﻿using System;
+﻿using ReactiveSolutions.AttributeSystem.Core.Data;
+using System;
+using System.Collections.Generic;
 using UniRx;
 using UnityEngine;
 
@@ -12,10 +14,13 @@ namespace ReactiveSolutions.AttributeSystem.Core
         public SourceMode Mode;
         public float ConstantValue;
 
-        [Tooltip("Supports dot notation for external providers, e.g., 'Owner.Strength' or just 'Agility'")]
-        public string AttributePath;
+        [Header("Attribute Reference")]
+        [Tooltip("The name of the attribute to read (e.g. 'Strength').")]
+        public string AttributeName;
 
-        // --- NEW: Context Baking ---
+        [Tooltip("The path to the provider. Empty = Local. Example: ['Owner', 'EquippedWeapon']")]
+        public List<string> ProviderPath = new List<string>();
+
         // Stores the processor that 'owns' this source definition (e.g., the Weapon).
         // This is not serialized; it is set at runtime when the StatBlock is applied.
         private AttributeProcessor _bakedContext;
@@ -34,13 +39,11 @@ namespace ReactiveSolutions.AttributeSystem.Core
             if (Mode == SourceMode.Constant)
                 return Observable.Return(ConstantValue);
 
-            // If we have a baked context (creator), use it. Otherwise, use the local processor (host).
             var contextToUse = _bakedContext ?? localProcessor;
-
-            // Safety check: if context is somehow null (shouldn't happen in valid flow), fallback or error
             if (contextToUse == null) return Observable.Return(0f);
 
-            return contextToUse.GetAttributeObservable(AttributePath)
+            // Use the new structured lookup
+            return contextToUse.GetAttributeObservable(AttributeName, ProviderPath)
                 .SelectMany(attr => attr.ReactivePropertyAccess);
         }
     }

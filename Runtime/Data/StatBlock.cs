@@ -43,7 +43,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
                 // This ensures that if the modifier target is remote (e.g. "Owner.Strength"),
                 // the modifier source (e.g. "ItemLevel") is still resolved against THIS processor.
                 var modifier = spec.CreateModifier(processor);
-                processor.AddModifier(spec.SourceId, modifier, spec.TargetAttribute);
+                processor.AddModifier(spec.SourceId, modifier, spec.TargetAttribute, spec.TargetPath);
             }
         }
     }

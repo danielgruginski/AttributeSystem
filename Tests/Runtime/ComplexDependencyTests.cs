@@ -53,7 +53,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var source = new ValueSource
             {
                 Mode = ValueSource.SourceMode.Attribute,
-                AttributePath = "Owner.CasterLevel"
+                AttributeName = "CasterLevel",
+                ProviderPath = new List<string> { "Owner" }
             };
 
             var mod = new LinearAttributeModifier("CasterScaling", ModifierType.Additive, 0, source, 1f, 0f);
@@ -90,7 +91,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var source = new ValueSource
             {
                 Mode = ValueSource.SourceMode.Attribute,
-                AttributePath = "EquippedWeapon.ItemLevel"
+                AttributeName = "ItemLevel",
+                ProviderPath = new List<string> { "EquippedWeapon" }
             };
 
             var mod = new LinearAttributeModifier("ItemScaling", ModifierType.Additive, 0, source, 1f, 0f);

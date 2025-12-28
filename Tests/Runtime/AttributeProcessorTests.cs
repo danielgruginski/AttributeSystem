@@ -128,7 +128,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 // Value Source Settings
                 SourceMode = ValueSource.SourceMode.Constant,
                 ConstantValue = 1.5f,
-                AttributePath = "",
+                ProviderPath = new List<string>(),
+                AttributeName = "",
 
                 // Linear Math Settings
                 Coeff = 1.0f,
@@ -160,7 +161,9 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var source = new ValueSource
             {
                 Mode = ValueSource.SourceMode.Attribute,
-                AttributePath = "Owner.Strength"
+                AttributeName = "Strength",
+                ProviderPath = new List<string> { "Owner" }
+
             };
 
             var mod = new ReactiveSolutions.AttributeSystem.Core.Modifiers.LinearAttributeModifier(

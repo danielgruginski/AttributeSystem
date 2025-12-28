@@ -16,7 +16,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         [System.Serializable]
         public struct BaseAttributeEntry
         {
-            [AttributeName] public string Name;
+            public string Name;
             public float BaseValue;
         }
 
@@ -57,6 +57,17 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         /// </summary>
         public void AddAttribute(string name, float baseValue) => Processor.SetOrUpdateBaseValue(name, baseValue);
 
+        /// <summary>
+        /// Registers another controller as a provider (e.g. linking the Player as "Owner").
+        /// This resolves any pending modifiers waiting for this key.
+        /// </summary>
+        public void LinkProvider(string key, AttributeController provider)
+        {
+            if (provider != null)
+            {
+                Processor.RegisterExternalProvider(key, provider.Processor);
+            }
+        }
 
         /// <summary>
         /// Bridges the Processor's reactive search. 
