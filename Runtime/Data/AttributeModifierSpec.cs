@@ -1,6 +1,7 @@
 ﻿using Mono.Cecil;
 using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace ReactiveSolutions.AttributeSystem.Core.Data
@@ -14,8 +15,12 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
     {
         public enum ModifierCategory { Linear, SegmentedMultiplier }
 
-        [Header("Identity")]
-        [AttributeName] public string TargetAttribute;
+        [Header("Target Identity")]
+        [Tooltip("The name of the attribute to modify.")]
+        public string TargetAttribute;
+        [Tooltip("Path to the provider hosting the target attribute. Empty = Local.")]
+        public List<string> TargetPath = new List<string>(); // New Field for Target Path
+
         public string SourceId;
 
         [Header("Pipeline Settings")]
@@ -26,36 +31,42 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         [Header("Value Source Data")]
         public ValueSource.SourceMode SourceMode = ValueSource.SourceMode.Constant;
         public float ConstantValue;
-        public string AttributePath;
+
+        public string AttributeName; // Was 'AttributePath'
+        public List<string> ProviderPath = new List<string>(); // New field
 
         [Header("Linear Math Parameters")]
         public float Coeff = 1f;
         public float Addend = 0f;
 
+
         /// <summary>
         /// Converts this data spec into a functional reactive modifier.
-        /// This replaces the need for a separate Factory class.
+        /// Optionally accepts a 'context' (the processor creating this modifier) to bake into the source.
         /// </summary>
-        public IAttributeModifier CreateModifier()
+
+        public IAttributeModifier CreateModifier(AttributeProcessor context = null)
         {
-            // Build the ValueSource from the flat fields
             var source = new ValueSource
             {
                 Mode = SourceMode,
                 ConstantValue = ConstantValue,
-                AttributePath = AttributePath
+                AttributeName = AttributeName,
+                ProviderPath = new List<string>(ProviderPath) // Deep copy
             };
+
+            if (context != null)
+            {
+                source.BakeContext(context);
+            }
 
             switch (Category)
             {
                 case ModifierCategory.Linear:
                     return new LinearAttributeModifier(SourceId, Type, Priority, source, Coeff, Addend);
 
-                // Note: If you add more complex modifiers (like Segmented), 
-                // you would map them here or use [SerializeReference] for even cleaner code.
-
                 default:
-                    throw new NotImplementedException($"[ModifierSpec] Category {Category} is not implemented.");
+                    return new LinearAttributeModifier(SourceId, Type, Priority, source, 1f, 0f);
             }
         }
 
