@@ -167,6 +167,117 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             }
         }
 
+        [Test]
+        public void Scenario_WeaponSwap_ComplexPath()
+        {
+            // 1. Setup Processors
+            var mainChar = new AttributeProcessor();
+            var hireling = new AttributeProcessor();
+            var plainSword = new AttributeProcessor();
+            var magicSword = new AttributeProcessor();
+
+            // 2. Setup Base Values
+            // Char: CasterLevel = 5
+            mainChar.SetOrUpdateBaseValue(TestKeys.Mock("CasterLevel"), 5f);
+
+            // PlainSword: Damage = 3
+            plainSword.SetOrUpdateBaseValue(TestKeys.Mock("Damage"), 3f);
+
+            // MagicSword: Damage = 7, CasterLevel = 3
+            magicSword.SetOrUpdateBaseValue(TestKeys.Mock("Damage"), 7f);
+            magicSword.SetOrUpdateBaseValue(TestKeys.Mock("CasterLevel"), 3f);
+
+            // 3. Setup MagicSword Modifiers
+
+            // Mod A: Self Damage += Self CasterLevel
+            // Source: CasterLevel (Local/Baked to MagicSword context)
+            var sourceA = new ValueSource
+            {
+                Mode = ValueSource.SourceMode.Attribute,
+                AttributeName = TestKeys.Mock("CasterLevel")
+            };
+            sourceA.BakeContext(magicSword); // Explicitly bake context so it finds CasterLevel on MagicSword
+
+            var modA = new LinearAttributeModifier("MagicSwordSelfBuff", ModifierType.Additive, 0, sourceA, 1f, 0f);
+            magicSword.AddModifier("SelfBuff", modA, TestKeys.Mock("Damage"));
+
+            // Mod B: Owner->Hireling->EquippedWeapon->Damage += Self CasterLevel
+            var sourceB = new ValueSource
+            {
+                Mode = ValueSource.SourceMode.Attribute,
+                AttributeName = TestKeys.Mock("CasterLevel")
+            };
+            sourceB.BakeContext(magicSword); // Source is still MagicSword.CasterLevel
+
+            string shareBuffId = "MagicSwordShareBuff";
+            var modB = new LinearAttributeModifier(shareBuffId, ModifierType.Additive, 0, sourceB, 1f, 0f);
+            
+            // Target Path: Owner -> Hireling -> EquippedWeapon
+            var targetPath = new List<SemanticKey>
+            {
+                TestKeys.Mock("Owner"),
+                TestKeys.Mock("Hireling"),
+                TestKeys.Mock("EquippedWeapon")
+            };
+
+            // Add the remote modifier definition to MagicSword (it will push it down the path)
+            magicSword.AddModifier("ShareBuff", modB, TestKeys.Mock("Damage"), targetPath);
+
+            // 4. Constant Links (Hireling is always linked to Char)
+            mainChar.RegisterExternalProvider(TestKeys.Mock("Hireling"), hireling);
+
+            // --- PHASE 1: Char has MagicSword, Hireling has PlainSword ---
+
+            // Link Char <-> MagicSword
+            mainChar.RegisterExternalProvider(TestKeys.Mock("EquippedWeapon"), magicSword);
+            magicSword.RegisterExternalProvider(TestKeys.Mock("Owner"), mainChar);
+
+            // Link Hireling <-> PlainSword
+            hireling.RegisterExternalProvider(TestKeys.Mock("EquippedWeapon"), plainSword);
+            plainSword.RegisterExternalProvider(TestKeys.Mock("Owner"), hireling);
+
+            // Assertions Phase 1
+            // MagicSword Damage: 7 + 3 = 10
+            Assert.AreEqual(10f, magicSword.GetAttribute(TestKeys.Mock("Damage")).ReactivePropertyAccess.Value, "Phase 1: MagicSword Damage incorrect");
+
+            // PlainSword Damage: 3 + 3 (Shared Buff) = 6
+            // Path Trace: MagicSword(Context) -> Owner(Char) -> Hireling(Hireling) -> EquippedWeapon(PlainSword) -> Add Mod
+            Assert.AreEqual(6f, plainSword.GetAttribute(TestKeys.Mock("Damage")).ReactivePropertyAccess.Value, "Phase 1: PlainSword Damage incorrect");
+
+
+            // --- PHASE 2: Swap ---
+
+            // Simulate Unequip: Remove the "ShareBuff" from PlainSword
+            // FIX: Use the ID defined in the modifier constructor
+            plainSword.RemoveModifiersBySource(shareBuffId);
+
+            // Update Links
+            // Link Char <-> PlainSword
+            mainChar.RegisterExternalProvider(TestKeys.Mock("EquippedWeapon"), plainSword);
+            plainSword.RegisterExternalProvider(TestKeys.Mock("Owner"), mainChar);
+
+            // Link Hireling <-> MagicSword
+            hireling.RegisterExternalProvider(TestKeys.Mock("EquippedWeapon"), magicSword);
+            magicSword.RegisterExternalProvider(TestKeys.Mock("Owner"), hireling);
+
+            // Re-Add Modifiers logic? 
+            // In a real system, connecting MagicSword to Hireling should trigger the MagicSword to re-evaluate its modifiers.
+            // Since our modifiers were "Pushed" once, we need to re-push them for the new path.
+            // Simulate "OnEquip" call which re-adds the modifiers:
+            magicSword.AddModifier("ShareBuff", modB, TestKeys.Mock("Damage"), targetPath);
+
+            // Assertions Phase 2
+
+            // MagicSword Damage: 7 + 3 = 10 (Self buff always works)
+            Assert.AreEqual(10f, magicSword.GetAttribute(TestKeys.Mock("Damage")).ReactivePropertyAccess.Value, "Phase 2: MagicSword Damage incorrect");
+
+            // PlainSword Damage: 3 (Base)
+            // Path Trace: MagicSword(Context) -> Owner(Hireling) -> Hireling(MISSING on Hireling) -> ...
+            // The modifier chain breaks at "Hireling" because the Hireling doesn't have a provider named "Hireling".
+            // So PlainSword gets nothing.
+            Assert.AreEqual(3f, plainSword.GetAttribute(TestKeys.Mock("Damage")).ReactivePropertyAccess.Value, "Phase 2: PlainSword Damage incorrect");
+        }
+
         // --- HELPERS ---
 
         private void RunSequence(params string[] stepKeys)

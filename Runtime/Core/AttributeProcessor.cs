@@ -202,7 +202,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// <summary>
         /// Removes modifiers and triggers their Detach/Dispose lifecycle.
         /// </summary>
-        /*public void RemoveModifiersBySource(string sourceId)
+        public void RemoveModifiersBySource(string sourceId)
         {
             foreach (var attribute in _attributes.Values)
             {
@@ -219,6 +219,6 @@ namespace ReactiveSolutions.AttributeSystem.Core
             {
                 _pendingModifiers[key].RemoveAll(p => p.SourceId == sourceId);
             }
-        }*/
+        }
     }
 }
