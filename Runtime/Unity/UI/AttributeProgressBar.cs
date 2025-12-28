@@ -1,4 +1,5 @@
 ﻿using ReactiveSolutions.AttributeSystem.Core.Data;
+using SemanticKeys;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -12,11 +13,11 @@ namespace ReactiveSolutions.AttributeSystem.Unity.UI
     public class AttributeProgressBar : AttributeUIBehaviour
     {
         [Header("Attribute Mapping")]
-        [AttributeName]
-        [SerializeField] private string _currentAttributeName;
 
-        [AttributeName]
-        [SerializeField] private string _maxAttributeName;
+        [SerializeField] private SemanticKey _currentAttributeName;
+
+
+        [SerializeField] private SemanticKey _maxAttributeName;
 
         [Header("Settings")]
         [Tooltip("If true, the slider's max value will be set to the max attribute's value.")]

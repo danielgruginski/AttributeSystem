@@ -1,3 +1,4 @@
+using SemanticKeys;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,33 +14,32 @@ namespace ReactiveSolutions.AttributeSystem.Core
     /// </summary>
     public class AttributeProcessor
     {
-        private const char SEPARATOR = '.';
 
         // The core storage. ReactiveDictionary allows other systems to listen for adds/removes.
-        private readonly ReactiveDictionary<string, Attribute> _attributes = new();
-        public IReadOnlyReactiveDictionary<string, Attribute> Attributes => _attributes;
+        private readonly ReactiveDictionary<SemanticKey, Attribute> _attributes = new();
+        public IReadOnlyReactiveDictionary<SemanticKey, Attribute> Attributes => _attributes;
 
-        private readonly Dictionary<string, AttributeProcessor> _externalProviders = new();
-        private readonly Subject<string> _onProviderRegistered = new();
+        private readonly Dictionary<SemanticKey, AttributeProcessor> _externalProviders = new();
+        private readonly Subject<SemanticKey> _onProviderRegistered = new();
 
 
         // Stores modifiers waiting for a specific provider (Key = ProviderName)
         // Key: The NEXT provider in the chain we are waiting for.
-        private readonly Dictionary<string, List<PendingModifier>> _pendingModifiers = new();
+        private readonly Dictionary<SemanticKey, List<PendingModifier>> _pendingModifiers = new();
 
         private struct PendingModifier
         {
             public string SourceId;
             public IAttributeModifier Modifier;
-            public string TargetAttribute;
-            public List<string> RemainingPath; // The rest of the path after the current step
+            public SemanticKey TargetAttribute;
+            public List<SemanticKey> RemainingPath; // The rest of the path after the current step
         }
         // --------------------------
 
         /// <summary>
         /// Links an external processor to a key (e.g., Registering the Player as 'Owner' for a Sword).
         /// </summary>
-        public void RegisterExternalProvider(string key, AttributeProcessor processor)
+        public void RegisterExternalProvider(SemanticKey key, AttributeProcessor processor)
         {
             Debug.Assert(processor != null, $"[AttributeProcessor] Trying to register a null provider for key: {key}");
             _externalProviders[key] = processor;
@@ -59,7 +59,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             }
         }
 
-        public IObservable<Attribute> GetAttributeObservable(string attributeName, List<string> providerPath = null)
+        public IObservable<Attribute> GetAttributeObservable(SemanticKey attributeName, List<SemanticKey> providerPath = null)
         {
             // Base Case: No path means local attribute
             if (providerPath == null || providerPath.Count == 0)
@@ -68,17 +68,17 @@ namespace ReactiveSolutions.AttributeSystem.Core
             }
 
             // Recursive Step: Look for the first provider in the list
-            string nextProviderKey = providerPath[0];
-            var remainingPath = providerPath.Count > 1 ? providerPath.GetRange(1, providerPath.Count - 1) : new List<string>();
+            SemanticKey nextProviderKey = providerPath[0];
+            var remainingPath = providerPath.Count > 1 ? providerPath.GetRange(1, providerPath.Count - 1) : new List<SemanticKey>();
 
             return _onProviderRegistered
-                .StartWith(_externalProviders.ContainsKey(nextProviderKey) ? nextProviderKey : null)
+                .StartWith(_externalProviders.ContainsKey(nextProviderKey) ? nextProviderKey : SemanticKey.None)
                 .Where(k => k == nextProviderKey)
                 .Take(1)
                 .SelectMany(_ => _externalProviders[nextProviderKey].GetAttributeObservable(attributeName, remainingPath));
         }
 
-        private IObservable<Attribute> GetLocalAttributeObservable(string name)
+        private IObservable<Attribute> GetLocalAttributeObservable(SemanticKey name)
         {
             return Observable.Create<Attribute>(observer =>
             {
@@ -113,16 +113,16 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// </summary>
         public IObservable<Attribute> OnAttributeAdded => _attributes.ObserveAdd().Select(evt => evt.Value);
 
-        public Attribute GetAttribute(string name) => GetAttribute(name, null);
+        public Attribute GetAttribute(SemanticKey name) => GetAttribute(name, null);
 
-        public Attribute GetAttribute(string name, List<string> providerPath)
+        public Attribute GetAttribute(SemanticKey name, List<SemanticKey> providerPath)
         {
             if (providerPath == null || providerPath.Count == 0)
             {
                 return _attributes.TryGetValue(name, out var attr) ? attr : null;
             }
 
-            string nextKey = providerPath[0];
+            SemanticKey nextKey = providerPath[0];
             if (_externalProviders.TryGetValue(nextKey, out var provider))
             {
                 var remaining = providerPath.Count > 1 ? providerPath.GetRange(1, providerPath.Count - 1) : null;
@@ -136,7 +136,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// This is ideal for consumers (bridges, UI) that need to read an attribute's final value
         /// without necessarily setting its base.
         /// </summary>
-        public Attribute GetOrCreateAttribute(string name, float defaultBaseIfMissing = 0f)
+        public Attribute GetOrCreateAttribute(SemanticKey name, float defaultBaseIfMissing = 0f)
         {
             // GetOrCreate only works locally for safety
             if (!_attributes.TryGetValue(name, out var attr))
@@ -152,20 +152,20 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// method for establishing a character's foundational stats.
         /// Currently GetAttribute(...) will autogenerate the Attribute if missing.
         /// </summary>
-        public void SetOrUpdateBaseValue(string attributeName, float newBase)
+        public void SetOrUpdateBaseValue(SemanticKey attributeName, float newBase)
         {
             var attr = GetOrCreateAttribute(attributeName);
             attr.SetBaseValue(newBase);
         }
 
-        public void AddModifier(string sourceId, IAttributeModifier modifier, string attributeName)
+        public void AddModifier(string sourceId, IAttributeModifier modifier, SemanticKey attributeName)
             => AddModifier(sourceId, modifier, attributeName, null);
 
         /// <summary>
         /// Adds a modifier, traversing the provider path if necessary.
         /// Handles queuing for missing providers automatically.
         /// </summary>
-        public void AddModifier(string sourceId, IAttributeModifier modifier, string attributeName, List<string> providerPath)
+        public void AddModifier(string sourceId, IAttributeModifier modifier, SemanticKey attributeName, List<SemanticKey> providerPath)
         {
             // Base Case: Local Add
             if (providerPath == null || providerPath.Count == 0)
@@ -176,8 +176,8 @@ namespace ReactiveSolutions.AttributeSystem.Core
             }
 
             // Recursive Step
-            string nextKey = providerPath[0];
-            var remaining = providerPath.Count > 1 ? providerPath.GetRange(1, providerPath.Count - 1) : new List<string>();
+            SemanticKey nextKey = providerPath[0];
+            var remaining = providerPath.Count > 1 ? providerPath.GetRange(1, providerPath.Count - 1) : new List<SemanticKey>();
 
             if (_externalProviders.TryGetValue(nextKey, out var provider))
             {

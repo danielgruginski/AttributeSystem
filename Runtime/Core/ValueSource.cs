@@ -1,4 +1,5 @@
 ﻿using ReactiveSolutions.AttributeSystem.Core.Data;
+using SemanticKeys;
 using System;
 using System.Collections.Generic;
 using UniRx;
@@ -16,10 +17,10 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         [Header("Attribute Reference")]
         [Tooltip("The name of the attribute to read (e.g. 'Strength').")]
-        public string AttributeName;
+        public SemanticKey AttributeName;
 
         [Tooltip("The path to the provider. Empty = Local. Example: ['Owner', 'EquippedWeapon']")]
-        public List<string> ProviderPath = new List<string>();
+        public List<SemanticKey> ProviderPath = new List<SemanticKey>();
 
         // Stores the processor that 'owns' this source definition (e.g., the Weapon).
         // This is not serialized; it is set at runtime when the StatBlock is applied.

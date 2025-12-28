@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using SemanticKeys;
+using UnityEngine;
 
 namespace ReactiveSolutions.AttributeSystem.Unity
 {
@@ -18,8 +19,8 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         [SerializeField] private AttributeController _provider;
 
         [Header("Configuration")]
-        [Tooltip("The key used in dot notation (e.g., if Alias is 'Owner', use 'Owner.Strength').")]
-        [SerializeField] private string _alias = "Owner";
+        [Tooltip("The key that will me used in the path to refer to this object (e.g. Owner, Holder, EquippedItem)")]
+        [SerializeField] private SemanticKey _alias;
 
         [Tooltip("If true, the link is established during Awake.")]
         [SerializeField] private bool _linkOnAwake = true;
@@ -66,6 +67,6 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         }
 
         public void SetReceiver(AttributeController receiver) => _receiver = receiver;
-        public void SetAlias(string alias) => _alias = alias;
+        public void SetAlias(SemanticKey alias) => _alias = alias;
     }
 }

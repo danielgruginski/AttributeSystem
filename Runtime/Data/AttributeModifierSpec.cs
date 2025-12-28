@@ -1,5 +1,6 @@
 ﻿using Mono.Cecil;
 using ReactiveSolutions.AttributeSystem.Core.Modifiers;
+using SemanticKeys;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -17,9 +18,9 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
 
         [Header("Target Identity")]
         [Tooltip("The name of the attribute to modify.")]
-        public string TargetAttribute;
+        public SemanticKey TargetAttribute;
         [Tooltip("Path to the provider hosting the target attribute. Empty = Local.")]
-        public List<string> TargetPath = new List<string>(); // New Field for Target Path
+        public List<SemanticKey> TargetPath = new List<SemanticKey>(); // New Field for Target Path
 
         public string SourceId;
 
@@ -32,8 +33,8 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         public ValueSource.SourceMode SourceMode = ValueSource.SourceMode.Constant;
         public float ConstantValue;
 
-        public string AttributeName; // Was 'AttributePath'
-        public List<string> ProviderPath = new List<string>(); // New field
+        public SemanticKey AttributeName; // Was 'AttributePath'
+        public List<SemanticKey> ProviderPath = new List<SemanticKey>(); // New field
 
         [Header("Linear Math Parameters")]
         public float Coeff = 1f;
@@ -52,7 +53,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
                 Mode = SourceMode,
                 ConstantValue = ConstantValue,
                 AttributeName = AttributeName,
-                ProviderPath = new List<string>(ProviderPath) // Deep copy
+                ProviderPath = new List<SemanticKey>(ProviderPath) // Deep copy
             };
 
             if (context != null)
@@ -77,7 +78,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         {
             return new AttributeModifierSpec
             {
-                TargetAttribute = "",
+                TargetAttribute = SemanticKey.None,
                 SourceId = "NewSource",
                 Category = ModifierCategory.Linear,
                 Type = ModifierType.Additive,

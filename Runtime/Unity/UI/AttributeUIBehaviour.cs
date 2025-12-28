@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using UniRx;
 using System;
+using SemanticKeys;
 
 namespace ReactiveSolutions.AttributeSystem.Unity.UI
 {
@@ -36,7 +37,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity.UI
         /// Internalizes the triple-wait logic.
         /// Call this in Awake or Start to bind a specific attribute to a callback.
         /// </summary>
-        protected void MonitorAttribute(string attributeName, Action<float> onValueChanged)
+        protected void MonitorAttribute(SemanticKey attributeName, Action<float> onValueChanged)
         {
             Debug.Assert(!string.IsNullOrEmpty(attributeName), $"[AttributeUI] Attribute name is null or empty on {gameObject.name}");
 
