@@ -18,6 +18,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
             public float Value;
         }
 
+        public string BlockName = "New Block"; // Helper for editor naming
         public List<BaseValueEntry> BaseValues = new List<BaseValueEntry>();
         public List<AttributeModifierSpec> Modifiers = new List<AttributeModifierSpec>();
 
@@ -38,7 +39,10 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
             // 2. Apply Modifiers
             foreach (var spec in Modifiers)
             {
-                var modifier = spec.CreateModifier();
+                // We pass 'processor' here so the modifier knows who created it (The Context).
+                // This ensures that if the modifier target is remote (e.g. "Owner.Strength"),
+                // the modifier source (e.g. "ItemLevel") is still resolved against THIS processor.
+                var modifier = spec.CreateModifier(processor);
                 processor.AddModifier(spec.SourceId, modifier, spec.TargetAttribute);
             }
         }

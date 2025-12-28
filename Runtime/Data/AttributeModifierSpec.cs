@@ -32,11 +32,12 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         public float Coeff = 1f;
         public float Addend = 0f;
 
+
         /// <summary>
         /// Converts this data spec into a functional reactive modifier.
-        /// This replaces the need for a separate Factory class.
+        /// Optionally accepts a 'context' (the processor creating this modifier) to bake into the source.
         /// </summary>
-        public IAttributeModifier CreateModifier()
+        public IAttributeModifier CreateModifier(AttributeProcessor context = null)
         {
             // Build the ValueSource from the flat fields
             var source = new ValueSource
@@ -46,16 +47,22 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
                 AttributePath = AttributePath
             };
 
+            // CRITICAL: Bind the source to the creator context
+            if (context != null)
+            {
+                source.BakeContext(context);
+            }
+
             switch (Category)
             {
                 case ModifierCategory.Linear:
                     return new LinearAttributeModifier(SourceId, Type, Priority, source, Coeff, Addend);
 
-                // Note: If you add more complex modifiers (like Segmented), 
-                // you would map them here or use [SerializeReference] for even cleaner code.
+                // Note: If you have Segmented or other types, ensure they use 'source' correctly.
 
                 default:
-                    throw new NotImplementedException($"[ModifierSpec] Category {Category} is not implemented.");
+                    // Fallback for safety
+                    return new LinearAttributeModifier(SourceId, Type, Priority, source, 1f, 0f);
             }
         }
 
