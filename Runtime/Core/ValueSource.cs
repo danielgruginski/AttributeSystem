@@ -47,5 +47,8 @@ namespace ReactiveSolutions.AttributeSystem.Core
             return contextToUse.GetAttributeObservable(AttributeName, ProviderPath)
                 .SelectMany(attr => attr.ReactivePropertyAccess);
         }
+
+        public static ValueSource Const(float val) => new ValueSource { Mode = ValueSource.SourceMode.Constant, ConstantValue = val };
+
     }
 }

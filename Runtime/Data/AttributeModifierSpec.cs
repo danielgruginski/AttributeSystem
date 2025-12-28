@@ -1,89 +1,87 @@
-﻿using Mono.Cecil;
-using ReactiveSolutions.AttributeSystem.Core.Modifiers;
+﻿using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using SemanticKeys;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace ReactiveSolutions.AttributeSystem.Core.Data
 {
-    /// <summary>
-    /// A serializable DTO (Data Transfer Object) used in StatBlocks or JSON.
-    /// This acts as the "Blueprint" for a modifier.
-    /// </summary>
     [Serializable]
     public class AttributeModifierSpec
     {
-        public enum ModifierCategory { Linear, SegmentedMultiplier }
-
-        [Header("Target Identity")]
-        [Tooltip("The name of the attribute to modify.")]
+        [Header("Target")]
         public SemanticKey TargetAttribute;
-        [Tooltip("Path to the provider hosting the target attribute. Empty = Local.")]
-        public List<SemanticKey> TargetPath = new List<SemanticKey>(); // New Field for Target Path
-
+        public List<SemanticKey> TargetPath = new List<SemanticKey>();
         public string SourceId;
 
-        [Header("Pipeline Settings")]
-        public ModifierCategory Category = ModifierCategory.Linear;
+        [Header("Pipeline")]
         public ModifierType Type = ModifierType.Additive;
         public int Priority = 0;
 
-        [Header("Value Source Data")]
-        public ValueSource.SourceMode SourceMode = ValueSource.SourceMode.Constant;
-        public float ConstantValue;
+        [Header("Logic")]
+        public SemanticKey LogicType;
 
-        public SemanticKey AttributeName; // Was 'AttributePath'
-        public List<SemanticKey> ProviderPath = new List<SemanticKey>(); // New field
+        [Header("Unified Arguments")]
+        [Tooltip("Define all inputs here. Use Mode=Constant for static values, Mode=Attribute for dynamic ones.")]
+        public List<ValueSource> Arguments = new List<ValueSource>();
 
-        [Header("Linear Math Parameters")]
-        public float Coeff = 1f;
-        public float Addend = 0f;
-
+        // --- LEGACY FIELDS ---
+        // Kept to ensure Unity doesn't delete data on deserialization.
+        // The CreateModifier method migrates these into 'Arguments' at runtime.
+        [HideInInspector] public List<ValueSource> Inputs;
+        [HideInInspector] public List<float> Constants;
+        [HideInInspector] public ModifierCategory Category;
+        [HideInInspector] public float Coeff = 1f;
+        [HideInInspector] public float Addend = 0f;
+        [HideInInspector] public float ConstantValue;
+        [HideInInspector] public ValueSource.SourceMode SourceMode;
+        // ---------------------
 
         /// <summary>
-        /// Converts this data spec into a functional reactive modifier.
-        /// Optionally accepts a 'context' (the processor creating this modifier) to bake into the source.
+        /// Creates the modifier using the provided Factory service.
         /// </summary>
-
-        public IAttributeModifier CreateModifier(AttributeProcessor context = null)
+        public IAttributeModifier CreateModifier(IModifierFactory factory, AttributeProcessor context = null)
         {
-            var source = new ValueSource
-            {
-                Mode = SourceMode,
-                ConstantValue = ConstantValue,
-                AttributeName = AttributeName,
-                ProviderPath = new List<SemanticKey>(ProviderPath) // Deep copy
-            };
+            // 1. Migrate (Legacy support)
+            var finalArgs = new List<ValueSource>();
+            if (Arguments != null && Arguments.Count > 0) finalArgs.AddRange(Arguments);
+            else MigrateLegacyData(finalArgs);
 
+            // 2. Bake Context
             if (context != null)
             {
-                source.BakeContext(context);
+                foreach (var arg in finalArgs) arg.BakeContext(context);
             }
 
-            switch (Category)
-            {
-                case ModifierCategory.Linear:
-                    return new LinearAttributeModifier(SourceId, Type, Priority, source, Coeff, Addend);
-
-                default:
-                    return new LinearAttributeModifier(SourceId, Type, Priority, source, 1f, 0f);
-            }
+            // 3. Create via INJECTED Factory
+            var args = new ModifierArgs(SourceId, Type, Priority, finalArgs);
+            return factory.Create(LogicType, args);
         }
 
-        /// <summary>
-        /// Helper to create a default spec for the JSON Authoring window.
-        /// </summary>
-        public static AttributeModifierSpec CreateDefault()
+        private void MigrateLegacyData(List<ValueSource> targetList)
         {
-            return new AttributeModifierSpec
+            if (Inputs != null && Inputs.Count > 0) targetList.AddRange(Inputs);
+            if (Constants != null && Constants.Count > 0)
+                targetList.AddRange(Constants.Select(c => new ValueSource { Mode = ValueSource.SourceMode.Constant, ConstantValue = c }));
+
+            if (targetList.Count == 0)
             {
-                TargetAttribute = SemanticKey.None,
-                SourceId = "NewSource",
-                Category = ModifierCategory.Linear,
-                Type = ModifierType.Additive,
-                ConstantValue = 1.0f
-            };
+                if (Category == ModifierCategory.Linear)
+                {
+                    LogicType = sk.Modifiers.Linear;
+                    targetList.Add(new ValueSource { Mode = SourceMode, ConstantValue = ConstantValue });
+                    targetList.Add(new ValueSource { Mode = ValueSource.SourceMode.Constant, ConstantValue = Coeff });
+                    targetList.Add(new ValueSource { Mode = ValueSource.SourceMode.Constant, ConstantValue = Addend });
+                }
+                else
+                {
+                    LogicType = sk.Modifiers.Static;
+                    targetList.Add(new ValueSource { Mode = ValueSource.SourceMode.Constant, ConstantValue = ConstantValue });
+                }
+            }
         }
     }
+
+    public enum ModifierCategory { Linear, SegmentedMultiplier }
 }

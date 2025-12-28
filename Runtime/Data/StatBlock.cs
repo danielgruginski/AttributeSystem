@@ -24,9 +24,9 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         public List<AttributeModifierSpec> Modifiers = new List<AttributeModifierSpec>();
 
         /// <summary>
-        /// Populates a processor with the data from this block.
+        /// Populates a processor. Requires a ModifierFactory to resolve logic types.
         /// </summary>
-        public void ApplyToProcessor(AttributeProcessor processor)
+        public void ApplyToProcessor(AttributeProcessor processor, IModifierFactory factory)
         {
             // 1. Set Base Values
             foreach (var entry in BaseValues)
@@ -40,10 +40,8 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
             // 2. Apply Modifiers
             foreach (var spec in Modifiers)
             {
-                // We pass 'processor' here so the modifier knows who created it (The Context).
-                // This ensures that if the modifier target is remote (e.g. "Owner.Strength"),
-                // the modifier source (e.g. "ItemLevel") is still resolved against THIS processor.
-                var modifier = spec.CreateModifier(processor);
+                // Pass the factory down to the spec
+                var modifier = spec.CreateModifier(factory, processor);
                 processor.AddModifier(spec.SourceId, modifier, spec.TargetAttribute, spec.TargetPath);
             }
         }

@@ -23,6 +23,16 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         // We wrap steps in Actions to allow easy permutation testing
         private Dictionary<string, Action> _steps;
 
+        // Helper to wrap inputs into standard Linear Modifier Args (Input, 1, 0)
+        private ModifierArgs CreateLinearArgs(string sourceId, ValueSource input)
+        {
+            return new ModifierArgs(
+                sourceId,
+                ModifierType.Additive,
+                0,
+                new List<ValueSource> { input, ValueSource.Const(1f), ValueSource.Const(0f) }
+            );
+        }
         [SetUp]
         public void Setup()
         {
@@ -58,8 +68,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 ProviderPath = new List<SemanticKey> { TestKeys.Mock("Owner") }
             };
 
-            var mod = new LinearAttributeModifier("CasterScaling", ModifierType.Additive, 0, source, 1f, 0f);
 
+            var mod = new LinearModifier(CreateLinearArgs("CasterScaling", source));
 
             var AttributeName = TestKeys.Mock("ItemLevel");
             var ProviderPath = new List<SemanticKey> { TestKeys.Mock("EquippedWeapon") };
@@ -99,7 +109,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 ProviderPath = new List<SemanticKey> { TestKeys.Mock("EquippedWeapon") }
             };
 
-            var mod = new LinearAttributeModifier("ItemScaling", ModifierType.Additive, 0, source, 1f, 0f);
+            var mod = new LinearModifier(CreateLinearArgs("ItemScaling", source));
 
             // Weapon adds this to its Owner
 
@@ -198,8 +208,13 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             };
             sourceA.BakeContext(magicSword); // Explicitly bake context so it finds CasterLevel on MagicSword
 
-            var modA = new LinearAttributeModifier("MagicSwordSelfBuff", ModifierType.Additive, 0, sourceA, 1f, 0f);
-            magicSword.AddModifier("SelfBuff", modA, TestKeys.Mock("Damage"));
+            // Manual Arg construction
+            var modA = new LinearModifier(new ModifierArgs(
+                "MagicSwordSelfBuff",
+                ModifierType.Additive,
+                0,
+                new List<ValueSource> { sourceA, ValueSource.Const(1f), ValueSource.Const(0f) }
+            )); magicSword.AddModifier("SelfBuff", modA, TestKeys.Mock("Damage"));
 
             // Mod B: Owner->Hireling->EquippedWeapon->Damage += Self CasterLevel
             var sourceB = new ValueSource
@@ -210,7 +225,12 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             sourceB.BakeContext(magicSword); // Source is still MagicSword.CasterLevel
 
             string shareBuffId = "MagicSwordShareBuff";
-            var modB = new LinearAttributeModifier(shareBuffId, ModifierType.Additive, 0, sourceB, 1f, 0f);
+            var modB = new LinearModifier(new ModifierArgs(
+                shareBuffId,
+                ModifierType.Additive,
+                0,
+                new List<ValueSource> { sourceB, ValueSource.Const(1f), ValueSource.Const(0f) }
+            ));
             
             // Target Path: Owner -> Hireling -> EquippedWeapon
             var targetPath = new List<SemanticKey>
