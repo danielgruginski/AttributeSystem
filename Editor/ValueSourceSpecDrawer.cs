@@ -1,84 +1,83 @@
-﻿using ReactiveSolutions.AttributeSystem;
-using ReactiveSolutions.AttributeSystem.Core;
-using ReactiveSolutions.AttributeSystem.Core.Data;
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
+using ReactiveSolutions.AttributeSystem.Core;
 
 namespace ReactiveSolutions.AttributeSystem.Editor
 {
     [CustomPropertyDrawer(typeof(ValueSource))]
     public class ValueSourceSpecDrawer : PropertyDrawer
     {
-        public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-        {
-            // We squeeze everything into one line for compactness
-            return EditorGUIUtility.singleLineHeight;
-        }
+        // Constants for layout
+        private const float ModeWidth = 80f;
+        private const float Padding = 5f;
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             EditorGUI.BeginProperty(position, label, property);
 
-            var typeProp = property.FindPropertyRelative("Type");
-            var constProp = property.FindPropertyRelative("ConstantValue");
-            var attrProp = property.FindPropertyRelative("AttributeName");
+            // 1. Fetch Properties (Safe Checks)
+            var modeProp = property.FindPropertyRelative("Mode");
+            var constantProp = property.FindPropertyRelative("ConstantValue");
+            var attrNameProp = property.FindPropertyRelative("AttributeName");
+            var providerPathProp = property.FindPropertyRelative("ProviderPath");
 
-            // Layout: Label | Dropdown (30%) | Value Field (Remaining)
-
-            // 1. Label
-            Rect labelRect = new Rect(position.x, position.y, EditorGUIUtility.labelWidth, position.height);
-            EditorGUI.LabelField(labelRect, label);
-
-            // Calculate remaining width
-            float contentX = position.x + EditorGUIUtility.labelWidth;
-            float contentWidth = position.width - EditorGUIUtility.labelWidth;
-
-            // 2. Type Dropdown
-            float typeWidth = contentWidth * 0.35f;
-            Rect typeRect = new Rect(contentX, position.y, typeWidth, position.height);
-            EditorGUI.PropertyField(typeRect, typeProp, GUIContent.none);
-
-            // 3. Value Field (Context Sensitive)
-            float valueX = contentX + typeWidth + 5f;
-            float valueWidth = contentWidth - typeWidth - 5f;
-            Rect valueRect = new Rect(valueX, position.y, valueWidth, position.height);
-
-            int typeIndex = typeProp.enumValueIndex; // 0 = Constant, 1 = Attribute (based on ValueSource.SourceType enum)
-
-            if (typeIndex == 0) // Constant
+            if (modeProp == null)
             {
-                EditorGUI.PropertyField(valueRect, constProp, GUIContent.none);
+                EditorGUI.LabelField(position, "Error: ValueSource fields not found.");
+                EditorGUI.EndProperty();
+                return;
             }
-            else // Attribute
+
+            // 2. Draw Label (if inside a list, this is "Element X" or our custom label)
+            position = EditorGUI.PrefixLabel(position, GUIUtility.GetControlID(FocusType.Passive), label);
+
+            // 3. Draw Mode Dropdown
+            var modeRect = new Rect(position.x, position.y, ModeWidth, position.height);
+            EditorGUI.PropertyField(modeRect, modeProp, GUIContent.none);
+
+            // 4. Draw Context-Specific Field
+            var valueRect = new Rect(position.x + ModeWidth + Padding, position.y, position.width - ModeWidth - Padding, position.height);
+
+            int modeIndex = modeProp.enumValueIndex;
+            // Assuming Enum Order: 0 = Constant, 1 = Attribute (Check your Enum definition!)
+
+            if (modeIndex == (int)ValueSource.SourceMode.Constant)
             {
-                // You could use your existing StatBlockIDDrawer logic here if you wanted a dropdown of attributes!
-                // For now, a text field is safe.
-                string currentVal = attrProp.stringValue;
-                string newVal = EditorGUI.TextField(valueRect, currentVal);
-                if (newVal != currentVal)
+                if (constantProp != null)
+                    EditorGUI.PropertyField(valueRect, constantProp, GUIContent.none);
+            }
+            else // Attribute Mode
+            {
+                // Draw Attribute Name and potentially Provider Path
+
+                float halfWidth = valueRect.width * 0.5f;
+                var attrRect = new Rect(valueRect.x, valueRect.y, halfWidth, valueRect.height);
+                var pathRect = new Rect(valueRect.x + halfWidth, valueRect.y, halfWidth, valueRect.height);
+
+                if (attrNameProp != null)
                 {
-                    attrProp.stringValue = newVal;
+                    // FIX: Use PropertyField directly. 
+                    // Since 'attrNameProp' is a SemanticKey, Unity will automatically invoke SemanticKeyDrawer.
+                    // This replaces the manual TextField logic that was breaking things.
+                    EditorGUI.PropertyField(attrRect, attrNameProp, GUIContent.none);
                 }
 
-                if (string.IsNullOrEmpty(attrProp.stringValue))
+                // Optional: Show Provider Path count or simplified view
+                if (providerPathProp != null)
                 {
-                    // Placeholder hint
-                    GUIColorScope(Color.gray, () =>
-                    {
-                        EditorGUI.LabelField(valueRect, "Attribute Name");
-                    });
+                    // Draw a label showing path count, or ideally a foldout if space permitted.
+                    // For a single line drawer, a label is safest.
+                    string pathInfo = providerPathProp.arraySize > 0 ? $" [{providerPathProp.arraySize} Path Nodes]" : " [Local]";
+                    EditorGUI.LabelField(pathRect, pathInfo, EditorStyles.miniLabel);
                 }
             }
 
             EditorGUI.EndProperty();
         }
 
-        private void GUIColorScope(Color color, System.Action action)
+        public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
-            Color c = GUI.color;
-            GUI.color = color;
-            action();
-            GUI.color = c;
+            return EditorGUIUtility.singleLineHeight;
         }
     }
 }
