@@ -1,8 +1,9 @@
 ﻿using ReactiveSolutions.AttributeSystem.Core;
+using ReactiveSolutions.AttributeSystem.Core.Data;
+using SemanticKeys;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using ReactiveSolutions.AttributeSystem.Core.Data;
 
 namespace ReactiveSolutions.AttributeSystem.Unity
 {
@@ -16,7 +17,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         [System.Serializable]
         public struct BaseAttributeEntry
         {
-            public string Name;
+            public SemanticKey Name;
             public float BaseValue;
         }
 
@@ -50,18 +51,18 @@ namespace ReactiveSolutions.AttributeSystem.Unity
 
         // --- Bridge Methods to Processor ---
 
-        public Core.Attribute GetAttribute(string name) => Processor.GetAttribute(name);
+        public Core.Attribute GetAttribute(SemanticKey name) => Processor.GetAttribute(name);
 
         /// <summary>
         /// Allows external systems (like StatBlockLinker) to inject values directly.
         /// </summary>
-        public void AddAttribute(string name, float baseValue) => Processor.SetOrUpdateBaseValue(name, baseValue);
+        public void AddAttribute(SemanticKey name, float baseValue) => Processor.SetOrUpdateBaseValue(name, baseValue);
 
         /// <summary>
         /// Registers another controller as a provider (e.g. linking the Player as "Owner").
         /// This resolves any pending modifiers waiting for this key.
         /// </summary>
-        public void LinkProvider(string key, AttributeController provider)
+        public void LinkProvider(SemanticKey key, AttributeController provider)
         {
             if (provider != null)
             {
@@ -73,7 +74,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         /// Bridges the Processor's reactive search. 
         /// Use this to avoid race conditions during initialization.
         /// </summary>
-        public IObservable<Core.Attribute> GetAttributeObservable(string name)
+        public IObservable<Core.Attribute> GetAttributeObservable(SemanticKey name)
             => Processor.GetAttributeObservable(name);
     }
 }

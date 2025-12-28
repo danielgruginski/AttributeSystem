@@ -3,6 +3,7 @@ using UniRx;
 using System;
 using ReactiveSolutions.AttributeSystem.Core;
 using TMPro;
+using SemanticKeys;
 
 namespace ReactiveSolutions.AttributeSystem.Unity.UI
 {
@@ -13,7 +14,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity.UI
     public class AttributeDisplayText : AttributeUIBehaviour
     {
         //[AttributeName]
-        [SerializeField] private string _attributeName;
+        [SerializeField] private SemanticKey _attributeName;
 
         [Header("Formatting")]
         [SerializeField] private string _prefix;

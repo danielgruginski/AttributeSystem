@@ -2,7 +2,9 @@
     "name": "com.reactivesolutions.AttributeSystem.Editor",
     "rootNamespace": "ReactiveSolutions.AttributeSystem.Editor",
     "references": [
-        "com.reactivesolutions.AttributeSystem"
+        "com.reactivesolutions.AttributeSystem",
+        "com.reactivesolutions.semantickeys",
+        "com.reactivesolutions.semantickeys.editor"
     ],
     "includePlatforms": [
         "Editor"

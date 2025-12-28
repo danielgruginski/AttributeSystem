@@ -5,6 +5,7 @@ using ReactiveSolutions.AttributeSystem.Core.Data; // For ValueSource
 using UnityEngine;
 using System;
 using System.Collections.Generic;
+using SemanticKeys;
 
 namespace ReactiveSolutions.AttributeSystem.Tests
 {
@@ -43,7 +44,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
         // Step A: Add CasterLevel to Character (Base 2)
         private void Step_A_AddCasterLevel()
-            => _charProc.SetOrUpdateBaseValue("CasterLevel", 2f);
+            => _charProc.SetOrUpdateBaseValue(TestKeys.Mock("CasterLevel"), 2f);
 
         // Step B: Add modifier: Add CasterLevel value to EquippedWeapon.ItemLevel
         private void Step_B_AddCasterToWeapon()
@@ -53,19 +54,22 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var source = new ValueSource
             {
                 Mode = ValueSource.SourceMode.Attribute,
-                AttributeName = "CasterLevel",
-                ProviderPath = new List<string> { "Owner" }
+                AttributeName = TestKeys.Mock("CasterLevel"),
+                ProviderPath = new List<SemanticKey> { TestKeys.Mock("Owner") }
             };
 
             var mod = new LinearAttributeModifier("CasterScaling", ModifierType.Additive, 0, source, 1f, 0f);
 
+
+            var AttributeName = TestKeys.Mock("ItemLevel");
+            var ProviderPath = new List<SemanticKey> { TestKeys.Mock("EquippedWeapon") };
             // Character tries to push this modifier to its 'EquippedWeapon'
-            _charProc.AddModifier("CasterBonus", mod, "EquippedWeapon.ItemLevel");
+            _charProc.AddModifier("CasterBonus", mod, AttributeName, ProviderPath);
         }
 
         // Step C: Add ItemLevel to Weapon (Base 6)
         private void Step_C_AddItemLevel()
-            => _weapProc.SetOrUpdateBaseValue("ItemLevel", 6f);
+            => _weapProc.SetOrUpdateBaseValue(TestKeys.Mock("ItemLevel"), 6f);
 
         // Step D: Add modifier: Add ItemLevel to Owner.Strength
         private void Step_D_AddItemToStrength()
@@ -91,21 +95,24 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var source = new ValueSource
             {
                 Mode = ValueSource.SourceMode.Attribute,
-                AttributeName = "ItemLevel",
-                ProviderPath = new List<string> { "EquippedWeapon" }
+                AttributeName = TestKeys.Mock("ItemLevel"),
+                ProviderPath = new List<SemanticKey> { TestKeys.Mock("EquippedWeapon") }
             };
 
             var mod = new LinearAttributeModifier("ItemScaling", ModifierType.Additive, 0, source, 1f, 0f);
 
             // Weapon adds this to its Owner
-            _weapProc.AddModifier("ItemBonus", mod, "Owner.Strength");
+
+            var AttributeName = TestKeys.Mock("Strength");
+            var ProviderPath = new List<SemanticKey> { TestKeys.Mock("Owner") };
+            _weapProc.AddModifier("ItemBonus", mod, AttributeName, ProviderPath);
         }
 
         // Step E: Link Character to Weapon as "Owner" (Weapon.Owner = Char)
-        private void Step_E_LinkOwner() => _weapProc.RegisterExternalProvider("Owner", _charProc);
+        private void Step_E_LinkOwner() => _weapProc.RegisterExternalProvider(TestKeys.Mock("Owner"), _charProc);
 
         // Step F: Link Weapon to Character as "EquipedWeapon" (Char.EquippedWeapon = Weap)
-        private void Step_F_LinkEquipped() => _charProc.RegisterExternalProvider("EquippedWeapon", _weapProc);
+        private void Step_F_LinkEquipped() => _charProc.RegisterExternalProvider(TestKeys.Mock("EquippedWeapon"), _weapProc);
 
 
         // --- THE SCENARIOS ---
@@ -175,14 +182,14 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         {
             // 1. Check Weapon ItemLevel
             // Base 6 + CasterLevel(2) = 8
-            var itemLvl = _weapProc.GetAttribute("ItemLevel");
+            var itemLvl = _weapProc.GetAttribute(TestKeys.Mock("ItemLevel"));
             Assert.IsNotNull(itemLvl, "Weapon.ItemLevel missing");
             Assert.AreEqual(8f, itemLvl.ReactivePropertyAccess.Value, "Weapon ItemLevel Calculation Failed");
 
             // 2. Check Character Strength
             // Base 0 + ItemLevel(8) = 8
             // Note: GetAttribute might need to auto-create Strength if Step D was the only thing adding to it
-            var str = _charProc.GetAttribute("Strength");
+            var str = _charProc.GetAttribute(TestKeys.Mock("Strength"));
             // If Step D failed to add the modifier, this might be null or 0
             Assert.IsNotNull(str, "Character.Strength missing");
             Assert.AreEqual(8f, str.ReactivePropertyAccess.Value, "Character Strength Calculation Failed");

@@ -1,4 +1,5 @@
 
+using SemanticKeys;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,7 +14,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
     /// </summary>
     public class Attribute : IDisposable
     {
-        public string Name { get; }
+        public SemanticKey Name { get; }
 
         private readonly ReactiveProperty<float> _baseValue;
         private readonly ReactiveCollection<IAttributeModifier> _modifiers = new();
@@ -29,7 +30,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// Exposes the current modifiers for queries (like removal by SourceId).
         /// </summary>
         public IEnumerable<IAttributeModifier> Modifiers => _modifiers;
-        public Attribute(string name, float initialBase, AttributeProcessor processor)
+        public Attribute(SemanticKey name, float initialBase, AttributeProcessor processor)
         {
             Name = name;
             _processor = processor;
