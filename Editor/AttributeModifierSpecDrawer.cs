@@ -8,6 +8,8 @@ using System.Text;
 using UnityEditor;
 using UnityEngine;
 
+
+
 namespace ReactiveSolutions.AttributeSystem.Editor
 {
     [CustomPropertyDrawer(typeof(AttributeModifierSpec))]
@@ -20,7 +22,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         {
             float h = 0;
 
-            // 1. Header "Modifier Spec"
+            // 1. Header
             h += LineH + Spacing;
 
             // 2. Logic Type (SemanticKey)
@@ -38,47 +40,25 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             // 4. Priority & Type
             h += LineH + Spacing;
 
-            // 5. Arguments (Always Expanded)
-            h += LineH + Spacing; // Header "Parameters"
-
+            // 5. Arguments List
             var argsProp = property.FindPropertyRelative("Arguments");
             if (argsProp != null)
             {
-                // To safely calculate height, we need to know the *intended* size.
-                // We peek at the LogicType to see what it *should* be.
-                var logicTypeProp = property.FindPropertyRelative("LogicType");
-                string currentLogic = "Static";
-                if (logicTypeProp != null)
+                // Calculate height based on CURRENT array size. 
+                // Do not guess or resize here. Trust the serialized data.
+                int arraySize = argsProp.arraySize;
+
+                // Header "Parameters"
+                h += LineH + Spacing;
+
+                for (int i = 0; i < arraySize; i++)
                 {
-                    var logicValueProp = logicTypeProp.FindPropertyRelative("_value");
-                    if (logicValueProp != null) currentLogic = logicValueProp.stringValue;
-                }
-                if (string.IsNullOrEmpty(currentLogic)) currentLogic = "Static";
-
-                string[] paramNames = ModifierFactory.GetParameterNames(currentLogic);
-                int expectedSize = paramNames != null ? paramNames.Length : 0;
-
-                // We use the MAX of current or expected to reserve enough space to avoid overlap
-                // if resizing hasn't happened yet. OnGUI will handle the actual resize.
-                // This prevents "next element draws on top of list" during the resize frame.
-                int displayCount = Mathf.Max(argsProp.arraySize, expectedSize);
-
-                for (int i = 0; i < displayCount; i++)
-                {
-                    // If the element exists, measure it. If not (virtual), assume default height.
-                    if (i < argsProp.arraySize)
-                    {
-                        var element = argsProp.GetArrayElementAtIndex(i);
-                        h += (element != null ? EditorGUI.GetPropertyHeight(element, true) : LineH) + Spacing;
-                    }
-                    else
-                    {
-                        h += LineH + Spacing; // Fallback for pending elements
-                    }
+                    var element = argsProp.GetArrayElementAtIndex(i);
+                    h += (element != null ? EditorGUI.GetPropertyHeight(element, true) : LineH) + Spacing;
                 }
             }
 
-            return h + 10; // Extra padding
+            return h + 10; // Padding
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
@@ -91,7 +71,6 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             Rect contentPos = new Rect(position.x + 5, position.y + 5, position.width - 10, position.height - 10);
             float currentY = contentPos.y;
 
-            // Helper to grab a rect and advance Y
             Rect NextRect(float height)
             {
                 Rect r = new Rect(contentPos.x, currentY, contentPos.width, height);
@@ -102,7 +81,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             // --- 1. Header ---
             EditorGUI.LabelField(NextRect(LineH), "Modifier Spec", EditorStyles.boldLabel);
 
-            // --- 2. Logic Type (SemanticKey) ---
+            // --- 2. Logic Type ---
             var logicTypeProp = property.FindPropertyRelative("LogicType");
             string currentLogic = "Static";
 
@@ -111,18 +90,13 @@ namespace ReactiveSolutions.AttributeSystem.Editor
                 float logicH = EditorGUI.GetPropertyHeight(logicTypeProp);
 
                 EditorGUI.BeginChangeCheck();
-                // This invokes SemanticKeyDrawer (Dropdown) automatically
                 EditorGUI.PropertyField(NextRect(logicH), logicTypeProp, new GUIContent("Logic Operation"));
-
                 if (EditorGUI.EndChangeCheck())
                 {
-                    // CRITICAL FIX: Flush changes immediately so we can read the new value below
                     property.serializedObject.ApplyModifiedProperties();
-                    // Force update of the SerializedObject we are drawing to reflect the change in this frame
                     property.serializedObject.Update();
                 }
 
-                // Read the string value from the inner field to drive the parameter list
                 var logicValueProp = logicTypeProp.FindPropertyRelative("_value");
                 if (logicValueProp != null)
                 {
@@ -142,7 +116,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
                 EditorGUI.PropertyField(NextRect(EditorGUI.GetPropertyHeight(targetPathProp, true)), targetPathProp, new GUIContent("Target Path"), true);
             }
 
-            // --- 4. Configuration Row (Type | Priority) ---
+            // --- 4. Configuration Row ---
             var priorityProp = property.FindPropertyRelative("Priority");
             var modTypeProp = property.FindPropertyRelative("Type");
 
@@ -155,37 +129,31 @@ namespace ReactiveSolutions.AttributeSystem.Editor
                 Rect priRect = new Rect(rowRect.x + colW + 2, rowRect.y, colW - 2, rowRect.height);
 
                 float oldLabelW = EditorGUIUtility.labelWidth;
-
-                // Type
                 EditorGUIUtility.labelWidth = 40;
                 EditorGUI.PropertyField(typeRect, modTypeProp, new GUIContent("Type"));
-
-                // Priority
                 EditorGUIUtility.labelWidth = 30;
                 EditorGUI.PropertyField(priRect, priorityProp, new GUIContent("Pri"));
-
                 EditorGUIUtility.labelWidth = oldLabelW;
             }
 
-            // --- 5. Arguments List (Fixed / Always Expanded) ---
+            // --- 5. Arguments List ---
             var argsProp = property.FindPropertyRelative("Arguments");
             if (argsProp != null)
             {
                 string[] paramNames = ModifierFactory.GetParameterNames(currentLogic);
                 if (paramNames == null) paramNames = new string[0];
 
-                // --- SAFE RESIZING LOGIC ---
+                // Check for resize need
                 if (argsProp.arraySize != paramNames.Length)
                 {
+                    // Resize immediately and Apply.
                     argsProp.arraySize = paramNames.Length;
-
-                    // We apply properties to commit the size change.
                     property.serializedObject.ApplyModifiedProperties();
-                    property.serializedObject.Update();
 
-                    // Note: We do NOT exit here. We continue drawing with the new size.
-                    // Since GetPropertyHeight reserved space for the *max* of old/new size, 
-                    // we should have enough room to draw without overlap.
+                    // Exit to let the next repaint handle drawing with correct sizes.
+                    // This prevents "Invalid GUILayout state" from mismatching array sizes.
+                    EditorGUI.EndProperty();
+                    return;
                 }
 
                 EditorGUI.LabelField(NextRect(LineH), "Parameters", EditorStyles.boldLabel);
@@ -193,7 +161,6 @@ namespace ReactiveSolutions.AttributeSystem.Editor
                 EditorGUI.indentLevel++;
                 for (int i = 0; i < argsProp.arraySize; i++)
                 {
-                    // Safety break
                     if (i >= paramNames.Length) break;
 
                     var element = argsProp.GetArrayElementAtIndex(i);
@@ -201,9 +168,6 @@ namespace ReactiveSolutions.AttributeSystem.Editor
                     {
                         string paramLabel = paramNames[i];
                         float elHeight = EditorGUI.GetPropertyHeight(element, true);
-
-                        // We use PropertyField, which invokes ValueSourceSpecDrawer
-                        // This uses the specific label from paramNames instead of "Element X"
                         EditorGUI.PropertyField(NextRect(elHeight), element, new GUIContent(paramLabel), true);
                     }
                 }
