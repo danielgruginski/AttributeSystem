@@ -1,55 +1,34 @@
 ﻿using System;
 using System.Collections.Generic;
-using SemanticKeys;
 
 namespace ReactiveSolutions.AttributeSystem.Core
 {
     /// <summary>
     /// Represents a "Live" instance of a StatBlock applied to a processor.
-    /// Keeps track of the specific modifier instances created so they can be removed cleanly.
+    /// Keeps track of the disposable handles for all applied modifiers so they can be removed cleanly.
     /// </summary>
     public class ActiveStatBlock : IDisposable
     {
-        private readonly AttributeProcessor _targetProcessor;
-        private readonly List<AppliedModifierInfo> _appliedModifiers = new();
-
-        public ActiveStatBlock(AttributeProcessor targetProcessor)
-        {
-            _targetProcessor = targetProcessor;
-        }
+        private readonly List<IDisposable> _handles = new List<IDisposable>();
 
         /// <summary>
-        /// Registers a modifier that was just added to the processor.
+        /// Registers a cleanup handle (usually from AttributeProcessor.AddModifier).
         /// </summary>
-        public void Track(IAttributeModifier modifier, SemanticKey targetAttribute, List<SemanticKey> path)
+        public void AddHandle(IDisposable handle)
         {
-            _appliedModifiers.Add(new AppliedModifierInfo
-            {
-                Modifier = modifier,
-                Target = targetAttribute,
-                Path = path
-            });
+            if (handle != null) _handles.Add(handle);
         }
 
         /// <summary>
-        /// Removes all modifiers tracked by this instance from the processor.
+        /// Disposes all registered handles, effectively removing the modifiers from their targets.
         /// </summary>
         public void Dispose()
         {
-            foreach (var info in _appliedModifiers)
+            foreach (var handle in _handles)
             {
-                // We remove by INSTANCE, so even if 10 modifiers have SourceID="Sword",
-                // only THIS specific one is removed.
-                _targetProcessor.RemoveModifier(info.Modifier, info.Target, info.Path);
+                handle.Dispose();
             }
-            _appliedModifiers.Clear();
-        }
-
-        private struct AppliedModifierInfo
-        {
-            public IAttributeModifier Modifier;
-            public SemanticKey Target;
-            public List<SemanticKey> Path;
+            _handles.Clear();
         }
     }
 }

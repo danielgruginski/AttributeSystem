@@ -109,15 +109,19 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // Using LinearAttributeModifier since we have the source
             var source = new ValueSource { Mode = ValueSource.SourceMode.Constant, ConstantValue = 5f };
 
-            var mod = new StaticAttributeModifier( new ModifierArgs(
-                "Buff",
-                ModifierType.Additive,
-                0,
-                new List<ValueSource> { source }
-            ));
+            var scalingSpec = new AttributeModifierSpec
+            {
+                SourceId = "SpeedScaling",
+                Type = ModifierType.Additive,
+                Priority = 0,
+                LogicType = sk.Modifiers.Linear,
+                Arguments = new List<ValueSource> { source, ValueSource.Const(1f), ValueSource.Const(0f) }
+            };
+
+            var mod = new LinearModifier(scalingSpec);
 
             // Act
-            _processor.AddModifier(TestKeys.Mock("TestBuff"), mod, TestKeys.Mock("Speed"));
+            _processor.AddModifier("TestIDforSpeed", mod, TestKeys.Mock("Speed"));
 
             // Assert
             // 10 (Base) + 5 (Mod) = 15
@@ -184,16 +188,17 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 AttributeRef = new AttributeReference(TestKeys.Mock("Strength"), new List<SemanticKey> { TestKeys.Mock("Owner") })              
             };
 
-            // NEW ARCHITECTURE: Use LinearModifier and ModifierArgs
-            var args = new ModifierArgs(
-                "StrengthScaling",
-                ModifierType.Additive,
-                0,
-                // Args: [Input(Source), Coeff(1), Addend(0)]
-                new List<ValueSource> { source, ValueSource.Const(1f), ValueSource.Const(0f) }
-            );
+            var scalingSpec = new AttributeModifierSpec
+            {
+                SourceId = "StrengthScaling",
+                Type = ModifierType.Additive,
+                Priority = 0,
+                LogicType = sk.Modifiers.Linear,
+                Arguments = new List<ValueSource> { source, ValueSource.Const(1f), ValueSource.Const(0f) }
+            };
 
-            var mod = new LinearModifier(args);
+
+            var mod = new LinearModifier(scalingSpec);
 
             _processor.AddModifier("ScalingMod", mod, TestKeys.Mock("Damage"));
 

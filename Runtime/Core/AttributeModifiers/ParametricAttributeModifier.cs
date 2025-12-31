@@ -56,8 +56,8 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
         private readonly Func<IList<float>, float> _operation;
 
         // Constructor matches the Unified ModifierArgs
-        public FunctionalModifier(ModifierArgs args, Func<IList<float>, float> operation)
-            : base(args.SourceId, args.Type, args.Priority, args.Arguments)
+        public FunctionalModifier(AttributeModifierSpec spec, Func<IList<float>, float> operation)
+            : base(spec.SourceId, spec.Type, spec.Priority, spec.Arguments)
         {
             _operation = operation;
         }
@@ -77,8 +77,8 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     /// </summary>
     public class LinearModifier : ParametricAttributeModifier
     {
-        public LinearModifier(ModifierArgs args)
-            : base(args.SourceId, args.Type, args.Priority, args.Arguments) { }
+        public LinearModifier(AttributeModifierSpec spec)
+            : base(spec.SourceId, spec.Type, spec.Priority, spec.Arguments) { }
 
         protected override float Calculate(IList<float> args)
         {
@@ -95,8 +95,8 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     /// </summary>
     public class PolynomialModifier : ParametricAttributeModifier
     {
-        public PolynomialModifier(ModifierArgs args)
-            : base(args.SourceId, args.Type, args.Priority, args.Arguments) { }
+        public PolynomialModifier(AttributeModifierSpec spec)
+            : base(spec.SourceId, spec.Type, spec.Priority, spec.Arguments) { }
 
         protected override float Calculate(IList<float> args)
         {
@@ -113,8 +113,8 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     /// </summary>
     public class StaticAttributeModifier : ParametricAttributeModifier
     {
-        public StaticAttributeModifier(ModifierArgs args)
-            : base(args.SourceId, args.Type, args.Priority, args.Arguments) { }
+        public StaticAttributeModifier(AttributeModifierSpec spec)
+            : base(spec.SourceId, spec.Type, spec.Priority, spec.Arguments) { }
 
         protected override float Calculate(IList<float> args)
         {

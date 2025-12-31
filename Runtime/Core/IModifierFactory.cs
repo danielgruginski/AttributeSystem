@@ -7,7 +7,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
     public interface IModifierFactory
     {
         void Register(string id, ModifierBuilder builder);
-        IAttributeModifier Create(string id, ModifierArgs args);
+        IAttributeModifier Create(string id, AttributeModifierSpec spec);
         IAttributeModifier Create(AttributeModifierSpec spec, AttributeProcessor context);
         IEnumerable<string> GetAvailableTypes();
     }
@@ -15,25 +15,5 @@ namespace ReactiveSolutions.AttributeSystem.Core
     /// <summary>
     /// Delegate for creating a modifier instance.
     /// </summary>
-    public delegate IAttributeModifier ModifierBuilder(ModifierArgs args);
-
-
-    /// <summary>
-    /// Unified arguments structure passed to builders.
-    /// </summary>
-    /*public struct ModifierArgs
-    {
-        public string SourceId;
-        public ModifierType Type;
-        public int Priority;
-        public IList<ValueSource> Arguments;
-
-        public ModifierArgs(string sourceId, ModifierType type, int priority, IList<ValueSource> arguments)
-        {
-            SourceId = sourceId;
-            Type = type;
-            Priority = priority;
-            Arguments = arguments;
-        }
-    }*/
+    public delegate IAttributeModifier ModifierBuilder(AttributeModifierSpec spec);
 }

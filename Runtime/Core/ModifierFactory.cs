@@ -96,14 +96,14 @@ namespace ReactiveSolutions.AttributeSystem.Core
         // Keep the interface implementation
         public void Register(string id, ModifierBuilder builder) => Register(id, builder, "Value"); // Default fallback
 
-        public IAttributeModifier Create(string id, ModifierArgs args)
+        public IAttributeModifier Create(string id, AttributeModifierSpec spec)
         {
             if (string.IsNullOrEmpty(id) || !_registry.TryGetValue(id, out var builder))
             {
                 // Fallback / Null Object Pattern
-                return new StaticAttributeModifier(args);
+                return new StaticAttributeModifier(spec);
             }
-            return builder(args);
+            return builder(spec);
         }
 
         /// <summary>
@@ -123,8 +123,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             }
 
             // 3. Create
-            var args = new ModifierArgs(spec.SourceId, spec.Type, spec.Priority, finalArgs);
-            return Create(spec.LogicType, args);
+            return Create(spec.LogicType, spec);
         }
 
 

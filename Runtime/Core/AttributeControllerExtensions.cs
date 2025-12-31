@@ -2,12 +2,15 @@
 using ReactiveSolutions.AttributeSystem.Core.Data;
 using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using SemanticKeys;
+using sk;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
-
+/*
 namespace ReactiveSolutions.AttributeSystem.Unity
 {
+
     /// <summary>
     /// Extension methods providing a developer-friendly API for adding modifiers.
     /// Acts as a facade over the Core AttributeProcessor.
@@ -21,17 +24,24 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         /// <summary>
         /// Adds a simple constant modification.
         /// </summary>
-        public static void AddFlatMod(this AttributeController controller, string sourceId, string targetAttr, float value, ModifierType type = ModifierType.Additive, int priority = 10)
+        public static IDisposable AddFlatMod(this AttributeController controller, string sourceId, string targetAttr, float value, ModifierType type = ModifierType.Additive, int priority = 10)
         {
-            var args = new ModifierArgs(sourceId, type, priority, new List<ValueSource> { ValueSource.Const(value) });
-            var mod = new StaticAttributeModifier(args);
-            controller.Processor.AddModifier(sourceId, mod, Key(targetAttr));
+            var specs = new AttributeModifierSpec() {
+                SourceId = sourceId,
+                TargetAttribute = Key(targetAttr),
+                Type = type,
+                Priority = priority,
+                LogicType = Modifiers.Static,
+                Arguments = new List<ValueSource> { ValueSource.Const(value) }
+            };
+            var mod = new StaticAttributeModifier(specs);
+            return controller.Processor.AddModifier(sourceId, mod, Key(targetAttr));
         }
 
         /// <summary>
         /// Logic: (Source * Coefficient) + Addend
         /// </summary>
-        public static void AddLinearScaling(this AttributeController controller, string sourceId, string targetAttr, string sourceAttr, float coefficient, ModifierType type = ModifierType.Additive, int priority = 10, float addend = 0f)
+        public static IDisposable AddLinearScaling(this AttributeController controller, string sourceId, string targetAttr, string sourceAttr, float coefficient, ModifierType type = ModifierType.Additive, int priority = 10, float addend = 0f)
         {
             var source = new ValueSource { Mode = ValueSource.SourceMode.Attribute, AttributeRef = new AttributeReference(Key(sourceAttr)) };
 
@@ -43,13 +53,13 @@ namespace ReactiveSolutions.AttributeSystem.Unity
             });
 
             var mod = new LinearModifier(args);
-            controller.Processor.AddModifier(sourceId, mod, Key(targetAttr));
+            return controller.Processor.AddModifier(sourceId, mod, Key(targetAttr));
         }
 
         /// <summary>
         /// Logic: Base ^ ExponentSource
         /// </summary>
-        public static void AddExponentialScaling(this AttributeController controller, string sourceId, string targetAttr, string exponentAttr, float baseK, ModifierType type = ModifierType.Multiplicative, int priority = 100)
+        public static IDisposable AddExponentialScaling(this AttributeController controller, string sourceId, string targetAttr, string exponentAttr, float baseK, ModifierType type = ModifierType.Multiplicative, int priority = 100)
         {
             // We use the Factory's logic but instantiated manually for speed/safety
             var source = new ValueSource { Mode = ValueSource.SourceMode.Attribute, AttributeRef = new AttributeReference(Key(exponentAttr)) };
@@ -62,13 +72,13 @@ namespace ReactiveSolutions.AttributeSystem.Unity
 
             // Replicating "Exponential" logic: Pow(Base, Exponent) -> Pow(args[1], args[0])
             var mod = new FunctionalModifier(args, vals => Mathf.Pow(vals[1], vals[0]));
-            controller.Processor.AddModifier(sourceId, mod, Key(targetAttr));
+            return controller.Processor.AddModifier(sourceId, mod, Key(targetAttr));
         }
 
         /// <summary>
         /// Logic: Dividend / Divisor
         /// </summary>
-        public static void AddRatio(this AttributeController controller, string sourceId, string targetAttr, string dividendAttr, string divisorAttr, ModifierType type = ModifierType.Multiplicative, int priority = 100)
+        public static IDisposable AddRatio(this AttributeController controller, string sourceId, string targetAttr, string dividendAttr, string divisorAttr, ModifierType type = ModifierType.Multiplicative, int priority = 100)
         {
             var divSource = new ValueSource { Mode = ValueSource.SourceMode.Attribute, AttributeRef = new AttributeReference(Key(dividendAttr)) };
             var sorSource = new ValueSource { Mode = ValueSource.SourceMode.Attribute, AttributeRef = new AttributeReference(Key(divisorAttr)) };
@@ -81,13 +91,13 @@ namespace ReactiveSolutions.AttributeSystem.Unity
                 return (Mathf.Abs(d) < 0.0001f) ? vals[0] : vals[0] / d;
             });
 
-            controller.Processor.AddModifier(sourceId, mod, Key(targetAttr));
+            return controller.Processor.AddModifier(sourceId, mod, Key(targetAttr));
         }
 
         /// <summary>
         /// Logic: MaxBonus * (Input / (Input + SoftCap))
         /// </summary>
-        public static void AddDiminishingReturns(this AttributeController controller, string sourceId, string targetAttr, string inputAttr, float maxBonus, float softCapN, ModifierType type = ModifierType.Additive, int priority = 500)
+        public static IDisposable AddDiminishingReturns(this AttributeController controller, string sourceId, string targetAttr, string inputAttr, float maxBonus, float softCapN, ModifierType type = ModifierType.Additive, int priority = 500)
         {
             var input = new ValueSource { Mode = ValueSource.SourceMode.Attribute, AttributeRef = new AttributeReference(Key(inputAttr)) };
 
@@ -106,10 +116,10 @@ namespace ReactiveSolutions.AttributeSystem.Unity
                 return max * (inp / (inp + cap));
             });
 
-            controller.Processor.AddModifier(sourceId, mod, Key(targetAttr));
+            return controller.Processor.AddModifier(sourceId, mod, Key(targetAttr));
         }
 
-        public static void AddSegmentedMultiplier(this AttributeController controller, string sourceId, string targetAttr, string inputAttr, Dictionary<float, float> breakpoints, ModifierType type = ModifierType.Multiplicative, int priority = 400)
+        public static IDisposable AddSegmentedMultiplier(this AttributeController controller, string sourceId, string targetAttr, string inputAttr, Dictionary<float, float> breakpoints, ModifierType type = ModifierType.Multiplicative, int priority = 400)
         {
             var input = new ValueSource { Mode = ValueSource.SourceMode.Attribute, AttributeRef = new AttributeReference(Key(inputAttr)) };
 
@@ -132,14 +142,14 @@ namespace ReactiveSolutions.AttributeSystem.Unity
                 return 1f;
             });
 
-            controller.Processor.AddModifier(sourceId, mod, Key(targetAttr));
+            return controller.Processor.AddModifier(sourceId, mod, Key(targetAttr));
         }
 
         /// <summary>
         /// Logic: Scale * 0.5 * (sqrt(1 + 8 * Input / Scale) - 1)
         /// Creates a new attribute "{attributeName}Bonus" and adds the modifier to it.
         /// </summary>
-        public static void SetupTriangularBonus(this AttributeController controller, string sourceID, string attributeName)
+        public static IDisposable SetupTriangularBonus(this AttributeController controller, string sourceID, string attributeName)
         {
             // 1. Target Bonus Attribute
             SemanticKey bonusAttr = Key(attributeName + "Bonus");
@@ -167,7 +177,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
                 return Mathf.Min(input, curve);
             });
 
-            controller.Processor.AddModifier(sourceID, mod, bonusAttr);
+            return controller.Processor.AddModifier(sourceID, mod, bonusAttr);
         }
 
         // Placeholder Clamp
@@ -177,4 +187,4 @@ namespace ReactiveSolutions.AttributeSystem.Unity
             // You can add logic here similar to others using FunctionalModifier with sk.Modifiers.Clamp logic
         }
     }
-}
+}*/

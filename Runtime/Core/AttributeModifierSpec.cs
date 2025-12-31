@@ -1,27 +1,31 @@
-﻿using System.Collections.Generic;
-using ReactiveSolutions.AttributeSystem.Core.Data;
+﻿using ReactiveSolutions.AttributeSystem.Core.Modifiers;
+using SemanticKeys;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace ReactiveSolutions.AttributeSystem.Core
 {
-    /// <summary>
-    /// A wrapper passed to the concrete modifier factories.
-    /// Provides safe access to the generic argument list.
-    /// </summary>
-    public struct ModifierArgs
+    [Serializable]
+    public class AttributeModifierSpec
     {
+        [Header("Target")]
+        public SemanticKey TargetAttribute;
+        public List<SemanticKey> TargetPath = new List<SemanticKey>();
         public string SourceId;
-        public ModifierType Type;
-        public int Priority;
-        public List<ValueSource> Arguments;
 
-        public ModifierArgs(string sourceId, ModifierType type, int priority, List<ValueSource> arguments)
-        {
-            SourceId = sourceId;
-            Type = type;
-            Priority = priority;
-            Arguments = arguments ?? new List<ValueSource>();
-        }
+        [Header("Pipeline")]
+        public ModifierType Type = ModifierType.Additive;
+        public int Priority = 0;
+
+        [Header("Logic")]
+        //[SemanticKeyFilter("Modifiers")]
+        public SemanticKey LogicType;
+
+        [Header("Unified Arguments")]
+        [Tooltip("Define all inputs here. Use Mode=Constant for static values, Mode=Attribute for dynamic ones.")]
+        public List<ValueSource> Arguments = new List<ValueSource>();
 
         /// <summary>
         /// Safely retrieves an argument at the specified index.
@@ -54,5 +58,6 @@ namespace ReactiveSolutions.AttributeSystem.Core
             }
             return true;
         }
+
     }
 }

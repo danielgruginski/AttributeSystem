@@ -15,6 +15,9 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         [SerializeField] private AttributeController _targetController;
         [SerializeField] private StatBlockID _statBlock;
 
+        // The handle for the currently applied modifiers
+        private ActiveStatBlock _activeHandle;
+
         [Header("Settings")]
         [Tooltip("If true, values will be applied as soon as this component awakes.")]
         [SerializeField] private bool _applyOnAwake = true;
@@ -65,6 +68,10 @@ namespace ReactiveSolutions.AttributeSystem.Unity
                 _modifierFactory = new ModifierFactory();
             }
 
+            // Clean up previous block if any
+            _activeHandle?.Dispose();
+            _activeHandle = null;
+
             // 1. Construct the Resource path
             // Note: Resources.Load paths must not include the extension or "Resources/" prefix
             string resourcePath = $"Data/StatBlocks/{_statBlock.ID}";
@@ -83,12 +90,16 @@ namespace ReactiveSolutions.AttributeSystem.Unity
             // 3. Load Data
             StatBlockJsonLoader.LoadIntoStatBlock(jsonFile.text, tempBlock);
 
-            // 4. Apply to the Processor
-            tempBlock.ApplyToProcessor(_targetController.Processor, _modifierFactory);
+            // 4. Apply to the Processor and store the handle
+            _activeHandle = tempBlock.ApplyToProcessor(_targetController.Processor, _modifierFactory);
 
             Debug.Log($"[StatBlockLinker] Successfully applied '{_statBlock.ID}' to '{_targetController.name}'");
         }
-
+        private void OnDestroy()
+        {
+            // Clean up modifiers when the linker is destroyed (e.g. Unequip)
+            _activeHandle?.Dispose();
+        }
         public void SetTarget(AttributeController controller) => _targetController = controller;
         public void SetStatBlock(StatBlockID block) => _statBlock = block;
     }

@@ -23,19 +23,9 @@ namespace ReactiveSolutions.AttributeSystem.Core
         private readonly Subject<SemanticKey> _onProviderRegistered = new();
 
         // Replaces the old "PendingModifier" queue with a robust list of active watchers.
-        private readonly List<AttributeConnection> _activeConnections = new List<AttributeConnection>();
+        //private readonly List<AttributeConnection> _activeConnections = new List<AttributeConnection>();
 
-        // Stores modifiers waiting for a specific provider (Key = ProviderName)
-        // Key: The NEXT provider in the chain we are waiting for.
-        //private readonly Dictionary<SemanticKey, List<PendingModifier>> _pendingModifiers = new();
 
-        /*private struct PendingModifier
-        {
-            public string SourceId;
-            public IAttributeModifier Modifier;
-            public SemanticKey TargetAttribute;
-            public List<SemanticKey> RemainingPath; // The rest of the path after the current step
-        }*/
         // --------------------------
 
         /// <summary>
@@ -47,18 +37,6 @@ namespace ReactiveSolutions.AttributeSystem.Core
             _externalProviders[key] = processor;
             _onProviderRegistered.OnNext(key);
 
-            // Flush pending modifiers waiting for this provider
-            /*if (_pendingModifiers.TryGetValue(key, out var pendingList))
-            {
-                foreach (var req in pendingList)
-                {
-                    // Forward the modifier to the next step
-                    // If RemainingPath is empty, it adds locally on that processor.
-                    // If not, that processor will route it or queue it again.
-                    processor.AddModifier(req.SourceId, req.Modifier, req.TargetAttribute, req.RemainingPath);
-                }
-                _pendingModifiers.Remove(key);
-            }*/
         }
         /// <summary>
         /// Unregisters a provider, causing any dependent Connections to drop their modifiers.
@@ -176,46 +154,28 @@ namespace ReactiveSolutions.AttributeSystem.Core
             attr.SetBaseValue(newBase);
         }
 
-        public void AddModifier(string sourceId, IAttributeModifier modifier, SemanticKey attributeName)
+        public IDisposable AddModifier(string sourceId, IAttributeModifier modifier, SemanticKey attributeName)
             => AddModifier(sourceId, modifier, attributeName, null);
 
         /// <summary>
         /// Adds a modifier, traversing the provider path if necessary.
         /// Handles queuing for missing providers automatically.
         /// </summary>
-        public void AddModifier(string sourceId, IAttributeModifier modifier, SemanticKey attributeName, List<SemanticKey> providerPath)
+        public IDisposable AddModifier(string sourceId, IAttributeModifier modifier, SemanticKey attributeName, List<SemanticKey> providerPath)
         {
             if (providerPath == null || providerPath.Count == 0)
             {
                 // Local add
-                GetOrCreateAttribute(attributeName, 0f).AddModifier(modifier);
+                var attr = GetOrCreateAttribute(attributeName, 0f);
+                attr.AddModifier(modifier);
+                // Return a handle to clean up this specific addition
+                return Disposable.Create(() => attr.RemoveModifier(modifier));
             }
             else
             {
                 // Remote add -> Create Connection
-                var connection = new AttributeConnection(this, providerPath, attributeName, modifier, sourceId);
-                _activeConnections.Add(connection);
-            }
-        }
-
-        /// <summary>
-        /// Removes modifiers and triggers their Detach/Dispose lifecycle.
-        /// </summary>
-        public void RemoveModifiersBySource(string sourceId)
-        {
-            // 1. Remove Local Modifiers
-            foreach (var attribute in _attributes.Values)
-            {
-                var toRemove = attribute.Modifiers.Where(m => m.SourceId == sourceId).ToList();
-                foreach (var mod in toRemove) attribute.RemoveModifier(mod);
-            }
-
-            // 2. Dispose Remote Connections created by this source
-            var connectionsToRemove = _activeConnections.Where(c => c.SourceId == sourceId).ToList();
-            foreach (var conn in connectionsToRemove)
-            {
-                conn.Dispose(); // This removes the modifier from wherever it currently is
-                _activeConnections.Remove(conn);
+                // The connection handles the lifecycle, path traversal, and implements IDisposable.
+                return new AttributeConnection(this, providerPath, attributeName, modifier, sourceId);
             }
         }
     }

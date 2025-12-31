@@ -8,8 +8,8 @@ namespace ReactiveSolutions.AttributeSystem.Core
 {
     /// <summary>
     /// Represents a persistent link that tries to apply a modifier to a target at the end of a path.
-    /// If the path changes (e.g. Owner changes, Hireling dies), this connection automatically 
-    /// moves the modifier to the new target or enters a pending state.
+    /// It manages its own lifecycle via Rx subscriptions. 
+    /// To kill it, simply call Dispose().
     /// </summary>
     public class AttributeConnection : IDisposable
     {
@@ -92,16 +92,17 @@ namespace ReactiveSolutions.AttributeSystem.Core
             // 2. Apply New
             if (_currentTarget != null)
             {
-                // We use the direct local Add because the Connection handled the path traversal.
-                _currentTarget.AddModifier(_sourceId, _modifier, _targetAttribute);
+                // We use the direct local Add (Handle-less overload) because WE are the handle.
+                _currentTarget.GetOrCreateAttribute(_targetAttribute).AddModifier(_modifier);
             }
         }
 
         public void Dispose()
         {
+            // Cutting this subscription allows GC to collect this object
             _pathSubscription.Dispose();
 
-            // Final Cleanup
+            // Final Cleanup of the actual modifier
             if (_currentTarget != null)
             {
                 var attr = _currentTarget.GetAttribute(_targetAttribute);
