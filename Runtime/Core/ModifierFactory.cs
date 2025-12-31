@@ -1,8 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using ReactiveSolutions.AttributeSystem.Core.Data;
 using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using SemanticKeys;
+using System;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.DedicatedServer;
 
 namespace ReactiveSolutions.AttributeSystem.Core
 {
@@ -17,6 +19,9 @@ namespace ReactiveSolutions.AttributeSystem.Core
         {
             RegisterDefaults();
         }
+
+
+
 
         private void RegisterDefaults()
         {
@@ -45,6 +50,38 @@ namespace ReactiveSolutions.AttributeSystem.Core
             Register(sk.Modifiers.Step, args => new FunctionalModifier(args, vals =>
                 (Val(vals, 1) >= Val(vals, 0)) ? 1f : 0f),
                 "Edge Threshold", "Input Value");
+            // --- ADVANCED GAMEPLAY MODIFIERS (New) ---
+
+            // Ratio: A / B
+            Register("Ratio", args => new FunctionalModifier(args, vals =>
+            {
+                float d = Val(vals, 1);
+                return (Mathf.Abs(d) < 0.0001f) ? Val(vals, 0) : Val(vals, 0) / d;
+            }), "Dividend", "Divisor");
+
+            // Exponential: Base ^ Exponent
+            Register("Exponential", args => new FunctionalModifier(args, vals =>
+                Mathf.Pow(Val(vals, 1), Val(vals, 0))),
+                "Exponent", "Base");
+
+            // DiminishingReturns: Max * (Input / (Input + SoftCap))
+            Register("DiminishingReturns", args => new FunctionalModifier(args, vals =>
+            {
+                float inp = Mathf.Max(0, Val(vals, 0));
+                float max = Val(vals, 1);
+                float cap = Val(vals, 2);
+                return max * (inp / (inp + cap));
+            }), "Input", "Max Bonus", "Soft Cap");
+
+            // ScaledTriangular: Scale * 0.5 * (sqrt(1 + 8 * Input / Scale) - 1)
+            // Safety: Result <= Input
+            Register("ScaledTriangular", args => new FunctionalModifier(args, vals =>
+            {
+                float inp = Mathf.Max(0, Val(vals, 0));
+                float s = Mathf.Max(0.0001f, Val(vals, 1));
+                float curve = s * (Mathf.Sqrt(1 + (8 * inp) / s) - 1) * 0.5f;
+                return Mathf.Min(inp, curve);
+            }), "Input", "Scale");
         }
 
         public void Register(string id, ModifierBuilder builder, params string[] paramNames)
@@ -68,6 +105,30 @@ namespace ReactiveSolutions.AttributeSystem.Core
             }
             return builder(args);
         }
+
+        /// <summary>
+        /// Creates the modifier using the provided Factory service.
+        /// </summary>
+        public IAttributeModifier Create(AttributeModifierSpec spec, AttributeProcessor context = null)
+        {
+            // 1. Prepare Arguments
+            var finalArgs = new List<ValueSource>();
+            if (spec.Arguments != null && spec.Arguments.Count > 0) finalArgs.AddRange(spec.Arguments);
+            else Debug.LogWarning($"[ModifierFactory] ModifierSpec '{spec.LogicType}' has no arguments defined.");
+
+            // 2. Bake Context
+            if (context != null)
+            {
+                foreach (var arg in finalArgs) arg.BakeContext(context);
+            }
+
+            // 3. Create
+            var args = new ModifierArgs(spec.SourceId, spec.Type, spec.Priority, finalArgs);
+            return Create(spec.LogicType, args);
+        }
+
+
+
 
         public IEnumerable<string> GetAvailableTypes() => _registry.Keys;
 

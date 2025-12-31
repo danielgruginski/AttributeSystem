@@ -8,6 +8,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
     {
         void Register(string id, ModifierBuilder builder);
         IAttributeModifier Create(string id, ModifierArgs args);
+        IAttributeModifier Create(AttributeModifierSpec spec, AttributeProcessor context);
         IEnumerable<string> GetAvailableTypes();
     }
 
@@ -16,10 +17,11 @@ namespace ReactiveSolutions.AttributeSystem.Core
     /// </summary>
     public delegate IAttributeModifier ModifierBuilder(ModifierArgs args);
 
+
     /// <summary>
     /// Unified arguments structure passed to builders.
     /// </summary>
-    public struct ModifierArgs
+    /*public struct ModifierArgs
     {
         public string SourceId;
         public ModifierType Type;
@@ -33,5 +35,5 @@ namespace ReactiveSolutions.AttributeSystem.Core
             Priority = priority;
             Arguments = arguments;
         }
-    }
+    }*/
 }

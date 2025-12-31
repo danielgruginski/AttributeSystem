@@ -28,6 +28,9 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         /// </summary>
         public void ApplyToProcessor(AttributeProcessor processor, IModifierFactory factory)
         {
+            // Fallback for convenience/tests if you don't want to pass it every time
+            factory ??= new ModifierFactory();
+
             // 1. Set Base Values
             foreach (var entry in BaseValues)
             {
@@ -41,8 +44,15 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
             foreach (var spec in Modifiers)
             {
                 // Pass the factory down to the spec
-                var modifier = spec.CreateModifier(factory, processor);
-                processor.AddModifier(spec.SourceId, modifier, spec.TargetAttribute, spec.TargetPath);
+                var modifier = factory.Create(spec, processor);
+                if(modifier != null)
+                {
+                    processor.AddModifier(spec.SourceId, modifier, spec.TargetAttribute, spec.TargetPath);
+                }
+                else {
+                    Debug.LogWarning($"StatBlock.ApplyToProcessor: Could not create modifier of type '{spec.LogicType}' for attribute '{spec.TargetAttribute}'. Check that the type is registered in the factory.");
+                }
+
             }
         }
     }
