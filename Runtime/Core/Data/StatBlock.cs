@@ -20,9 +20,16 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
             public float Value;
         }
 
+
+
         public string BlockName = "New Block"; // Helper for editor naming
-        public List<BaseValueEntry> BaseValues = new List<BaseValueEntry>();
+        // Simple local tags (e.g. "Undead")
         public List<SemanticKey> Tags = new List<SemanticKey>();
+
+        // Remote tags (e.g. Apply "Blessed" to "Owner")
+        public List<TagModifierSpec> RemoteTags = new List<TagModifierSpec>();
+
+        public List<BaseValueEntry> BaseValues = new List<BaseValueEntry>();
         public List<AttributeModifierSpec> Modifiers = new List<AttributeModifierSpec>();
 
         /// <summary>
@@ -32,18 +39,31 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         {
             factory ??= new ModifierFactory();
             var activeBlock = new ActiveStatBlock();
-            // 1. Apply Tags (Reference Counted via AttributeTagManager)
-            foreach (var tag in Tags)
+            // 1. Apply Local Tags (Legacy/Simple support)
+            foreach (var tagKey in Tags)
             {
-                if (!string.IsNullOrEmpty(tag))
+                if (tagKey != SemanticKey.None)
                 {
-                    processor.AddTag(tag);
-                    // Register cleanup: Decrement ref count when block is disposed
-                    activeBlock.AddHandle(Disposable.Create(() => processor.RemoveTag(tag)));
+                    processor.AddTag(tagKey);
+                    activeBlock.AddHandle(Disposable.Create(() => processor.RemoveTag(tagKey)));
+                }
+
+            }
+
+            // 2. Apply Remote Tags (New System)
+            foreach (var tagSpec in RemoteTags)
+            {
+                if (tagSpec.Tag != SemanticKey.None)
+                {
+                    // Create a TagConnection which handles pathing and lifecycle
+                    var conn = new TagConnection(processor, tagSpec.TargetPath, tagSpec.Tag);
+                    activeBlock.AddHandle(conn);
                 }
             }
 
-            // 1. Set Base Values (Permanent for the session, generally not reverted by ActiveStatBlock)
+
+
+            // 3. Set Base Values (Permanent for the session, generally not reverted by ActiveStatBlock)
             foreach (var entry in BaseValues)
             {
                 if (!string.IsNullOrEmpty(entry.Name))
@@ -52,7 +72,9 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
                 }
             }
 
-            // 2. Apply Modifiers
+
+
+            // 4. Apply Modifiers
             foreach (var spec in Modifiers)
             {
                 var modifier = factory.Create(spec, processor);
