@@ -11,6 +11,8 @@ It is responsible for:
 2.  **Resolution:** Resolving complex paths to finding attributes on other entities (e.g., resolving `Owner` -> `Hireling` -> `Strength`).
     
 3.  **Modification:** Providing the API to add modifiers to attributes, managing the creation of `AttributeConnection`s for remote modifications.
+
+4.  **Tagging:** Managing Entity Tags for categorization and status effects.
     
 
 ## Key Features
@@ -54,7 +56,27 @@ Methods for retrieving or creating the attribute objects.
     -   Access to the underlying `IReadOnlyReactiveDictionary`. Useful for debugging or listing all stats.
         
 
-### 2. Reactive Access
+### 2. Tag Management
+
+The processor now includes a Tag Manager to handle entity states.
+
+-   **`IReadOnlyReactiveDictionary<SemanticKey, int> Tags`**
+    
+    -   The collection of active tags and their reference counts.
+        
+-   **`void AddTag(SemanticKey tag)`**
+    
+    -   Adds a tag. Increments the reference count if it already exists.
+        
+-   **`void RemoveTag(SemanticKey tag)`**
+    
+    -   Decrements the reference count. Removes the tag if count drops to zero.
+        
+-   **`bool HasTag(SemanticKey tag)`**
+    
+    -   Checks if the tag is currently active (count > 0).
+
+### 3. Reactive Access
 
 Methods for observing values, even across complex chains.
 
@@ -73,7 +95,7 @@ Methods for observing values, even across complex chains.
     -   Stream that fires whenever a new `Attribute` is created locally.
         
 
-### 3. Modifier Management (The Handle System)
+### 4. Modifier Management (The Handle System)
 
 The processor manages the application of modifiers.
 
@@ -92,7 +114,7 @@ The processor manages the application of modifiers.
     -   **Returns:** An `AttributeConnection` (which implements `IDisposable`). This object keeps the link alive. Disposing it removes the modifier from wherever it is currently applied.
         
 
-### 4. Provider Linking (Context)
+### 5. Provider Linking (Context)
 
 Methods for establishing relationships between entities.
 
