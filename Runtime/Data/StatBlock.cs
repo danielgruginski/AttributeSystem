@@ -1,5 +1,6 @@
 using SemanticKeys;
 using System.Collections.Generic;
+using UniRx;
 using UnityEngine;
 
 namespace ReactiveSolutions.AttributeSystem.Core.Data
@@ -21,6 +22,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
 
         public string BlockName = "New Block"; // Helper for editor naming
         public List<BaseValueEntry> BaseValues = new List<BaseValueEntry>();
+        public List<SemanticKey> Tags = new List<SemanticKey>();
         public List<AttributeModifierSpec> Modifiers = new List<AttributeModifierSpec>();
 
         /// <summary>
@@ -30,6 +32,16 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         {
             factory ??= new ModifierFactory();
             var activeBlock = new ActiveStatBlock();
+            // 1. Apply Tags (Reference Counted via AttributeTagManager)
+            foreach (var tag in Tags)
+            {
+                if (!string.IsNullOrEmpty(tag))
+                {
+                    processor.AddTag(tag);
+                    // Register cleanup: Decrement ref count when block is disposed
+                    activeBlock.AddHandle(Disposable.Create(() => processor.RemoveTag(tag)));
+                }
+            }
 
             // 1. Set Base Values (Permanent for the session, generally not reverted by ActiveStatBlock)
             foreach (var entry in BaseValues)

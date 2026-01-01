@@ -22,9 +22,18 @@ namespace ReactiveSolutions.AttributeSystem.Core
         private readonly Dictionary<SemanticKey, AttributeProcessor> _externalProviders = new();
         private readonly Subject<SemanticKey> _onProviderRegistered = new();
 
-        // Replaces the old "PendingModifier" queue with a robust list of active watchers.
-        //private readonly List<AttributeConnection> _activeConnections = new List<AttributeConnection>();
+        private readonly AttributeTagManager _tagManager = new AttributeTagManager();
 
+        /// <summary>
+        /// Exposes the tags as a read-only reactive collection.
+        /// </summary>
+        public IReadOnlyReactiveDictionary<SemanticKey, int> Tags => _tagManager.Tags;
+
+        public void AddTag(SemanticKey tag) => _tagManager.AddTag(tag);
+
+        public void RemoveTag(SemanticKey tag) => _tagManager.RemoveTag(tag);
+
+        public bool HasTag(SemanticKey tag) => _tagManager.HasTag(tag);
 
         // --------------------------
 
