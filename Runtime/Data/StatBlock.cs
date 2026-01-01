@@ -24,11 +24,14 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         public List<AttributeModifierSpec> Modifiers = new List<AttributeModifierSpec>();
 
         /// <summary>
-        /// Populates a processor with the data from this block.
+        /// Populates a processor and returns an ActiveStatBlock handle to manage the lifecycle of applied modifiers.
         /// </summary>
-        public void ApplyToProcessor(AttributeProcessor processor)
+        public ActiveStatBlock ApplyToProcessor(AttributeProcessor processor, IModifierFactory factory)
         {
-            // 1. Set Base Values
+            factory ??= new ModifierFactory();
+            var activeBlock = new ActiveStatBlock();
+
+            // 1. Set Base Values (Permanent for the session, generally not reverted by ActiveStatBlock)
             foreach (var entry in BaseValues)
             {
                 if (!string.IsNullOrEmpty(entry.Name))
@@ -40,12 +43,20 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
             // 2. Apply Modifiers
             foreach (var spec in Modifiers)
             {
-                // We pass 'processor' here so the modifier knows who created it (The Context).
-                // This ensures that if the modifier target is remote (e.g. "Owner.Strength"),
-                // the modifier source (e.g. "ItemLevel") is still resolved against THIS processor.
-                var modifier = spec.CreateModifier(processor);
-                processor.AddModifier(spec.SourceId, modifier, spec.TargetAttribute, spec.TargetPath);
+                var modifier = factory.Create(spec, processor);
+                if (modifier != null)
+                {
+                    // Capture the handle!
+                    var handle = processor.AddModifier(spec.SourceId, modifier, spec.TargetAttribute, spec.TargetPath);
+                    activeBlock.AddHandle(handle);
+                }
+                else
+                {
+                    Debug.LogWarning($"StatBlock.ApplyToProcessor: Could not create modifier of type '{spec.LogicType}'");
+                }
             }
+
+            return activeBlock;
         }
     }
 }

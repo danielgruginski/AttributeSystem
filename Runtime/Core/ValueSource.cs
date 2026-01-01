@@ -15,12 +15,8 @@ namespace ReactiveSolutions.AttributeSystem.Core
         public SourceMode Mode;
         public float ConstantValue;
 
-        [Header("Attribute Reference")]
-        [Tooltip("The name of the attribute to read (e.g. 'Strength').")]
-        public SemanticKey AttributeName;
-
-        [Tooltip("The path to the provider. Empty = Local. Example: ['Owner', 'EquippedWeapon']")]
-        public List<SemanticKey> ProviderPath = new List<SemanticKey>();
+        [Tooltip("The attribute to read from.")]
+        public AttributeReference AttributeRef;
 
         // Stores the processor that 'owns' this source definition (e.g., the Weapon).
         // This is not serialized; it is set at runtime when the StatBlock is applied.
@@ -43,9 +39,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
             var contextToUse = _bakedContext ?? localProcessor;
             if (contextToUse == null) return Observable.Return(0f);
 
-            // Use the new structured lookup
-            return contextToUse.GetAttributeObservable(AttributeName, ProviderPath)
+            // Use the structured reference
+            return contextToUse.GetAttributeObservable(AttributeRef.Name, AttributeRef.Path)
                 .SelectMany(attr => attr.ReactivePropertyAccess);
         }
+
+        public static ValueSource Const(float val) => new ValueSource { Mode = ValueSource.SourceMode.Constant, ConstantValue = val };
+
     }
 }

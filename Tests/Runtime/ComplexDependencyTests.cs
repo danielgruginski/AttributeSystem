@@ -23,6 +23,31 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         // We wrap steps in Actions to allow easy permutation testing
         private Dictionary<string, Action> _steps;
 
+        // Helper to wrap inputs into standard Linear Modifier Args (Input, 1, 0)
+        private AttributeModifierSpec CreateLinearSpecs(string sourceId, ValueSource input)
+        {
+            return new AttributeModifierSpec() { 
+                SourceId = sourceId,
+                Type = ModifierType.Additive,
+                Priority = 0,
+                LogicType = TestKeys.Mock("Linear"),
+                Arguments = new List<ValueSource> { input, ValueSource.Const(1f), ValueSource.Const(0f) }
+            };
+        }
+
+        private ValueSource AttrSource(string attributeName, List<SemanticKey> providerPath = null)
+        {
+            return new ValueSource
+            {
+                Mode = ValueSource.SourceMode.Attribute,
+                AttributeRef = new AttributeReference
+                {
+                    Name = TestKeys.Mock(attributeName),
+                    Path = providerPath ?? new List<SemanticKey>()
+                }
+            };
+        }
+
         [SetUp]
         public void Setup()
         {
@@ -51,15 +76,11 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         {
             // CRITICAL NOTE: This modifier lives on the WEAPON (the target).
             // Therefore, it must find CasterLevel via the "Owner" link, not directly.
-            var source = new ValueSource
-            {
-                Mode = ValueSource.SourceMode.Attribute,
-                AttributeName = TestKeys.Mock("CasterLevel"),
-                ProviderPath = new List<SemanticKey> { TestKeys.Mock("Owner") }
-            };
 
-            var mod = new LinearAttributeModifier("CasterScaling", ModifierType.Additive, 0, source, 1f, 0f);
+            var source = AttrSource("CasterLevel", new List<SemanticKey> { TestKeys.Mock("Owner") });
 
+
+            var mod = new LinearModifier(CreateLinearSpecs("CasterScaling", source));
 
             var AttributeName = TestKeys.Mock("ItemLevel");
             var ProviderPath = new List<SemanticKey> { TestKeys.Mock("EquippedWeapon") };
@@ -92,14 +113,10 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // Let's assume standard reactive flow: The Character pulls value from the Weapon.
             // So the ValueSource is "EquippedWeapon.ItemLevel" relative to the Character.
 
-            var source = new ValueSource
-            {
-                Mode = ValueSource.SourceMode.Attribute,
-                AttributeName = TestKeys.Mock("ItemLevel"),
-                ProviderPath = new List<SemanticKey> { TestKeys.Mock("EquippedWeapon") }
-            };
 
-            var mod = new LinearAttributeModifier("ItemScaling", ModifierType.Additive, 0, source, 1f, 0f);
+            var source = AttrSource("ItemLevel", new List<SemanticKey> { TestKeys.Mock("EquippedWeapon") });
+
+            var mod = new LinearModifier(CreateLinearSpecs("ItemScaling", source));
 
             // Weapon adds this to its Owner
 
@@ -177,13 +194,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var magicSword = new AttributeProcessor();
 
             // 2. Setup Base Values
-            // Char: CasterLevel = 5
             mainChar.SetOrUpdateBaseValue(TestKeys.Mock("CasterLevel"), 5f);
-
-            // PlainSword: Damage = 3
             plainSword.SetOrUpdateBaseValue(TestKeys.Mock("Damage"), 3f);
-
-            // MagicSword: Damage = 7, CasterLevel = 3
             magicSword.SetOrUpdateBaseValue(TestKeys.Mock("Damage"), 7f);
             magicSword.SetOrUpdateBaseValue(TestKeys.Mock("CasterLevel"), 3f);
 
@@ -191,27 +203,17 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             // Mod A: Self Damage += Self CasterLevel
             // Source: CasterLevel (Local/Baked to MagicSword context)
-            var sourceA = new ValueSource
-            {
-                Mode = ValueSource.SourceMode.Attribute,
-                AttributeName = TestKeys.Mock("CasterLevel")
-            };
-            sourceA.BakeContext(magicSword); // Explicitly bake context so it finds CasterLevel on MagicSword
-
-            var modA = new LinearAttributeModifier("MagicSwordSelfBuff", ModifierType.Additive, 0, sourceA, 1f, 0f);
+            var sourceA = AttrSource("CasterLevel");
+            sourceA.BakeContext(magicSword);
+            var modA = new LinearModifier(CreateLinearSpecs("MagicSwordSelfBuff", sourceA));
             magicSword.AddModifier("SelfBuff", modA, TestKeys.Mock("Damage"));
 
             // Mod B: Owner->Hireling->EquippedWeapon->Damage += Self CasterLevel
-            var sourceB = new ValueSource
-            {
-                Mode = ValueSource.SourceMode.Attribute,
-                AttributeName = TestKeys.Mock("CasterLevel")
-            };
-            sourceB.BakeContext(magicSword); // Source is still MagicSword.CasterLevel
-
-            string shareBuffId = "MagicSwordShareBuff";
-            var modB = new LinearAttributeModifier(shareBuffId, ModifierType.Additive, 0, sourceB, 1f, 0f);
+            var sourceB = AttrSource("CasterLevel");
+            sourceB.BakeContext(magicSword);
             
+            var modB = new LinearModifier(CreateLinearSpecs("MagicSwordShareBuff", sourceB));
+
             // Target Path: Owner -> Hireling -> EquippedWeapon
             var targetPath = new List<SemanticKey>
             {
@@ -220,8 +222,9 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 TestKeys.Mock("EquippedWeapon")
             };
 
-            // Add the remote modifier definition to MagicSword (it will push it down the path)
-            magicSword.AddModifier("ShareBuff", modB, TestKeys.Mock("Damage"), targetPath);
+            // CAPTURE THE HANDLE
+            IDisposable sharedBuffHandle = magicSword.AddModifier("ShareBuff", modB, TestKeys.Mock("Damage"), targetPath);
+
 
             // 4. Constant Links (Hireling is always linked to Char)
             mainChar.RegisterExternalProvider(TestKeys.Mock("Hireling"), hireling);
@@ -247,9 +250,10 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             // --- PHASE 2: Swap ---
 
-            // Simulate Unequip: Remove the "ShareBuff" from PlainSword
-            // FIX: Use the ID defined in the modifier constructor
-            plainSword.RemoveModifiersBySource(shareBuffId);
+            // Simulate Unequip: Remove the "ShareBuff" from MagicSword
+
+            // "Unequip" Logic: Dispose the handle associated with the applied modifier
+            sharedBuffHandle.Dispose();
 
             // Update Links
             // Link Char <-> PlainSword

@@ -22,18 +22,10 @@ namespace ReactiveSolutions.AttributeSystem.Core
         private readonly Dictionary<SemanticKey, AttributeProcessor> _externalProviders = new();
         private readonly Subject<SemanticKey> _onProviderRegistered = new();
 
+        // Replaces the old "PendingModifier" queue with a robust list of active watchers.
+        //private readonly List<AttributeConnection> _activeConnections = new List<AttributeConnection>();
 
-        // Stores modifiers waiting for a specific provider (Key = ProviderName)
-        // Key: The NEXT provider in the chain we are waiting for.
-        private readonly Dictionary<SemanticKey, List<PendingModifier>> _pendingModifiers = new();
 
-        private struct PendingModifier
-        {
-            public string SourceId;
-            public IAttributeModifier Modifier;
-            public SemanticKey TargetAttribute;
-            public List<SemanticKey> RemainingPath; // The rest of the path after the current step
-        }
         // --------------------------
 
         /// <summary>
@@ -45,19 +37,31 @@ namespace ReactiveSolutions.AttributeSystem.Core
             _externalProviders[key] = processor;
             _onProviderRegistered.OnNext(key);
 
-            // Flush pending modifiers waiting for this provider
-            if (_pendingModifiers.TryGetValue(key, out var pendingList))
+        }
+        /// <summary>
+        /// Unregisters a provider, causing any dependent Connections to drop their modifiers.
+        /// </summary>
+        public void UnregisterExternalProvider(SemanticKey key)
+        {
+            if (_externalProviders.ContainsKey(key))
             {
-                foreach (var req in pendingList)
-                {
-                    // Forward the modifier to the next step
-                    // If RemainingPath is empty, it adds locally on that processor.
-                    // If not, that processor will route it or queue it again.
-                    processor.AddModifier(req.SourceId, req.Modifier, req.TargetAttribute, req.RemainingPath);
-                }
-                _pendingModifiers.Remove(key);
+                _externalProviders.Remove(key);
+                _onProviderRegistered.OnNext(key); // Notify Connections (will resolve to null)
             }
         }
+        /// <summary>
+        /// Reactive stream that fires the new Processor whenever the provider for 'key' changes.
+        /// Used by AttributeConnection to track topology changes.
+        /// </summary>
+        public IObservable<AttributeProcessor> ObserveProvider(SemanticKey key)
+        {
+            return _onProviderRegistered
+                .Where(k => k == key)
+                .StartWith(key) // Check immediately
+                .Select(_ => _externalProviders.TryGetValue(key, out var p) ? p : null)
+                .DistinctUntilChanged();
+        }
+
 
         public IObservable<Attribute> GetAttributeObservable(SemanticKey attributeName, List<SemanticKey> providerPath = null)
         {
@@ -71,6 +75,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             SemanticKey nextProviderKey = providerPath[0];
             var remainingPath = providerPath.Count > 1 ? providerPath.GetRange(1, providerPath.Count - 1) : new List<SemanticKey>();
 
+            // Recursive Read is still useful for simple reads
             return _onProviderRegistered
                 .StartWith(_externalProviders.ContainsKey(nextProviderKey) ? nextProviderKey : SemanticKey.None)
                 .Where(k => k == nextProviderKey)
@@ -97,15 +102,6 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 return Disposable.Empty;
             });
         }
-
-        /*private IObservable<Attribute> GetExternalAttributeObservable(string providerKey, string attributeName)
-        {
-            return _onProviderRegistered
-                .StartWith(_externalProviders.ContainsKey(providerKey) ? providerKey : null)
-                .Where(k => k == providerKey)
-                .Take(1)
-                .SelectMany(_ => _externalProviders[providerKey].GetAttributeObservable(attributeName));
-        }*/
 
         /// <summary>
         /// A reactive stream that fires whenever a new Attribute is added.
@@ -158,66 +154,28 @@ namespace ReactiveSolutions.AttributeSystem.Core
             attr.SetBaseValue(newBase);
         }
 
-        public void AddModifier(string sourceId, IAttributeModifier modifier, SemanticKey attributeName)
+        public IDisposable AddModifier(string sourceId, IAttributeModifier modifier, SemanticKey attributeName)
             => AddModifier(sourceId, modifier, attributeName, null);
 
         /// <summary>
         /// Adds a modifier, traversing the provider path if necessary.
         /// Handles queuing for missing providers automatically.
         /// </summary>
-        public void AddModifier(string sourceId, IAttributeModifier modifier, SemanticKey attributeName, List<SemanticKey> providerPath)
+        public IDisposable AddModifier(string sourceId, IAttributeModifier modifier, SemanticKey attributeName, List<SemanticKey> providerPath)
         {
-            // Base Case: Local Add
             if (providerPath == null || providerPath.Count == 0)
             {
+                // Local add
                 var attr = GetOrCreateAttribute(attributeName, 0f);
                 attr.AddModifier(modifier);
-                return;
-            }
-
-            // Recursive Step
-            SemanticKey nextKey = providerPath[0];
-            var remaining = providerPath.Count > 1 ? providerPath.GetRange(1, providerPath.Count - 1) : new List<SemanticKey>();
-
-            if (_externalProviders.TryGetValue(nextKey, out var provider))
-            {
-                provider.AddModifier(sourceId, modifier, attributeName, remaining);
+                // Return a handle to clean up this specific addition
+                return Disposable.Create(() => attr.RemoveModifier(modifier));
             }
             else
             {
-                // Queue it
-                if (!_pendingModifiers.ContainsKey(nextKey))
-                    _pendingModifiers[nextKey] = new List<PendingModifier>();
-
-                _pendingModifiers[nextKey].Add(new PendingModifier
-                {
-                    SourceId = sourceId,
-                    Modifier = modifier,
-                    TargetAttribute = attributeName,
-                    RemainingPath = remaining
-                });
-            }
-        }
-
-        /// <summary>
-        /// Removes modifiers and triggers their Detach/Dispose lifecycle.
-        /// </summary>
-        public void RemoveModifiersBySource(string sourceId)
-        {
-            foreach (var attribute in _attributes.Values)
-            {
-                // We find all modifiers matching the ID and remove them
-                var toRemove = attribute.Modifiers.Where(m => m.SourceId == sourceId).ToList();
-                foreach (var mod in toRemove)
-                {
-                    attribute.RemoveModifier(mod);
-                }
-            }
-
-            // Note: We might also want to clean up pending modifiers if the source is removed before the provider arrives.
-            foreach (var key in _pendingModifiers.Keys.ToList())
-            {
-                _pendingModifiers[key].RemoveAll(p => p.SourceId == sourceId);
+                // Remote add -> Create Connection
+                // The connection handles the lifecycle, path traversal, and implements IDisposable.
+                return new AttributeConnection(this, providerPath, attributeName, modifier, sourceId);
             }
         }
     }

@@ -3,7 +3,8 @@
     "rootNamespace": "ReactiveSolutions.AttributeSystem",
     "references": [
         "UniRx",
-        "com.reactivesolutions.semantickeys"
+        "com.reactivesolutions.semantickeys",
+        "Unity.Addressables"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

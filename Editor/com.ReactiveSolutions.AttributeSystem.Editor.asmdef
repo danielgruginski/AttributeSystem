@@ -4,7 +4,8 @@
     "references": [
         "com.reactivesolutions.AttributeSystem",
         "com.reactivesolutions.semantickeys",
-        "com.reactivesolutions.semantickeys.editor"
+        "com.reactivesolutions.semantickeys.editor",
+        "UniRx"
     ],
     "includePlatforms": [
         "Editor"

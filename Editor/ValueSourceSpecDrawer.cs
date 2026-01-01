@@ -1,17 +1,35 @@
-﻿using ReactiveSolutions.AttributeSystem;
-using ReactiveSolutions.AttributeSystem.Core;
-using ReactiveSolutions.AttributeSystem.Core.Data;
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
+using ReactiveSolutions.AttributeSystem.Core;
 
 namespace ReactiveSolutions.AttributeSystem.Editor
 {
     [CustomPropertyDrawer(typeof(ValueSource))]
     public class ValueSourceSpecDrawer : PropertyDrawer
     {
+        // Constants for layout
+        private const float ModeWidth = 80f;
+        private const float Padding = 5f;
+
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
-            // We squeeze everything into one line for compactness
+            var modeProp = property.FindPropertyRelative("Mode");
+
+            // If in Attribute mode, the height depends on the AttributeReference drawer
+            if (modeProp != null && modeProp.enumValueIndex == (int)ValueSource.SourceMode.Attribute)
+            {
+                var attrRefProp = property.FindPropertyRelative("AttributeRef");
+                if (attrRefProp != null)
+                {
+                    // Add a tiny bit of padding for the mode dropdown line
+                    // Actually, AttributeReferenceDrawer handles its own height, 
+                    // but we draw the Mode dropdown on the same line as the "Name" part of the ref.
+                    // Let's defer to the AttributeReference height.
+                    return EditorGUI.GetPropertyHeight(attrRefProp, true);
+                }
+            }
+
+            // Default single line for Constant mode
             return EditorGUIUtility.singleLineHeight;
         }
 
@@ -19,66 +37,44 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         {
             EditorGUI.BeginProperty(position, label, property);
 
-            var typeProp = property.FindPropertyRelative("Type");
-            var constProp = property.FindPropertyRelative("ConstantValue");
-            var attrProp = property.FindPropertyRelative("AttributeName");
+            var modeProp = property.FindPropertyRelative("Mode");
+            var constantProp = property.FindPropertyRelative("ConstantValue");
+            var attrRefProp = property.FindPropertyRelative("AttributeRef");
 
-            // Layout: Label | Dropdown (30%) | Value Field (Remaining)
+            // 1. Draw Label
+            Rect contentPosition = EditorGUI.PrefixLabel(position, GUIUtility.GetControlID(FocusType.Passive), label);
 
-            // 1. Label
-            Rect labelRect = new Rect(position.x, position.y, EditorGUIUtility.labelWidth, position.height);
-            EditorGUI.LabelField(labelRect, label);
+            // 2. Draw Mode Dropdown (Fixed Width)
+            Rect modeRect = new Rect(contentPosition.x, contentPosition.y, ModeWidth, EditorGUIUtility.singleLineHeight);
+            EditorGUI.PropertyField(modeRect, modeProp, GUIContent.none);
 
-            // Calculate remaining width
-            float contentX = position.x + EditorGUIUtility.labelWidth;
-            float contentWidth = position.width - EditorGUIUtility.labelWidth;
+            // 3. Draw Content
+            Rect valueRect = new Rect(contentPosition.x + ModeWidth + Padding, contentPosition.y, contentPosition.width - ModeWidth - Padding, position.height);
 
-            // 2. Type Dropdown
-            float typeWidth = contentWidth * 0.35f;
-            Rect typeRect = new Rect(contentX, position.y, typeWidth, position.height);
-            EditorGUI.PropertyField(typeRect, typeProp, GUIContent.none);
+            int modeIndex = modeProp.enumValueIndex; // 0 = Constant, 1 = Attribute
 
-            // 3. Value Field (Context Sensitive)
-            float valueX = contentX + typeWidth + 5f;
-            float valueWidth = contentWidth - typeWidth - 5f;
-            Rect valueRect = new Rect(valueX, position.y, valueWidth, position.height);
-
-            int typeIndex = typeProp.enumValueIndex; // 0 = Constant, 1 = Attribute (based on ValueSource.SourceType enum)
-
-            if (typeIndex == 0) // Constant
+            if (modeIndex == (int)ValueSource.SourceMode.Constant)
             {
-                EditorGUI.PropertyField(valueRect, constProp, GUIContent.none);
+                // Just draw the float field
+                // Ensure height is single line for the float field even if 'position' is tall
+                Rect floatRect = new Rect(valueRect.x, valueRect.y, valueRect.width, EditorGUIUtility.singleLineHeight);
+                EditorGUI.PropertyField(floatRect, constantProp, GUIContent.none);
             }
-            else // Attribute
+            else
             {
-                // You could use your existing StatBlockIDDrawer logic here if you wanted a dropdown of attributes!
-                // For now, a text field is safe.
-                string currentVal = attrProp.stringValue;
-                string newVal = EditorGUI.TextField(valueRect, currentVal);
-                if (newVal != currentVal)
+                if (attrRefProp != null)
                 {
-                    attrProp.stringValue = newVal;
-                }
+                    // Pass drawing to AttributeReferenceDrawer.
+                    // IMPORTANT: AttributeReferenceDrawer expects to draw the label. 
+                    // We pass GUIContent.none because we already drew our main label (e.g. "Input").
+                    // However, AttributeReferenceDrawer starts with the "Name" field.
+                    // We need to ensure it draws within 'valueRect'.
 
-                if (string.IsNullOrEmpty(attrProp.stringValue))
-                {
-                    // Placeholder hint
-                    GUIColorScope(Color.gray, () =>
-                    {
-                        EditorGUI.LabelField(valueRect, "Attribute Name");
-                    });
+                    EditorGUI.PropertyField(valueRect, attrRefProp, GUIContent.none, true);
                 }
             }
 
             EditorGUI.EndProperty();
-        }
-
-        private void GUIColorScope(Color color, System.Action action)
-        {
-            Color c = GUI.color;
-            GUI.color = color;
-            action();
-            GUI.color = c;
         }
     }
 }
