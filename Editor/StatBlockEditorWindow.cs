@@ -32,7 +32,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         private GUIStyle _headerStyle;
         private GUIStyle _boxStyle;
 
-        [MenuItem("Window/Attributes/Stat Block Editor (Unified)")]
+        [MenuItem("Window/Attribute System/Stat Block Editor (Unified)")]
         public static void ShowWindow() => GetWindow<StatBlockEditorWindow>("StatBlock Editor");
 
         private void OnEnable()
