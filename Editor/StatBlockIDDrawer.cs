@@ -19,10 +19,10 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         private static string[] _availableOptions;
 
         // We cache the valid options to avoid IO every frame
-        private static void CacheOptions()
+        private static void CacheOptions(bool force = false)
         {
-            // Only refresh if null or empty. You could add a "Refresh" button or check on focus if needed.
-            if (_availableOptions != null && _availableOptions.Length > 0) return;
+            // Only refresh if null, empty or forced.
+            if (!force && _availableOptions != null && _availableOptions.Length > 0) return;
 
             string fullPath = Path.Combine(Application.dataPath, JSON_SUB_PATH);
             if (!Directory.Exists(fullPath))
@@ -71,6 +71,18 @@ namespace ReactiveSolutions.AttributeSystem.Editor
                 }
             }
 
+            // --- Layout Calculation ---
+
+            // 1. Calculate the Button Rect (Fixed width on the right)
+            float refreshButtonWidth = 20f;
+            float spacing = 2f;
+
+            // 2. Calculate the Main Content Rect (Full width minus button minus spacing)
+            float contentWidth = position.width - refreshButtonWidth - spacing;
+
+            Rect contentRect = new Rect(position.x, position.y, contentWidth, position.height);
+            Rect refreshRect = new Rect(position.x + contentWidth + spacing, position.y, refreshButtonWidth, position.height);
+
             // Visual handling for "Missing" data (e.g. file was deleted)
             if (!found && !string.IsNullOrEmpty(currentID))
             {
@@ -90,15 +102,22 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             }
             else
             {
-                // Draw the Dropdown
-                int newIndex = EditorGUI.Popup(position, label.text, currentIndex, _availableOptions);
+                // === STANDARD STATE (Dropdown) ===
+                int newIndex = EditorGUI.Popup(contentRect, label.text, currentIndex, _availableOptions);
 
-                // Apply change
                 if (newIndex != currentIndex)
                 {
                     string selected = _availableOptions[newIndex];
                     idProperty.stringValue = (selected == "None") ? "" : selected;
                 }
+            }
+
+            // Draw Refresh Button
+            // We use a predefined icon like "Refresh" or standard text
+            var refreshIcon = EditorGUIUtility.IconContent("Refresh");
+            if (GUI.Button(refreshRect, refreshIcon, EditorStyles.iconButton)) 
+            {
+                CacheOptions(force: true);
             }
         }
     }

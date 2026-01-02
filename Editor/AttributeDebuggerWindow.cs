@@ -14,6 +14,10 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         private Vector2 _scrollPosition;
         private bool _autoRefresh = true;
 
+        // Tag Filter State (for Attributes) - Keeping this for UI organization
+        private string _selectedTagFilter = null;
+        private List<string> _availableTags = new List<string>();
+
         [MenuItem("Window/Attribute System/Attribute Debugger")]
         public static void ShowWindow()
         {
@@ -47,6 +51,8 @@ namespace ReactiveSolutions.AttributeSystem.Editor
                 EditorGUILayout.HelpBox("Selected Controller has no Processor initialized.", MessageType.Warning);
                 return;
             }
+            DrawProcessorTags();
+            GUILayout.Space(5);
 
             DrawAttributesList();
 
@@ -54,6 +60,24 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             if (_autoRefresh && Application.isPlaying)
             {
                 Repaint();
+            }
+        }
+
+        private void DrawProcessorTags()
+        {
+            var tags = _selectedController.Processor.Tags;
+            if (tags.Count > 0)
+            {
+                GUILayout.BeginHorizontal("box");
+                GUILayout.Label("Entity Tags:", EditorStyles.boldLabel, GUILayout.Width(80));
+                foreach (var tag in tags)
+                {
+                    GUI.backgroundColor = new Color(1f, 0.9f, 0.6f); // Light Yellow for Entity Tags
+                    //GUILayout.Label(tag, EditorStyles.helpBox);
+                    GUI.backgroundColor = Color.white;
+                }
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
             }
         }
 

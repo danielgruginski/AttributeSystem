@@ -297,9 +297,10 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             string json = JsonUtility.ToJson(_container.Data, true);
             File.WriteAllText(fullPath, json);
 
-            AssetDatabase.Refresh();
+            AssetDatabase.ImportAsset(fullPath);
             _fullFilePath = fullPath;
             Debug.Log($"Saved StatBlock to {fileName}");
+            Repaint();
         }
 
         private void LoadJson()
