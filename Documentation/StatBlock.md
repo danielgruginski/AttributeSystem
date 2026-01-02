@@ -60,7 +60,43 @@ public List<AttributeModifierSpec> Modifiers;
 -   **Usage:** Defining "+10% Strength", "Clamp Health between 0 and MaxHealth".
     
 -   **Behavior:** Each spec is converted into a live `IAttributeModifier` instance via the `ModifierFactory` and applied to the processor.
+
+### 3. Tags
+
+The StatBlock can now apply tags to entities. This is useful for categorization (e.g., "Undead", "Boss") or status effects (e.g., "Stunned", "Blessed").
+
+#### Local Tags (`Tags`)
+
+A list of strings (or SemanticKeys) applied to the **Self** (the processor the block is applied to).
+
+```
+public List<SemanticKey> Tags;
+
+```
+
+-   **Usage:** "This Armor is Cursed." -> Adds "Cursed" tag to the Armor.
     
+-   **Behavior:** Adds the tag to the processor. Removed when the StatBlock is disposed.
+    
+
+#### Remote Tags (`RemoteTags`)
+
+A list of specs to apply tags to **Remote Entities** via a provider path.
+
+```
+public List<TagModifierSpec> RemoteTags;
+
+```
+
+-   **Usage:** "This Holy Sword applies 'Blessed' to its Owner."
+    
+-   **Structure:**
+    
+    -   `Tag`: The tag to apply (e.g., "Blessed").
+        
+    -   `TargetPath`: The path to the target (e.g., `["Owner"]`).
+        
+-   **Behavior:** Creates a `TagConnection` that monitors the path. If the Owner changes, the tag moves automatically.
 
 ## Public API
 
@@ -96,6 +132,13 @@ A StatBlock is typically stored as a `.json` file in `Resources/Data/StatBlocks`
 ```
 {
   "BlockName": "Iron Sword",
+  "Tags": [ "Magical" ], // Local Tag on the Sword
+  "RemoteTags": [
+    {
+      "Tag": "Blessed", // Remote Tag applied to Owner
+      "TargetPath": [ "Owner" ]
+    }
+  ],
   "BaseValues": [
     { "Name": "Durability", "Value": 100.0 }
   ],

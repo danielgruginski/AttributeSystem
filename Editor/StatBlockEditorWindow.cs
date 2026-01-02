@@ -74,12 +74,22 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             _serializedObject.Update();
 
             SerializedProperty dataProp = _serializedObject.FindProperty("Data");
+            SerializedProperty tagsProp = dataProp.FindPropertyRelative("Tags");
+            SerializedProperty remoteTagsProp = dataProp.FindPropertyRelative("RemoteTags");
             SerializedProperty baseValuesProp = dataProp.FindPropertyRelative("BaseValues");
             SerializedProperty modifiersProp = dataProp.FindPropertyRelative("Modifiers");
 
             // --- 1. Draw Base Values (Standard Inspector is fine here) ---
+
+            EditorGUILayout.LabelField("Tags", _headerStyle);
+            EditorGUILayout.PropertyField(tagsProp, true);
+
+            EditorGUILayout.LabelField("Remote Tags", _headerStyle);
+            EditorGUILayout.PropertyField(remoteTagsProp, true);
+
             EditorGUILayout.LabelField("Base Attributes", _headerStyle);
             EditorGUILayout.PropertyField(baseValuesProp, true);
+
 
             EditorGUILayout.Space(15);
             EditorGUILayout.LabelField("Modifier Pipeline", _headerStyle);
@@ -287,9 +297,10 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             string json = JsonUtility.ToJson(_container.Data, true);
             File.WriteAllText(fullPath, json);
 
-            AssetDatabase.Refresh();
+            AssetDatabase.ImportAsset(fullPath);
             _fullFilePath = fullPath;
             Debug.Log($"Saved StatBlock to {fileName}");
+            Repaint();
         }
 
         private void LoadJson()
