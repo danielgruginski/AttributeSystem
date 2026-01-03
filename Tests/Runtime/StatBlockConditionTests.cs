@@ -54,7 +54,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.SetOrUpdateBaseValue(Strength, 0);
 
             // Assert
-            Assert.AreEqual(5, _processor.GetAttribute(Strength).ReactivePropertyAccess.Value);
+            Assert.AreEqual(5, _processor.GetAttribute(Strength).Value.Value);
         }
 
         [Test]
@@ -83,7 +83,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             _processor.SetOrUpdateBaseValue(Strength, 0);
 
-            Assert.AreEqual(10, _processor.GetAttribute(Strength).ReactivePropertyAccess.Value);
+            Assert.AreEqual(10, _processor.GetAttribute(Strength).Value.Value);
         }
 
         [Test]
@@ -112,7 +112,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             var activeStatBlock = statBlock.ApplyToProcessor(_processor, _factory);
 
-            Assert.AreEqual(0, _processor.GetAttribute(Strength).ReactivePropertyAccess.Value);
+            Assert.AreEqual(0, _processor.GetAttribute(Strength).Value.Value);
         }
 
         [Test]
@@ -141,11 +141,11 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             _processor.SetOrUpdateBaseValue(Stealth, 0);
 
-            Assert.AreEqual(5, _processor.GetAttribute(Stealth).ReactivePropertyAccess.Value);
+            Assert.AreEqual(5, _processor.GetAttribute(Stealth).Value.Value);
 
             // Add tag -> Should deactivate
             _processor.AddTag(tag);
-            Assert.AreEqual(0, _processor.GetAttribute(Stealth).ReactivePropertyAccess.Value);
+            Assert.AreEqual(0, _processor.GetAttribute(Stealth).Value.Value);
         }
 
         [Test]
@@ -175,11 +175,11 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.SetOrUpdateBaseValue(DamageBonus, 0);
 
             // 50 > 30 -> Active
-            Assert.AreEqual(10, _processor.GetAttribute(DamageBonus).ReactivePropertyAccess.Value);
+            Assert.AreEqual(10, _processor.GetAttribute(DamageBonus).Value.Value);
 
             // Lower Health -> Inactive
             _processor.SetOrUpdateBaseValue(Health, 20);
-            Assert.AreEqual(0, _processor.GetAttribute(DamageBonus).ReactivePropertyAccess.Value);
+            Assert.AreEqual(0, _processor.GetAttribute(DamageBonus).Value.Value);
         }
 
         [Test]
@@ -215,19 +215,19 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.SetOrUpdateBaseValue(Defense, 0);
 
             // Initially false
-            Assert.AreEqual(0, _processor.GetAttribute(Defense).ReactivePropertyAccess.Value);
+            Assert.AreEqual(0, _processor.GetAttribute(Defense).Value.Value);
 
             // Add A -> True
             _processor.AddTag(tagA);
-            Assert.AreEqual(100, _processor.GetAttribute(Defense).ReactivePropertyAccess.Value);
+            Assert.AreEqual(100, _processor.GetAttribute(Defense).Value.Value);
 
             // Remove A -> False
             _processor.RemoveTag(tagA);
-            Assert.AreEqual(0, _processor.GetAttribute(Defense).ReactivePropertyAccess.Value);
+            Assert.AreEqual(0, _processor.GetAttribute(Defense).Value.Value);
 
             // Add B -> True
             _processor.AddTag(tagB);
-            Assert.AreEqual(100, _processor.GetAttribute(Defense).ReactivePropertyAccess.Value);
+            Assert.AreEqual(100, _processor.GetAttribute(Defense).Value.Value);
         }
     }
 }

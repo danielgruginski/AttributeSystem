@@ -3,6 +3,7 @@ using ReactiveSolutions.AttributeSystem.Core;
 using SemanticKeys;
 using UnityEngine;
 using UnityEngine.TestTools;
+using static UnityEngine.GraphicsBuffer;
 
 namespace ReactiveSolutions.AttributeSystem.Tests
 {
@@ -52,10 +53,10 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             Assert.IsNotNull(attackAttr, "Failed to retrieve attribute via alias (Attack). It returned null.");
 
-            Debug.Log($"Resolved: {attackAttr.Name} (Expected: {_strengthKey})");
+            Debug.Log($"Resolved Attribute Object Name: {attackAttr.Name}");
 
-            Assert.AreEqual(_strengthKey.ToString(), attackAttr.Name.ToString());
-            Assert.AreEqual(10, attackAttr.ReactivePropertyAccess.Value);
+            Assert.AreEqual(_attackKey.ToString(), attackAttr.Name.ToString());
+            Assert.AreEqual(10, attackAttr.Value.Value);
         }
 
         [Test]
@@ -68,7 +69,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.SetOrUpdateBaseValue(_mainStatKey, 20);
 
             // Check via Target
-            Assert.AreEqual(20, _processor.GetAttribute(_intelligenceKey).ReactivePropertyAccess.Value);
+            Assert.AreEqual(20, _processor.GetAttribute(_intelligenceKey).Value.Value);
         }
 
         [Test]
@@ -79,8 +80,11 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.SetPointer(_aliasB, _realStat);
             _processor.SetOrUpdateBaseValue(_realStat, 50);
 
-            Assert.AreEqual(50, _processor.GetAttribute(_aliasA).ReactivePropertyAccess.Value);
+            Assert.AreEqual(50, _processor.GetAttribute(_aliasA).Value.Value);
         }
+
+
+
 
         [Test]
         public void CircularDependency_IsPrevented()
@@ -89,7 +93,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.SetPointer(_keyA, _keyB);
 
             // Expect the error log from the next call
-            LogAssert.Expect(LogType.Error, $"[AttributeProcessor] Detected circular pointer dependency between '{_keyB}' and '{_keyA}'. Operation aborted.");
+            LogAssert.Expect(LogType.Error, $"[AttributeProcessor] Circular pointer detected: {_keyB} -> {_keyA}");
 
             // Attempt to point B -> A (Loop)
             // Should be blocked by internal check and log Error
@@ -109,15 +113,20 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             Assert.IsNotNull(attrB);
 
             // Logic Check:
-            // 1. A points to B. So attrA IS attrB.
-            // 2. B does NOT point to A (prevented). So B is independent.
-            // 3. Last write was 20.
+            // 1. A is a Pointer to B. It reads 20.
+            Assert.AreEqual(20, attrA.Value.Value, "A is an alias of B, so it should reflect B's value (20).");
 
-            Assert.AreEqual(20, attrA.ReactivePropertyAccess.Value, "A is an alias of B, so it should reflect B's value (20).");
-            Assert.AreEqual(20, attrB.ReactivePropertyAccess.Value, "B is the target storage, so it should hold the value 20.");
+            // 2. B is a Concrete Attribute. It stores 20.
+            Assert.AreEqual(20, attrB.Value.Value, "B is the target storage, so it should hold the value 20.");
 
-            // Verify they are indeed the same instance (proving A->B resolution)
-            Assert.AreSame(attrA, attrB, "Attribute A should resolve to the same instance as Attribute B.");
+            // 3. They are NOT the same object instance.
+            // attrA is the PointerAttribute wrapper. attrB is the concrete Attribute.
+            Assert.AreNotSame(attrA, attrB, "Attribute A (Pointer) should be distinct from Attribute B (Concrete).");
+
+            // 4. Verify Types
+            Assert.IsInstanceOf<PointerAttribute>(attrA);
+            Assert.IsInstanceOf<Attribute>(attrB);
+            Assert.IsNotInstanceOf<PointerAttribute>(attrB);
         }
         [Test]
         public void LongerCircularDependency_IsPrevented()
@@ -126,7 +135,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.SetPointer(_keyA, _keyB);
 
             // Expect the error log from the next call
-            LogAssert.Expect(LogType.Error, $"[AttributeProcessor] Detected circular pointer dependency between '{_keyD}' and '{_keyA}'. Operation aborted.");
+            LogAssert.Expect(LogType.Error, $"[AttributeProcessor] Circular pointer detected: {_keyD} -> {_keyA}");
 
             // Attempt to point B -> A (Loop)
             // Should be blocked by internal check and log Error
@@ -151,15 +160,15 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.SetPointer(_alias, _target);
             _processor.SetOrUpdateBaseValue(_target, 100);
 
-            Assert.AreEqual(100, _processor.GetAttribute(_alias).ReactivePropertyAccess.Value);
+            Assert.AreEqual(100, _processor.GetAttribute(_alias).Value.Value);
 
             _processor.RemovePointer(_alias);
 
             // Reset alias to prove independence (since it might be null if not created)
             _processor.SetOrUpdateBaseValue(_alias, 0);
 
-            Assert.AreEqual(0, _processor.GetAttribute(_alias).ReactivePropertyAccess.Value);
-            Assert.AreEqual(100, _processor.GetAttribute(_target).ReactivePropertyAccess.Value);
+            Assert.AreEqual(0, _processor.GetAttribute(_alias).Value.Value);
+            Assert.AreEqual(100, _processor.GetAttribute(_target).Value.Value);
         }
     }
 }

@@ -241,11 +241,11 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             // Assertions Phase 1
             // MagicSword Damage: 7 + 3 = 10
-            Assert.AreEqual(10f, magicSword.GetAttribute(TestKeys.Mock("Damage")).ReactivePropertyAccess.Value, "Phase 1: MagicSword Damage incorrect");
+            Assert.AreEqual(10f, magicSword.GetAttribute(TestKeys.Mock("Damage")).Value.Value, "Phase 1: MagicSword Damage incorrect");
 
             // PlainSword Damage: 3 + 3 (Shared Buff) = 6
             // Path Trace: MagicSword(Context) -> Owner(Char) -> Hireling(Hireling) -> EquippedWeapon(PlainSword) -> Add Mod
-            Assert.AreEqual(6f, plainSword.GetAttribute(TestKeys.Mock("Damage")).ReactivePropertyAccess.Value, "Phase 1: PlainSword Damage incorrect");
+            Assert.AreEqual(6f, plainSword.GetAttribute(TestKeys.Mock("Damage")).Value.Value, "Phase 1: PlainSword Damage incorrect");
 
 
             // --- PHASE 2: Swap ---
@@ -273,13 +273,13 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // Assertions Phase 2
 
             // MagicSword Damage: 7 + 3 = 10 (Self buff always works)
-            Assert.AreEqual(10f, magicSword.GetAttribute(TestKeys.Mock("Damage")).ReactivePropertyAccess.Value, "Phase 2: MagicSword Damage incorrect");
+            Assert.AreEqual(10f, magicSword.GetAttribute(TestKeys.Mock("Damage")).Value.Value, "Phase 2: MagicSword Damage incorrect");
 
             // PlainSword Damage: 3 (Base)
             // Path Trace: MagicSword(Context) -> Owner(Hireling) -> Hireling(MISSING on Hireling) -> ...
             // The modifier chain breaks at "Hireling" because the Hireling doesn't have a provider named "Hireling".
             // So PlainSword gets nothing.
-            Assert.AreEqual(3f, plainSword.GetAttribute(TestKeys.Mock("Damage")).ReactivePropertyAccess.Value, "Phase 2: PlainSword Damage incorrect");
+            Assert.AreEqual(3f, plainSword.GetAttribute(TestKeys.Mock("Damage")).Value.Value, "Phase 2: PlainSword Damage incorrect");
         }
 
         // --- HELPERS ---
@@ -299,7 +299,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // Base 6 + CasterLevel(2) = 8
             var itemLvl = _weapProc.GetAttribute(TestKeys.Mock("ItemLevel"));
             Assert.IsNotNull(itemLvl, "Weapon.ItemLevel missing");
-            Assert.AreEqual(8f, itemLvl.ReactivePropertyAccess.Value, "Weapon ItemLevel Calculation Failed");
+            Assert.AreEqual(8f, itemLvl.Value.Value, "Weapon ItemLevel Calculation Failed");
 
             // 2. Check Character Strength
             // Base 0 + ItemLevel(8) = 8
@@ -307,7 +307,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var str = _charProc.GetAttribute(TestKeys.Mock("Strength"));
             // If Step D failed to add the modifier, this might be null or 0
             Assert.IsNotNull(str, "Character.Strength missing");
-            Assert.AreEqual(8f, str.ReactivePropertyAccess.Value, "Character Strength Calculation Failed");
+            Assert.AreEqual(8f, str.Value.Value, "Character Strength Calculation Failed");
         }
     }
 }

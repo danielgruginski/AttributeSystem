@@ -133,8 +133,8 @@ namespace ReactiveSolutions.AttributeSystem.Editor
 
             // Live Value
             float current = 0f;
-            if (attr.ReactivePropertyAccess != null)
-                current = attr.ReactivePropertyAccess.Value;
+            if (attr.Value != null)
+                current = attr.Value.Value;
 
             GUILayout.Label($"Value: {current:0.##}", EditorStyles.largeLabel);
             GUILayout.FlexibleSpace();

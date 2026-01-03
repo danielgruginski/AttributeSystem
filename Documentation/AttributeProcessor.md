@@ -13,6 +13,8 @@ It is responsible for:
 3.  **Modification:** Providing the API to add modifiers to attributes, managing the creation of `AttributeConnection`s for remote modifications.
 
 4.  **Tagging:** Managing Entity Tags for categorization and status effects.
+
+5.  **Aliasing:** Manages Attribute Pointers.
     
 
 ## Key Features
@@ -42,7 +44,11 @@ Methods for retrieving or creating the attribute objects.
 -   **`GetAttribute(SemanticKey name)`**
     
     -   Retrieves a local attribute. Returns `null` if not found.
-        
+
+-   **`GetAttributeObservable(SemanticKey key)`** 
+
+  - Returns an `IObservable<float>` stream of the attribute's final value. Handles resolution of aliases automatically.
+
 -   **`GetOrCreateAttribute(SemanticKey name, float defaultBaseIfMissing = 0f)`**
     
     -   Safely gets an attribute, creating it with the specified base value if it doesn't exist. Ideal for ensuring a stat exists before modifying it.
@@ -55,8 +61,18 @@ Methods for retrieving or creating the attribute objects.
     
     -   Access to the underlying `IReadOnlyReactiveDictionary`. Useful for debugging or listing all stats.
         
+### 2. Pointer Management
 
-### 2. Tag Management
+-   `SetPointer(SemanticKey alias, SemanticKey target)`: Creates or updates an alias.
+    
+    -   If `alias` already exists as a concrete attribute, it is **overwritten** by the pointer (previous data is lost).
+        
+    -   Prevents circular dependencies (e.g., `A -> B -> A`, `A -> A`, `A -> B -> C -> A`).
+        
+-   `RemovePointer(SemanticKey alias)`: Deletes the alias. This does **not** affect the Target attribute.
+
+
+### 3. Tag Management
 
 The processor now includes a Tag Manager to handle entity states.
 
@@ -76,7 +92,7 @@ The processor now includes a Tag Manager to handle entity states.
     
     -   Checks if the tag is currently active (count > 0).
 
-### 3. Reactive Access
+### 4. Reactive Access
 
 Methods for observing values, even across complex chains.
 
@@ -95,7 +111,7 @@ Methods for observing values, even across complex chains.
     -   Stream that fires whenever a new `Attribute` is created locally.
         
 
-### 4. Modifier Management (The Handle System)
+### 5. Modifier Management (The Handle System)
 
 The processor manages the application of modifiers.
 
@@ -114,7 +130,7 @@ The processor manages the application of modifiers.
     -   **Returns:** An `AttributeConnection` (which implements `IDisposable`). This object keeps the link alive. Disposing it removes the modifier from wherever it is currently applied.
         
 
-### 5. Provider Linking (Context)
+### 6. Provider Linking (Context)
 
 Methods for establishing relationships between entities.
 

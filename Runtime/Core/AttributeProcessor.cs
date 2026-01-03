@@ -19,8 +19,9 @@ namespace ReactiveSolutions.AttributeSystem.Core
         private readonly ReactiveDictionary<SemanticKey, Attribute> _attributes = new();
         public IReadOnlyReactiveDictionary<SemanticKey, Attribute> Attributes => _attributes;
 
-        // Maps an Alias -> Target Attribute Key
-        private Dictionary<SemanticKey, SemanticKey> _pointers = new Dictionary<SemanticKey, SemanticKey>();
+        // REMOVED: _pointers dictionary.
+        // Pointers are now first-class citizens (PointerAttribute instances) inside _attributes.
+        //private Dictionary<SemanticKey, SemanticKey> _pointers = new Dictionary<SemanticKey, SemanticKey>();
 
         private readonly Dictionary<SemanticKey, AttributeProcessor> _externalProviders = new();
         private readonly Subject<SemanticKey> _onProviderRegistered = new();
@@ -40,71 +41,74 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         // --- Pointer Management ---
 
-        /// <summary>
-        /// Creates an alias pointer. When 'alias' is requested, it will resolve to 'target'.
-        /// </summary>
-        public void SetPointer(SemanticKey alias, SemanticKey target)
+        public void SetPointer(SemanticKey alias, SemanticKey target, List<SemanticKey> path = null)
         {
-            if (alias == target)
+            if (alias == target && (path == null || path.Count == 0))
             {
                 Debug.LogWarning($"[AttributeProcessor] Cannot point alias '{alias}' to itself.");
                 return;
             }
 
-            // Simple loop detection
-            // If target is already pointing to alias, this would create a loop
-            if (IsCircular(alias, target))
+            if (IsLocallyCircular(alias, target))
             {
-                Debug.LogError($"[AttributeProcessor] Detected circular pointer dependency between '{alias}' and '{target}'. Operation aborted.");
+                Debug.LogError($"[AttributeProcessor] Circular pointer detected: {alias} -> {target}");
                 return;
             }
 
-            _pointers[alias] = target;
+            // TODO: Test if an external provider chain would cause a cycle too.
+
+
+            // Check collision with existing attribute
+            if (_attributes.TryGetValue(alias, out var existing))
+            {
+                if (existing is PointerAttribute pointer)
+                {
+                    // If it's already a pointer, just retarget it
+                    pointer.SetTarget(target, path);
+                    return;
+                }
+                else
+                {
+                    // It's a concrete attribute. We are overwriting it with a pointer.
+                    // This effectively "deletes" the old attribute and replaces it with an alias.
+                    Debug.LogWarning($"[AttributeProcessor] Overwriting concrete attribute '{alias}' with a Pointer to '{target}'. Previous data lost.");
+                    existing.Dispose();
+                    _attributes.Remove(alias);
+                }
+            }
+
+            // Create new pointer
+            var newPointer = new PointerAttribute(alias, target, this, path);
+            _attributes[alias] = newPointer;
         }
 
         public void RemovePointer(SemanticKey alias)
         {
-            if (_pointers.ContainsKey(alias))
+            if (_attributes.TryGetValue(alias, out var attr) && attr is PointerAttribute pointer)
             {
-                _pointers.Remove(alias);
+                // Remove from dictionary FIRST so observers (like dependent pointers)
+                // get the notification and unhook/fallback BEFORE we kill the object.
+                _attributes.Remove(alias);
+                pointer.Dispose();
             }
         }
 
-        private bool IsCircular(SemanticKey alias, SemanticKey target)
+        private bool IsLocallyCircular(SemanticKey alias, SemanticKey target)
         {
-            var current = target;
-            int safetyCounter = 0;
+            // We are about to set Alias -> Target.
+            // Check if Target eventually points back to Alias.
+            var currentKey = target;
+            int safeguard = 0;
 
-            // Loop through the chain. If we ever encounter 'alias', it's a circle.
-            // Because if we set alias->target, and target eventually points back to alias,
-            // we have closed the loop.
-            while (_pointers.ContainsKey(current))
+            while (_attributes.TryGetValue(currentKey, out var attr) && attr is PointerAttribute ptr)
             {
-                current = _pointers[current];
-                if (current == alias) return true;
 
-                safetyCounter++;
-                if (safetyCounter > 100)
-                {
-                    Debug.LogError("[AttributeProcessor] Infinite loop detected in pointer chain during check.");
-                    return true; // Safety break
-                }
+                currentKey = ptr.TargetKey;
+
+                if (currentKey == alias) return true;
+                if (++safeguard > 100) return true;
             }
             return false;
-        }
-        /// <summary>
-        /// Recursively resolves a key alias to its final target.
-        /// </summary>
-        private SemanticKey ResolvePointer(SemanticKey key)
-        {
-            int safeguard = 0;
-            // Iteratively resolve
-            while (_pointers.TryGetValue(key, out var target))
-            {
-                key = target;
-                if (++safeguard > 100) break; // Should be caught by SetPointer but safety first
-            }
-            return key;
         }
 
 
@@ -138,7 +142,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
         public IObservable<AttributeProcessor> ObserveProvider(SemanticKey key)
         {
             return _onProviderRegistered
-                .Where(k => k == key)
+                .Where(k => k.Equals(key))
                 .StartWith(key) // Check immediately
                 .Select(_ => _externalProviders.TryGetValue(key, out var p) ? p : null)
                 .DistinctUntilChanged();
@@ -151,8 +155,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             if (providerPath == null || providerPath.Count == 0)
             {
                 // Resolve pointer locally before observing
-                var resolvedKey = ResolvePointer(attributeName);
-                return GetLocalAttributeObservable(resolvedKey);
+                return GetLocalAttributeObservable(attributeName);
             }
 
             // Recursive Step: Look for the first provider in the list
@@ -199,8 +202,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
         {
             if (providerPath == null || providerPath.Count == 0)
             {
-                var resolvedKey = ResolvePointer(name);
-                return _attributes.TryGetValue(resolvedKey, out var attr) ? attr : null;
+                return _attributes.TryGetValue(name, out var attr) ? attr : null;
             }
 
             SemanticKey nextKey = providerPath[0];
@@ -219,12 +221,11 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// </summary>
         public Attribute GetOrCreateAttribute(SemanticKey name, float defaultBaseIfMissing = 0f)
         {
-            var resolvedKey = ResolvePointer(name);
             // GetOrCreate only works locally for safety
-            if (!_attributes.TryGetValue(resolvedKey, out var attr))
+            if (!_attributes.TryGetValue(name, out var attr))
             {
-                attr = new Attribute(resolvedKey, defaultBaseIfMissing, this);
-                _attributes[resolvedKey] = attr;
+                attr = new Attribute(name, defaultBaseIfMissing, this);
+                _attributes[name] = attr;
             }
             return attr;
         }
@@ -238,13 +239,11 @@ namespace ReactiveSolutions.AttributeSystem.Core
         {
             // GetAttribute automatically resolves aliases now
             var attr = GetOrCreateAttribute(key);
+            // Calling SetBaseValue is polymorphic:
+            // - Concrete: Sets internal value
+            // - Pointer: Redirects to target
             attr.SetBaseValue(value);
         }
-        /*public void SetOrUpdateBaseValue(SemanticKey attributeName, float newBase)
-        {
-            var attr = GetOrCreateAttribute(attributeName);
-            attr.SetBaseValue(newBase);
-        }*/
 
         public IDisposable AddModifier(string sourceId, IAttributeModifier modifier, SemanticKey attributeName)
             => AddModifier(sourceId, modifier, attributeName, null);
@@ -259,9 +258,10 @@ namespace ReactiveSolutions.AttributeSystem.Core
             {
                 // Local add
                 var attr = GetOrCreateAttribute(attributeName, 0f);
-                attr.AddModifier(modifier);
-                // Return a handle to clean up this specific addition
-                return Disposable.Create(() => attr.RemoveModifier(modifier));
+                // Polymorphic AddModifier:
+                // - Concrete: Adds to modifiers list
+                // - Pointer: Adds to local list AND proxies to target
+                return attr.AddModifier(modifier);
             }
             else
             {
