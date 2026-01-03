@@ -41,7 +41,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
             // Use the structured reference
             return contextToUse.GetAttributeObservable(AttributeRef.Name, AttributeRef.Path)
-                .SelectMany(attr => attr.ReactivePropertyAccess);
+                .SelectMany(attr => attr.Value);
         }
 
         public static ValueSource Const(float val) => new ValueSource { Mode = ValueSource.SourceMode.Constant, ConstantValue = val };

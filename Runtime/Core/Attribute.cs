@@ -12,24 +12,32 @@ namespace ReactiveSolutions.AttributeSystem.Core
     /// The core math engine for a single attribute.
     /// Calculates value through a sequential pipeline sorted by priority.
     /// </summary>
-    public class Attribute : IDisposable
+    public class Attribute : IAttribute
     {
         public SemanticKey Name { get; }
 
-        private readonly ReactiveProperty<float> _baseValue;
-        private readonly ReactiveCollection<IAttributeModifier> _modifiers = new();
-        private readonly ReactiveProperty<float> _currentValue = new();
-        private readonly AttributeProcessor _processor;
-        private readonly CompositeDisposable _calculationDisposable = new();
+        protected readonly ReactiveProperty<float> _baseValue; 
+        public virtual float BaseValue => _baseValue.Value;
+
+        public virtual IReadOnlyReactiveProperty<float> Value => _finalValue;
+        public bool IsDisposed { get; private set; } // Implement Interface
+
+        protected readonly ReactiveCollection<IAttributeModifier> _modifiers = new();
+        protected readonly ReactiveProperty<float> _finalValue = new();
+
+        protected readonly AttributeProcessor _processor;
+        protected readonly CompositeDisposable _calculationDisposable = new();
         private IDisposable _currentChainSubscription;
 
-        public IReadOnlyReactiveProperty<float> ReactivePropertyAccess => _currentValue;
-        public float BaseValue => _baseValue.Value;
+        
+       
 
         /// <summary>
         /// Exposes the current modifiers for queries (like removal by SourceId).
         /// </summary>
         public IEnumerable<IAttributeModifier> Modifiers => _modifiers;
+
+
         public Attribute(SemanticKey name, float initialBase, AttributeProcessor processor)
         {
             Name = name;
@@ -46,26 +54,32 @@ namespace ReactiveSolutions.AttributeSystem.Core
             _baseValue.Subscribe(_ => RebuildCalculationChain()).AddTo(_calculationDisposable);
         }
 
-        public void SetBaseValue(float value) => _baseValue.Value = value;
+        public virtual void SetBaseValue(float value) => _baseValue.Value = value;
 
-        public void AddModifier(IAttributeModifier modifier)
+        public virtual IDisposable AddModifier(IAttributeModifier modifier)
         {
             Debug.Assert(modifier != null, $"[Attribute] Attempted to add null modifier to {Name}");
             _modifiers.Add(modifier);
+
+            return Disposable.Create(() => RemoveModifier(modifier));
         }
 
-        public void RemoveModifier(IAttributeModifier modifier)
+        public virtual void RemoveModifier(IAttributeModifier modifier)
         {
             _modifiers.Remove(modifier);
         }
 
-        private void RebuildCalculationChain()
+        /// <summary>
+        /// Rebuilds the calculation pipeline. 
+        /// Virtual so PointerAttribute can override it to do nothing (since it delegates math).
+        /// </summary>
+        protected virtual void RebuildCalculationChain()
         {
             _currentChainSubscription?.Dispose();
 
             if (_modifiers.Count == 0)
             {
-                _currentValue.Value = _baseValue.Value;
+                _finalValue.Value = _baseValue.Value;
                 return;
             }
 
@@ -79,7 +93,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 {
                     float b = latest[0];
                     float[] values = latest.Skip(1).ToArray();
-                    _currentValue.Value = CalculatePipeline(b, mods, values);
+                    _finalValue.Value = CalculatePipeline(b, mods, values);
                 });
         }
 
@@ -109,10 +123,16 @@ namespace ReactiveSolutions.AttributeSystem.Core
             return result;
         }
 
-        public void Dispose()
+        public virtual void Dispose()
         {
+            if (IsDisposed) return;
+            IsDisposed = true; // Mark as dead
             _currentChainSubscription?.Dispose();
             _calculationDisposable.Dispose();
+            _baseValue.Dispose();
+            _finalValue.Dispose();
         }
+
+
     }
 }

@@ -89,7 +89,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // 2. Subscribe BEFORE the attribute even exists on the owner
             // This tests your reactive pipeline's robustness
             _processor.GetAttributeObservable(AttributeName, ProviderPath)
-                .SelectMany(attr => attr.ReactivePropertyAccess)
+                .SelectMany(attr => attr.Value)
                 .Subscribe(val => lastValue = val);
 
             // 3. Now create/update the value on the owner
@@ -125,7 +125,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             // Assert
             // 10 (Base) + 5 (Mod) = 15
-            Assert.AreEqual(15f, _processor.GetAttribute(TestKeys.Mock("Speed")).ReactivePropertyAccess.Value);
+            Assert.AreEqual(15f, _processor.GetAttribute(TestKeys.Mock("Speed")).Value.Value);
         }
 
         [Test]
@@ -167,7 +167,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             block.ApplyToProcessor(_processor, _factory);
 
             // Assert
-            var finalValue = _processor.GetAttribute(TestKeys.Mock("Speed")).ReactivePropertyAccess.Value;
+            var finalValue = _processor.GetAttribute(TestKeys.Mock("Speed")).Value.Value;
             Assert.AreEqual(15f, finalValue, $"Expected 15, but got {finalValue}. Check if ModifierType.Multiplicative is handled correctly.");
         }
 
@@ -204,7 +204,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             // 3. Verify Intermediate State
             // The pipeline for "Damage" is now waiting for "Owner.Strength".
-            Assert.AreEqual(10f, _processor.GetAttribute(TestKeys.Mock("Damage")).ReactivePropertyAccess.Value,
+            Assert.AreEqual(10f, _processor.GetAttribute(TestKeys.Mock("Damage")).Value.Value,
                 "Value should hold steady (Base Value) while waiting for external provider");
 
             // 4. Create Owner and Register (The "Late Arrival")
@@ -215,7 +215,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             // 5. Assert Final Update
             // Now the link is established, the modifier calculates (5 * 1 + 0 = 5), and Damage becomes 10 + 5 = 15.
-            Assert.AreEqual(15f, _processor.GetAttribute(TestKeys.Mock("Damage")).ReactivePropertyAccess.Value,
+            Assert.AreEqual(15f, _processor.GetAttribute(TestKeys.Mock("Damage")).Value.Value,
                 "Value should automatically update once the external provider is registered");
         }
 
