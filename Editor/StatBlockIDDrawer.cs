@@ -8,116 +8,90 @@ using ReactiveSolutions.AttributeSystem.Core.Data;
 
 namespace ReactiveSolutions.AttributeSystem.Editor
 {
-
     /// <summary>
-    /// Draws the StatBlockID struct as a dropdown menu of available JSON files.
+    /// Draws a dropdown for StatBlockID strings.
+    /// Supports both [StatBlockID] attribute on strings AND fields of type StatBlockID struct.
     /// </summary>
+    [CustomPropertyDrawer(typeof(StatBlockIDAttribute))]
     [CustomPropertyDrawer(typeof(StatBlockID))]
     public class StatBlockIDDrawer : PropertyDrawer
     {
-        private const string JSON_SUB_PATH = "Resources/Data/StatBlocks";
-        private static string[] _availableOptions;
-
-        // We cache the valid options to avoid IO every frame
-        private static void CacheOptions(bool force = false)
-        {
-            // Only refresh if null, empty or forced.
-            if (!force && _availableOptions != null && _availableOptions.Length > 0) return;
-
-            string fullPath = Path.Combine(Application.dataPath, JSON_SUB_PATH);
-            if (!Directory.Exists(fullPath))
-            {
-                _availableOptions = new string[] { "Error: Path Not Found" };
-                return;
-            }
-
-            // Get files and add a "None" or "Empty" option at the start if desired
-            var files = Directory.GetFiles(fullPath, "*.json")
-                                 .Select(Path.GetFileNameWithoutExtension)
-                                 .ToList();
-
-            files.Insert(0, "None"); // Optional: Allow clearing the selection
-            _availableOptions = files.ToArray();
-        }
+        private static string[] _cachedIds;
+        private static float _lastCacheTime;
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
-            // Ensure we have data
-            CacheOptions();
-
-            // Find the specific string property inside the struct
-            SerializedProperty idProperty = property.FindPropertyRelative("ID");
-
-            if (idProperty == null)
+            // Handle Struct vs String property
+            SerializedProperty idProperty;
+            if (property.type == nameof(StatBlockID))
             {
-                EditorGUI.LabelField(position, label.text, "Error: ID field not found");
-                return;
-            }
-
-            string currentID = idProperty.stringValue;
-            int currentIndex = 0;
-
-            // Find current index in the list
-            // We use a simple loop; for massive lists (1000+ items) this could be optimized, 
-            // but for file lists it's fine.
-            bool found = false;
-            for (int i = 0; i < _availableOptions.Length; i++)
-            {
-                if (_availableOptions[i] == currentID)
-                {
-                    currentIndex = i;
-                    found = true;
-                    break;
-                }
-            }
-
-            // --- Layout Calculation ---
-
-            // 1. Calculate the Button Rect (Fixed width on the right)
-            float refreshButtonWidth = 20f;
-            float spacing = 2f;
-
-            // 2. Calculate the Main Content Rect (Full width minus button minus spacing)
-            float contentWidth = position.width - refreshButtonWidth - spacing;
-
-            Rect contentRect = new Rect(position.x, position.y, contentWidth, position.height);
-            Rect refreshRect = new Rect(position.x + contentWidth + spacing, position.y, refreshButtonWidth, position.height);
-
-            // Visual handling for "Missing" data (e.g. file was deleted)
-            if (!found && !string.IsNullOrEmpty(currentID))
-            {
-                // Draw a warning and a text field so the user can see/fix the broken ID manually
-                float warningWidth = 20f;
-                Rect warningRect = new Rect(position.x, position.y, warningWidth, position.height);
-                Rect fieldRect = new Rect(position.x + warningWidth, position.y, position.width - warningWidth, position.height);
-
-                EditorGUI.LabelField(warningRect, new GUIContent("!", "File not found in Resources"));
-
-                // Allow editing the string manually if the file is missing
-                string newValue = EditorGUI.TextField(fieldRect, label, currentID);
-                if (newValue != currentID)
-                {
-                    idProperty.stringValue = newValue;
-                }
+                idProperty = property.FindPropertyRelative("ID");
+                // Label handling for structs in lists is automatic usually, but let's be safe
             }
             else
             {
-                // === STANDARD STATE (Dropdown) ===
-                int newIndex = EditorGUI.Popup(contentRect, label.text, currentIndex, _availableOptions);
+                idProperty = property;
+            }
 
-                if (newIndex != currentIndex)
+            EditorGUI.BeginProperty(position, label, property);
+
+            // Draw Label
+            position = EditorGUI.PrefixLabel(position, GUIUtility.GetControlID(FocusType.Passive), label);
+
+            RefreshCacheIfNeeded();
+
+            int selectedIndex = -1;
+            string currentId = idProperty.stringValue;
+
+            // Find current index
+            if (!string.IsNullOrEmpty(currentId))
+            {
+                for (int i = 0; i < _cachedIds.Length; i++)
                 {
-                    string selected = _availableOptions[newIndex];
-                    idProperty.stringValue = (selected == "None") ? "" : selected;
+                    if (_cachedIds[i] == currentId)
+                    {
+                        selectedIndex = i;
+                        break;
+                    }
                 }
             }
 
-            // Draw Refresh Button
-            // We use a predefined icon like "Refresh" or standard text
-            var refreshIcon = EditorGUIUtility.IconContent("Refresh");
-            if (GUI.Button(refreshRect, refreshIcon, EditorStyles.iconButton)) 
+            // Draw Dropdown
+            var displayOptions = new List<string>(_cachedIds);
+            displayOptions.Insert(0, "None");
+
+            int newIndex = EditorGUI.Popup(position, selectedIndex + 1, displayOptions.ToArray());
+
+            if (newIndex != selectedIndex + 1)
             {
-                CacheOptions(force: true);
+                if (newIndex == 0)
+                {
+                    idProperty.stringValue = "";
+                }
+                else
+                {
+                    idProperty.stringValue = _cachedIds[newIndex - 1];
+                }
+            }
+
+            EditorGUI.EndProperty();
+        }
+
+        private void RefreshCacheIfNeeded()
+        {
+            if (_cachedIds == null || Time.realtimeSinceStartup - _lastCacheTime > 5f)
+            {
+                string path = Path.Combine(Application.dataPath, "Resources/Data/StatBlocks");
+                if (Directory.Exists(path))
+                {
+                    string[] files = Directory.GetFiles(path, "*.json");
+                    _cachedIds = files.Select(p => Path.GetFileNameWithoutExtension(p)).ToArray();
+                }
+                else
+                {
+                    _cachedIds = new string[0];
+                }
+                _lastCacheTime = Time.realtimeSinceStartup;
             }
         }
     }

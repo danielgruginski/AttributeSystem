@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using ReactiveSolutions.AttributeSystem.Core;
 using ReactiveSolutions.AttributeSystem.Core.Data;
@@ -14,8 +15,9 @@ namespace ReactiveSolutions.AttributeSystem.Unity
     {
         [Tooltip("List of StatBlock IDs to apply (e.g. 'BaseStats', 'WarriorClass').")]
         [StatBlockID]
-        public List<string> StatBlockIds = new List<string>();
+        public List<StatBlockID> StatBlockIds = new List<StatBlockID>();
 
+        [SerializeField]
         private AttributeController _controller;
         private List<ActiveStatBlock> _activeBlocks = new List<ActiveStatBlock>();
 
@@ -24,8 +26,14 @@ namespace ReactiveSolutions.AttributeSystem.Unity
 
         private void Awake()
         {
-            _controller = GetComponent<AttributeController>();
-            _modifierFactory = new ModifierFactory();
+            if(_controller == null)
+            { 
+                _controller = GetComponent<AttributeController>();
+            }
+            if(_modifierFactory == null)
+            { 
+                _modifierFactory = new ModifierFactory(); 
+            }
         }
 
         private void Start()
@@ -54,22 +62,10 @@ namespace ReactiveSolutions.AttributeSystem.Unity
 
             foreach (var id in StatBlockIds)
             {
-                if (string.IsNullOrEmpty(id)) continue;
-
-                StatBlock block = new StatBlock();
-                StatBlockJsonLoader.LoadIntoStatBlock(id, block );
-                if (block != null)
-                {
-                    // Apply the block and store the handle
-                    var activeHandle = block.ApplyToProcessor(_controller.Processor, _modifierFactory);
-                    _activeBlocks.Add(activeHandle);
-                }
-                else
-                {
-                    Debug.LogWarning($"[StatBlockLinker] Could not load StatBlock with ID: {id}");
-                }
+                AddStatBlock(id);
             }
         }
+
 
         /// <summary>
         /// Removes all currently applied stat blocks.
@@ -81,6 +77,29 @@ namespace ReactiveSolutions.AttributeSystem.Unity
                 handle?.Dispose();
             }
             _activeBlocks.Clear();
+        }
+
+        public void SetTarget(AttributeController controller)
+        {
+            _controller = controller;
+        }
+
+        public void AddStatBlock(StatBlockID statBlockID)
+        {
+            if (string.IsNullOrEmpty(statBlockID)) return;
+
+            StatBlock block = new StatBlock();
+            StatBlockJsonLoader.LoadIntoStatBlock(statBlockID, block);
+            if (block != null)
+            {
+                // Apply the block and store the handle
+                var activeHandle = block.ApplyToProcessor(_controller.Processor, _modifierFactory);
+                _activeBlocks.Add(activeHandle);
+            }
+            else
+            {
+                Debug.LogWarning($"[StatBlockLinker] Could not load StatBlock with ID: {statBlockID}");
+            }
         }
     }
 }

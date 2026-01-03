@@ -17,5 +17,6 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         // implicit conversion lets you use StatBlockID as a string in your code seamlessly
         public static implicit operator string(StatBlockID statBlock) => statBlock.ID;
         public static implicit operator StatBlockID(string id) => new StatBlockID { ID = id };
+        public override string ToString() => ID;
     }
 }
