@@ -57,16 +57,35 @@ namespace ReactiveSolutions.AttributeSystem.Unity
             }
         }
 
+        public void RemoveLink()
+        {
+            if (_receiver != null && _provider != null)
+            {
+                _receiver.Processor.UnregisterExternalProvider(_alias);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            RemoveLink();
+        }
+
         /// <summary>
         /// Sets the provider at runtime (e.g., when a player picks up this weapon).
         /// </summary>
         public void SetProvider(AttributeController provider)
         {
             _provider = provider;
-            LinkContext();
+            if (_receiver != null && _provider != null)
+                LinkContext();
         }
 
-        public void SetReceiver(AttributeController receiver) => _receiver = receiver;
+        public void SetReceiver(AttributeController receiver) 
+        {
+            _receiver = receiver;
+            if(_receiver != null && _provider != null)
+                LinkContext();
+        }
         public void SetAlias(SemanticKey alias) => _alias = alias;
     }
 }

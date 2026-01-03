@@ -74,12 +74,15 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             _serializedObject.Update();
 
             SerializedProperty dataProp = _serializedObject.FindProperty("Data");
+            SerializedProperty activationProp = dataProp.FindPropertyRelative("ActivationCondition");
             SerializedProperty tagsProp = dataProp.FindPropertyRelative("Tags");
             SerializedProperty remoteTagsProp = dataProp.FindPropertyRelative("RemoteTags");
             SerializedProperty baseValuesProp = dataProp.FindPropertyRelative("BaseValues");
             SerializedProperty modifiersProp = dataProp.FindPropertyRelative("Modifiers");
 
             // --- 1. Draw Base Values (Standard Inspector is fine here) ---
+            EditorGUILayout.LabelField("Activation Conditions", _headerStyle);
+            EditorGUILayout.PropertyField(activationProp, true);
 
             EditorGUILayout.LabelField("Tags", _headerStyle);
             EditorGUILayout.PropertyField(tagsProp, true);
