@@ -133,13 +133,13 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         {
             var linker = _swordGO.AddComponent<StatBlockLinker>();
             linker.SetTarget(_swordController);
-            linker.SetStatBlock(new StatBlockID { ID = "NonExistentBlock_99999" });
+            linker.AddStatBlock(new StatBlockID { ID = "NonExistentBlock_99999" });
 
             // Should verify this logs an error but does not throw exception
-            LogAssert.Expect(LogType.Error, "[StatBlockLinker] Could not find JSON file at: Resources/Data/StatBlocks/NonExistentBlock_99999.json");
+            LogAssert.Expect(LogType.Error, "[StatBlockJsonLoader] Could not load StatBlock with ID: NonExistentBlock_99999 (Attempted path: Data/StatBlocks/NonExistentBlock_99999)");
 
             // This call should not crash
-            linker.ApplyStatBlock();
+            linker.ApplyStatBlocks();
         }
 
         [UnityTest]
