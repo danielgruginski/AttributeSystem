@@ -77,6 +77,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             SerializedProperty activationProp = dataProp.FindPropertyRelative("ActivationCondition");
             SerializedProperty tagsProp = dataProp.FindPropertyRelative("Tags");
             SerializedProperty remoteTagsProp = dataProp.FindPropertyRelative("RemoteTags");
+            SerializedProperty pointersProp = dataProp.FindPropertyRelative("Pointers");
             SerializedProperty baseValuesProp = dataProp.FindPropertyRelative("BaseValues");
             SerializedProperty modifiersProp = dataProp.FindPropertyRelative("Modifiers");
 
@@ -89,6 +90,9 @@ namespace ReactiveSolutions.AttributeSystem.Editor
 
             EditorGUILayout.LabelField("Remote Tags", _headerStyle);
             EditorGUILayout.PropertyField(remoteTagsProp, true);
+
+            EditorGUILayout.LabelField("Attribute Pointers (Aliases)", _headerStyle);
+            EditorGUILayout.PropertyField(pointersProp, true);
 
             EditorGUILayout.LabelField("Base Attributes", _headerStyle);
             EditorGUILayout.PropertyField(baseValuesProp, true);

@@ -1,4 +1,4 @@
-
+using ReactiveSolutions.AttributeSystem.Core.Data;
 using SemanticKeys;
 using System;
 using System.Collections.Generic;
@@ -8,35 +8,36 @@ using UnityEngine;
 
 namespace ReactiveSolutions.AttributeSystem.Core
 {
-    /// <summary>
-    /// The core math engine for a single attribute.
-    /// Calculates value through a sequential pipeline sorted by priority.
-    /// </summary>
     public class Attribute : IAttribute
     {
         public SemanticKey Name { get; }
 
-        protected readonly ReactiveProperty<float> _baseValue; 
+        protected readonly ReactiveProperty<float> _baseValue;
         public virtual float BaseValue => _baseValue.Value;
 
         public virtual IReadOnlyReactiveProperty<float> Value => _finalValue;
-        public bool IsDisposed { get; private set; } // Implement Interface
+        public bool IsDisposed { get; private set; }
 
         protected readonly ReactiveCollection<IAttributeModifier> _modifiers = new();
         protected readonly ReactiveProperty<float> _finalValue = new();
+
+        protected readonly ReactiveCollection<AttributeReference> _pointerStack = new();
 
         protected readonly AttributeProcessor _processor;
         protected readonly CompositeDisposable _calculationDisposable = new();
         private IDisposable _currentChainSubscription;
 
-        
-       
-
-        /// <summary>
-        /// Exposes the current modifiers for queries (like removal by SourceId).
-        /// </summary>
         public IEnumerable<IAttributeModifier> Modifiers => _modifiers;
 
+        public AttributeReference? ActivePointerTarget
+        {
+            get
+            {
+                if (_pointerStack.Count > 0)
+                    return _pointerStack[_pointerStack.Count - 1];
+                return null;
+            }
+        }
 
         public Attribute(SemanticKey name, float initialBase, AttributeProcessor processor)
         {
@@ -44,13 +45,15 @@ namespace ReactiveSolutions.AttributeSystem.Core
             _processor = processor;
             _baseValue = new ReactiveProperty<float>(initialBase);
 
-            // Rebuild the math chain whenever the list of modifiers changes
             _modifiers.ObserveCountChanged()
                 .StartWith(_modifiers.Count)
                 .Subscribe(_ => RebuildCalculationChain())
                 .AddTo(_calculationDisposable);
 
-            // Rebuild if the base value changes
+            _pointerStack.ObserveCountChanged()
+                .Subscribe(_ => RebuildCalculationChain())
+                .AddTo(_calculationDisposable);
+
             _baseValue.Subscribe(_ => RebuildCalculationChain()).AddTo(_calculationDisposable);
         }
 
@@ -60,7 +63,6 @@ namespace ReactiveSolutions.AttributeSystem.Core
         {
             Debug.Assert(modifier != null, $"[Attribute] Attempted to add null modifier to {Name}");
             _modifiers.Add(modifier);
-
             return Disposable.Create(() => RemoveModifier(modifier));
         }
 
@@ -69,37 +71,58 @@ namespace ReactiveSolutions.AttributeSystem.Core
             _modifiers.Remove(modifier);
         }
 
-        /// <summary>
-        /// Rebuilds the calculation pipeline. 
-        /// Virtual so PointerAttribute can override it to do nothing (since it delegates math).
-        /// </summary>
+        public IDisposable AddPointer(SemanticKey targetName, List<SemanticKey> path = null)
+        {
+            var pointerRef = new AttributeReference { Name = targetName, Path = path };
+            _pointerStack.Add(pointerRef);
+            return Disposable.Create(() => _pointerStack.Remove(pointerRef));
+        }
+
         protected virtual void RebuildCalculationChain()
         {
             _currentChainSubscription?.Dispose();
 
-            if (_modifiers.Count == 0)
+            IObservable<float> sourceStream;
+
+            if (_pointerStack.Count > 0)
             {
-                _finalValue.Value = _baseValue.Value;
+                var ptr = _pointerStack[_pointerStack.Count - 1];
+
+                sourceStream = _processor.GetAttributeObservable(ptr.Name, ptr.Path)
+                    .Select(attr =>
+                    {
+                        if (attr == null) return Observable.Return(0f);
+                        return attr.Value;
+                    })
+                    .Switch();
+            }
+            else
+            {
+                sourceStream = _baseValue;
+            }
+
+            var mods = _modifiers.ToList();
+            if (mods.Count == 0)
+            {
+                _currentChainSubscription = sourceStream.Subscribe(val => _finalValue.Value = val);
                 return;
             }
 
-            // Capture the current list of modifiers and their magnitudes
-            var mods = _modifiers.ToList();
             var magnitudeStreams = mods.Select(m => m.GetMagnitude(_processor)).ToList();
 
-            // The pipeline: BaseValue + all individual modifier streams
-            _currentChainSubscription = Observable.CombineLatest(magnitudeStreams.Prepend(_baseValue))
-                .Subscribe(latest =>
-                {
-                    float b = latest[0];
-                    float[] values = latest.Skip(1).ToArray();
-                    _finalValue.Value = CalculatePipeline(b, mods, values);
-                });
+            _currentChainSubscription = Observable.CombineLatest(
+                magnitudeStreams.Prepend(sourceStream)
+            )
+            .Subscribe(latest =>
+            {
+                float baseVal = latest[0];
+                float[] modifierValues = latest.Skip(1).ToArray();
+                _finalValue.Value = CalculatePipeline(baseVal, mods, modifierValues);
+            });
         }
 
         private float CalculatePipeline(float b, List<IAttributeModifier> mods, float[] values)
         {
-            // Zip and sort by priority for the sequential flow
             var pipeline = mods.Select((m, i) => new { Modifier = m, Val = values[i] })
                                .OrderBy(x => x.Modifier.Priority);
 
@@ -126,13 +149,13 @@ namespace ReactiveSolutions.AttributeSystem.Core
         public virtual void Dispose()
         {
             if (IsDisposed) return;
-            IsDisposed = true; // Mark as dead
+            IsDisposed = true;
             _currentChainSubscription?.Dispose();
             _calculationDisposable.Dispose();
             _baseValue.Dispose();
             _finalValue.Dispose();
+            _pointerStack.Dispose();
+            _modifiers.Dispose();
         }
-
-
     }
 }

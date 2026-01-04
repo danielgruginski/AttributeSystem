@@ -4,24 +4,25 @@ Attribute Pointers allow you to create **Aliases** that redirect to a **Target A
 
 ## Core Concept
 
-A Pointer is a special type of Attribute that does not store its own value. Instead, it mirrors the value of another attribute (the Target).
+A Pointer is an Attribute that overrides its own Base Value with the value of a Target Attribute.
 
--   **Reading** a Pointer returns the Target's value.
+-   **Reading** a Pointer returns the Target's value (plus any local modifiers on the pointer).
     
--   **Modifying** a Pointer (setting Base Value) applies the change to the Target.
+-   **Modifying** a Pointer (setting Base Value) sets the pointer's _local_ base value, which is usually ignored (shadowed) while the pointer is active.
     
--   **Modifiers** applied to a Pointer are effectively applied to the Target (they "flow through").
+-   **Modifiers** applied to a Pointer are applied to the _result_ of the pointer. (e.g. `MainStat = (Strength) + MainStatBuffs`).
     
 
 ### Use Cases
 
--   **Class Archetypes:** Create a `MainStat` alias. For a Warrior, point it to `Strength`. For a Mage, point it to `Intelligence`. All your UI and Damage calculations can just use `MainStat` without knowing the specific underlying stat.
+-   **Class Archetypes:** Create a `MainStat` alias. For a Warrior, point it to `Strength`. For a Mage, point it to `Intelligence`.
     
 -   **Damage Conversion:** Create an alias `DamageSource`. Point it to `FireDamage` or `IceDamage` depending on the equipped weapon element.
     
 -   **Shared Resources:** Make `Energy` point to `Stamina` for Rogues, but `Mana` for Mages.
     
 -   **Remote Stats:** Create a `SkillBonus` pointer that links to `Owner.Intelligence`.
+    
 
 ## Usage in Code
 
@@ -34,8 +35,8 @@ You manage pointers via the `AttributeProcessor`.
 var aliasKey = new SemanticKey("MainStat");
 var targetKey = new SemanticKey("Strength");
 
-// Create the link
-processor.SetPointer(aliasKey, targetKey);
+// Create the link. Returns an IDisposable to undo the pointer.
+var handle = processor.SetPointer(aliasKey, targetKey);
 
 ```
 
@@ -53,9 +54,10 @@ processor.SetPointer(skillBonusKey, intKey, ownerPath);
 
 ```
 
--   If the "Owner" provider is not registered yet, the pointer returns 0.
+-   If the "Owner" provider is not registered yet, the pointer resolves to 0 (default).
     
 -   As soon as you call `processor.RegisterExternalProvider("Owner", playerProcessor)`, the pointer automatically connects and streams the value.
+    
 
 ### Accessing Values
 
@@ -65,11 +67,7 @@ processor.SetOrUpdateBaseValue(targetKey, 50);
 
 // Read via Alias
 var aliasAttr = processor.GetAttribute(aliasKey);
-Debug.Log(aliasAttr.Value.Value); // Outputs 50
-
-// Write via Alias
-processor.SetOrUpdateBaseValue(aliasKey, 100);
-Debug.Log(processor.GetAttribute(targetKey).Value.Value); // Outputs 100
+Debug.Log(aliasAttr.Value.Value); // Outputs 50 (from Target)
 
 ```
 
@@ -77,46 +75,36 @@ Debug.Log(processor.GetAttribute(targetKey).Value.Value); // Outputs 100
 
 Pointers can be chained (`A -> B -> C`). The system automatically resolves the chain to the final concrete attribute.
 
--   **Self-Healing:** If you break a chain (e.g., delete `B`), `A` will gracefully handle it (usually returning 0) until the link is restored.
-    
 -   **Cycle Prevention:** The system prevents circular pointers (`A -> B -> A`) and logs an error if detected.
     
-
-## Advanced Behavior
-
-### Polymorphism
-
-Under the hood, pointers are implemented as `PointerAttribute` instances.
-
--   `GetAttribute("Alias")` returns the `PointerAttribute` object.
-    
--   `GetAttribute("Alias").Name` returns the Alias Name (e.g., "MainStat").
-    
--   `GetAttribute("Alias").Value` returns the stream of the Target (e.g., Strength).
+-   **Self-Healing:** If a link in the chain is broken, the dependent pointers gracefully fallback to 0.
     
 
-### Modifiers
+## Architecture: The Pointer Stack
 
-Adding a modifier to a pointer applies it to the target context.
+Under the hood, every `Attribute` maintains a **Stack of Pointers**. This allows for robust "Polymorph" behavior where effects can override stats temporarily without destroying data.
+
+1.  **Base Layer:** The attribute's concrete Base Value.
+    
+2.  **Pointer Layer(s):** When you call `SetPointer`, you push a new reference onto the stack.
+    
+3.  **Resolution:** The attribute uses the Topmost Pointer in the stack as its source. If the stack is empty, it uses the Base Layer.
+    
+
+This means you can have a "Base" pointer (Class: Warrior -> Strength) and a "Temporary" pointer (Spell: Polymorph -> SheepStrength) active at the same time. When the spell ends (pointer removed), it falls back to the Class pointer.
+
+### Modifiers on Pointers
+
+Modifiers added to an Alias apply **Locally**.
 
 ```
-// Add +10 to MainStat
-processor.AddModifier("Buff", new AdditiveModifier(10), aliasKey);
+Alias (A) -> Target (B)
+B = 10
+Modifier on A = +5
 
-// Strength (the target) now increases by 10.
-
-```
-
-### Dynamic Re-Targeting
-
-You can change a pointer's target at runtime.
-
-```
-// Switch class to Mage
-processor.SetPointer(aliasKey, new SemanticKey("Intelligence"));
+Result A = (B.Value) + 5 = 15.
+Result B = 10.
 
 ```
 
--   The pointer immediately updates to reflect the new target's value.
-    
--   **Note:** Modifiers explicitly added to the _Alias_ will move to the new Target. Modifiers added to the _Old Target_ stay on the Old Target.
+This is distinct from "Proxying" where the modifier would move to B. This architecture ensures that buffs applied to a temporary form (or alias) stay on that alias and don't pollute the underlying stats.

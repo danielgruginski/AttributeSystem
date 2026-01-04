@@ -21,6 +21,15 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
             public float Value;
         }
 
+        [System.Serializable]
+        public struct PointerSpec
+        {
+            [Tooltip("The alias name (e.g. 'MainStat').")]
+            public SemanticKey Alias;
+
+            [Tooltip("The target to point to.")]
+            public AttributeReference Target;
+        }
 
 
         public string BlockName = "New Block"; // Helper for editor naming
@@ -33,6 +42,9 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
 
         // Remote tags (e.g. Apply "Blessed" to "Owner")
         public List<TagModifierSpec> RemoteTags = new List<TagModifierSpec>();
+
+        // Pointers (Aliases)
+        public List<PointerSpec> Pointers = new List<PointerSpec>();
 
         public List<BaseValueEntry> BaseValues = new List<BaseValueEntry>();
         public List<AttributeModifierSpec> Modifiers = new List<AttributeModifierSpec>();
@@ -97,7 +109,18 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         {
             var contentHandle = new ActiveStatBlock();
 
-            // 1. Apply Local Tags
+            // 1. Apply Pointers (Structural / Reversible)
+            // We apply these first so modifiers in this same block can target the alias if needed.
+            foreach (var ptr in Pointers)
+            {
+                if (ptr.Alias != SemanticKey.None && ptr.Target.Name != SemanticKey.None)
+                {
+                    var ptrHandle = processor.SetPointer(ptr.Alias, ptr.Target.Name, ptr.Target.Path);
+                    contentHandle.AddHandle(ptrHandle);
+                }
+            }
+
+            // 2. Apply Local Tags
             foreach (var tagKey in Tags)
             {
                 if (tagKey != SemanticKey.None)
@@ -107,7 +130,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
                 }
             }
 
-            // 2. Apply Remote Tags
+            // 3. Apply Remote Tags
             foreach (var tagSpec in RemoteTags)
             {
                 if (tagSpec.Tag != SemanticKey.None)
@@ -117,7 +140,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
                 }
             }
 
-            // 3. Apply Modifiers
+            // 4. Apply Modifiers
             foreach (var spec in Modifiers)
             {
                 var modifier = factory.Create(spec, processor);
