@@ -65,7 +65,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // Act: Unregister Provider
             _localProcessor.UnregisterExternalProvider(_providerKey);
 
-            // Assert: Fallback to 0
+            // Assert: Fallback to 0 (Missing Provider)
             Assert.AreEqual(0, _localProcessor.GetAttribute(_pointerKey).Value.Value);
         }
 
@@ -89,40 +89,24 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         }
 
         [Test]
-        public void RemotePointer_PropagatesWrite()
+        public void RemotePointer_ModifiersAreLocal()
         {
-            _localProcessor.RegisterExternalProvider(_providerKey, _remoteProcessor);
-            _localProcessor.SetPointer(_pointerKey, _targetAttrKey, new List<SemanticKey> { _providerKey });
-
-            // Create target on remote implicitly by writing from local
-            _localProcessor.SetOrUpdateBaseValue(_pointerKey, 999);
-
-            // Check Remote directly
-            var remoteAttr = _remoteProcessor.GetAttribute(_targetAttrKey);
-            Assert.IsNotNull(remoteAttr);
-            Assert.AreEqual(999, remoteAttr.BaseValue);
-
-            // Check Local read
-            Assert.AreEqual(999, _localProcessor.GetAttribute(_pointerKey).Value.Value);
-        }
-
-        [Test]
-        public void RemotePointer_PropagatesModifiers()
-        {
+            // Setup: Remote has 10
             _remoteProcessor.SetOrUpdateBaseValue(_targetAttrKey, 10);
             _localProcessor.RegisterExternalProvider(_providerKey, _remoteProcessor);
             _localProcessor.SetPointer(_pointerKey, _targetAttrKey, new List<SemanticKey> { _providerKey });
 
             // Apply +5 Modifier to LOCAL pointer
-            // We need a dummy modifier implementation
             var mod = new SimpleTestModifier(5f);
             _localProcessor.AddModifier("TestMod", mod, _pointerKey);
 
-            // Verify Remote has 15 (10 base + 5 mod)
-            Assert.AreEqual(15, _remoteProcessor.GetAttribute(_targetAttrKey).Value.Value);
-
-            // Verify Local reads 15
+            // 1. Verify Local reads 15 (10 Remote + 5 Local Mod)
             Assert.AreEqual(15, _localProcessor.GetAttribute(_pointerKey).Value.Value);
+
+            // 2. Verify Remote is UNTOUCHED (Remains 10)
+            // In the new Stack architecture, modifiers are applied to the result of the pointer,
+            // they are not forwarded to the source.
+            Assert.AreEqual(10, _remoteProcessor.GetAttribute(_targetAttrKey).Value.Value);
         }
 
         [Test]
@@ -163,7 +147,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             public ModifierType Type => ModifierType.Additive;
             public string SourceId => "SourceIDMock";
             public int Priority => 0;
-            public float GetValue() => _val;
+            public float Modify(float val) => val + _val; // Simple implementation for test
             public IObservable<float> GetMagnitude(AttributeProcessor context) => Observable.Return(_val);
         }
     }

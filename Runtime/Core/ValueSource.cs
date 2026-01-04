@@ -39,12 +39,18 @@ namespace ReactiveSolutions.AttributeSystem.Core
             var contextToUse = _bakedContext ?? localProcessor;
             if (contextToUse == null) return Observable.Return(0f);
 
-            // Use the structured reference
+            // Use the structured reference.
+            // .Switch() is used to hot-swap if the attribute instance changes (e.g. pointer).
             return contextToUse.GetAttributeObservable(AttributeRef.Name, AttributeRef.Path)
-                .SelectMany(attr => attr.Value);
+                .Select(attr =>
+                {
+                    // FIX: Handle NULL attribute (e.g. missing provider or broken pointer)
+                    if (attr == null) return Observable.Return(0f);
+                    return attr.Value;
+                })
+                .Switch();
         }
 
         public static ValueSource Const(float val) => new ValueSource { Mode = ValueSource.SourceMode.Constant, ConstantValue = val };
-
     }
 }

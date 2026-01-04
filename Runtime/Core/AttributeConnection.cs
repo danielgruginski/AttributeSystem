@@ -1,43 +1,77 @@
 ﻿using SemanticKeys;
+using System;
 using System.Collections.Generic;
+using UniRx;
+using UnityEngine;
 
 namespace ReactiveSolutions.AttributeSystem.Core
 {
     /// <summary>
-    /// Represents a persistent link that tries to apply a modifier to a target at the end of a path.
+    /// Manages the lifecycle of a modifier applied to a remote attribute.
+    /// It observes the provider connectivity and re-applies the modifier if the connection is restored.
     /// </summary>
-    public class AttributeConnection : PathConnection
+    public class AttributeConnection : IDisposable
     {
+        private readonly AttributeProcessor _localProcessor;
+        private readonly List<SemanticKey> _providerPath;
         private readonly SemanticKey _targetAttribute;
         private readonly IAttributeModifier _modifier;
         private readonly string _sourceId;
 
-        public string SourceId => _sourceId;
+        private readonly SerialDisposable _modifierHandle = new SerialDisposable();
+        private readonly IDisposable _topologySubscription;
+        private bool _isDisposed = false;
 
         public AttributeConnection(
-            AttributeProcessor root,
-            List<SemanticKey> path,
+            AttributeProcessor localProcessor,
+            List<SemanticKey> providerPath,
             SemanticKey targetAttribute,
             IAttributeModifier modifier,
-            string sourceId) : base(root, path)
+            string sourceId)
         {
+            _localProcessor = localProcessor;
+            _providerPath = providerPath;
             _targetAttribute = targetAttribute;
             _modifier = modifier;
             _sourceId = sourceId;
 
-            Connect();
+            // Observe the first link in the chain
+            SemanticKey nextKey = _providerPath[0];
+
+            _topologySubscription = _localProcessor.ObserveProvider(nextKey)
+                .Subscribe(provider =>
+                {
+                    if (provider == null)
+                    {
+                        // Provider disconnected -> Remove modifier
+                        _modifierHandle.Disposable = null;
+                    }
+                    else
+                    {
+                        // Provider connected -> Apply modifier (recursively if needed)
+                        var remainingPath = _providerPath.Count > 1 ? _providerPath.GetRange(1, _providerPath.Count - 1) : null;
+
+                        // FIX: We must catch potential errors during recursion if the chain is partially formed
+                        try
+                        {
+                            _modifierHandle.Disposable = provider.AddModifier(_sourceId, _modifier, _targetAttribute, remainingPath);
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogError($"[AttributeConnection] Failed to apply modifier to provider '{nextKey}': {e.Message}");
+                            _modifierHandle.Disposable = null;
+                        }
+                    }
+                });
         }
 
-        protected override void OnApplyToTarget(AttributeProcessor target)
+        public void Dispose()
         {
-            // We use the direct local Add (Handle-less overload) because WE are the handle.
-            target.GetOrCreateAttribute(_targetAttribute).AddModifier(_modifier);
-        }
+            if (_isDisposed) return;
+            _isDisposed = true;
 
-        protected override void OnRemoveFromTarget(AttributeProcessor target)
-        {
-            var attr = target.GetAttribute(_targetAttribute);
-            attr?.RemoveModifier(_modifier);
+            _topologySubscription?.Dispose();
+            _modifierHandle.Dispose();
         }
     }
 }
