@@ -52,7 +52,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void Controller_AddAttribute_SetsBaseValue()
         {
             var key = TestKeys.Mock("Health");
-            _playerController.AddAttribute(key, 100f);
+            _playerController.Instance.GetOrCreateAttribute(key, 100f);
 
             var attr = _playerController.Instance.GetAttribute(key);
             Assert.IsNotNull(attr);
@@ -63,7 +63,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void Controller_GetAttributeObservable_ResolvesReactiveValues()
         {
             var key = TestKeys.Mock("Mana");
-            _playerController.AddAttribute(key, 50f);
+            _playerController.Instance.GetOrCreateAttribute(key, 50f);
 
             float lastValue = 0f;
             _playerController.Instance.GetAttributeObservable(key)
@@ -82,11 +82,11 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         {
             // 1. Setup Player Strength
             var strKey = TestKeys.Mock("Strength");
-            _playerController.AddAttribute(strKey, 10f);
+            _playerController.Instance.GetOrCreateAttribute(strKey, 10f);
 
             // 2. Setup Sword Damage (Base 5)
             var dmgKey = TestKeys.Mock("Damage");
-            _swordController.AddAttribute(dmgKey, 5f);
+            _swordController.Instance.GetOrCreateAttribute(dmgKey, 5f);
 
             // 3. Add Modifier to Sword: Damage += Owner.Strength * 2
             // We use the raw Processor API as requested (no extensions)
@@ -155,7 +155,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             // 1. Setup
             var key = TestKeys.Mock("TestStat");
-            _playerController.AddAttribute(key, 10f);
+            _playerController.Instance.GetOrCreateAttribute(key, 10f);
 
             // 2. Create a "Fake" applied stat block (Manual simulation of Linker internals)
             var activeBlock = new ActiveStatBlock();

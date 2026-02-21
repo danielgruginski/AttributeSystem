@@ -41,7 +41,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
             }
         }
 
-        public void AddAttribute(SemanticKey key, float v)
-        => Instance.GetOrCreateAttribute(key, v);
+        //public void AddAttribute(SemanticKey key, float v)
+        //=> Instance.GetOrCreateAttribute(key, v);
     }
 }
