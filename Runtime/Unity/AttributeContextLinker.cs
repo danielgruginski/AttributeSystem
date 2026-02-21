@@ -13,10 +13,10 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         [Header("Roles")]
         [Tooltip("The controller that will RECEIVE the link (e.g., the Sword). " +
                  "Its modifiers can now use the Alias to find the Provider's stats.")]
-        [SerializeField] private AttributeController _receiver;
+        [SerializeField] private EntityController _receiver;
 
         [Tooltip("The controller that will PROVIDE the stats (e.g., the Player).")]
-        [SerializeField] private AttributeController _provider;
+        [SerializeField] private EntityController _provider;
 
         [Header("Configuration")]
         [Tooltip("The key that will me used in the path to refer to this object (e.g. Owner, Holder, EquippedItem)")]
@@ -41,7 +41,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
             // Fallback: If receiver is null, try to find it on this GameObject
             if (_receiver == null)
             {
-                _receiver = GetComponent<AttributeController>();
+                _receiver = GetComponent<EntityController>();
             }
 
             Debug.Assert(_receiver != null, $"[AttributeContextLinker] No Receiver (Target) Controller assigned on {gameObject.name}");
@@ -51,7 +51,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
             if (_receiver != null && _provider != null)
             {
                 // Register the provider's processor inside the receiver's processor
-                _receiver.Processor.RegisterExternalProvider(_alias, _provider.Processor);
+                _receiver.Instance.RegisterExternalProvider(_alias, _provider.Instance);
 
                 Debug.Log($"[AttributeContextLinker] Successfully linked '{_provider.name}' to '{_receiver.name}' as '{_alias}'.");
             }
@@ -61,7 +61,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         {
             if (_receiver != null && _provider != null)
             {
-                _receiver.Processor.UnregisterExternalProvider(_alias);
+                _receiver.Instance.UnregisterExternalProvider(_alias);
             }
         }
 
@@ -73,14 +73,14 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         /// <summary>
         /// Sets the provider at runtime (e.g., when a player picks up this weapon).
         /// </summary>
-        public void SetProvider(AttributeController provider)
+        public void SetProvider(EntityController provider)
         {
             _provider = provider;
             if (_receiver != null && _provider != null)
                 LinkContext();
         }
 
-        public void SetReceiver(AttributeController receiver) 
+        public void SetReceiver(EntityController receiver) 
         {
             _receiver = receiver;
             if(_receiver != null && _provider != null)

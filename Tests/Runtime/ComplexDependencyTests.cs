@@ -17,8 +17,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
     /// </summary>
     public class ComplexDependencyTests
     {
-        private AttributeProcessor _charProc;
-        private AttributeProcessor _weapProc;
+        private Entity _charProc;
+        private Entity _weapProc;
 
         // We wrap steps in Actions to allow easy permutation testing
         private Dictionary<string, Action> _steps;
@@ -51,8 +51,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         [SetUp]
         public void Setup()
         {
-            _charProc = new AttributeProcessor();
-            _weapProc = new AttributeProcessor();
+            _charProc = new Entity();
+            _weapProc = new Entity();
 
             _steps = new Dictionary<string, Action>
             {
@@ -188,10 +188,10 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void Scenario_WeaponSwap_ComplexPath()
         {
             // 1. Setup Processors
-            var mainChar = new AttributeProcessor();
-            var hireling = new AttributeProcessor();
-            var plainSword = new AttributeProcessor();
-            var magicSword = new AttributeProcessor();
+            var mainChar = new Entity();
+            var hireling = new Entity();
+            var plainSword = new Entity();
+            var magicSword = new Entity();
 
             // 2. Setup Base Values
             mainChar.SetOrUpdateBaseValue(TestKeys.Mock("CasterLevel"), 5f);

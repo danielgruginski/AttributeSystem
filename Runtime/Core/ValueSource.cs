@@ -20,9 +20,9 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         // Stores the processor that 'owns' this source definition (e.g., the Weapon).
         // This is not serialized; it is set at runtime when the StatBlock is applied.
-        private AttributeProcessor _bakedContext;
+        private Entity _bakedContext;
 
-        public void BakeContext(AttributeProcessor context)
+        public void BakeContext(Entity context)
         {
             _bakedContext = context;
         }
@@ -31,7 +31,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// <summary>
         /// Resolves the value into a reactive stream.
         /// </summary>
-        public IObservable<float> GetObservable(AttributeProcessor localProcessor)
+        public IObservable<float> GetObservable(Entity localProcessor)
         {
             if (Mode == SourceMode.Constant)
                 return Observable.Return(ConstantValue);

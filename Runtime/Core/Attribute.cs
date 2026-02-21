@@ -23,7 +23,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         protected readonly ReactiveCollection<AttributeReference> _pointerStack = new();
 
-        protected readonly AttributeProcessor _processor;
+        protected readonly Entity _processor;
         protected readonly CompositeDisposable _calculationDisposable = new();
         private IDisposable _currentChainSubscription;
 
@@ -39,7 +39,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             }
         }
 
-        public Attribute(SemanticKey name, float initialBase, AttributeProcessor processor)
+        public Attribute(SemanticKey name, float initialBase, Entity processor)
         {
             Name = name;
             _processor = processor;

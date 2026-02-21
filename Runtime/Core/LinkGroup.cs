@@ -11,10 +11,10 @@ namespace ReactiveSolutions.AttributeSystem.Core
     /// </summary>
     public class LinkGroup
     {
-        private readonly ReactiveCollection<AttributeProcessor> _members = new ReactiveCollection<AttributeProcessor>();
-        public IReadOnlyReactiveCollection<AttributeProcessor> Members => _members;
+        private readonly ReactiveCollection<Entity> _members = new ReactiveCollection<Entity>();
+        public IReadOnlyReactiveCollection<Entity> Members => _members;
 
-        public void AddMember(AttributeProcessor processor)
+        public void AddMember(Entity processor)
         {
             if (processor != null && !_members.Contains(processor))
             {
@@ -22,7 +22,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             }
         }
 
-        public void RemoveMember(AttributeProcessor processor)
+        public void RemoveMember(Entity processor)
         {
             if (processor != null)
             {
@@ -30,7 +30,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             }
         }
 
-        public bool Contains(AttributeProcessor processor) => _members.Contains(processor);
+        public bool Contains(Entity processor) => _members.Contains(processor);
 
         /// <summary>
         /// Applies a StatBlock to every member of this group.
@@ -51,7 +51,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             private readonly StatBlockCondition _condition;
 
             // Map members to their specific logic subscription
-            private readonly Dictionary<AttributeProcessor, IDisposable> _memberSubscriptions = new Dictionary<AttributeProcessor, IDisposable>();
+            private readonly Dictionary<Entity, IDisposable> _memberSubscriptions = new Dictionary<Entity, IDisposable>();
             private readonly CompositeDisposable _groupLifecycle = new CompositeDisposable();
 
             public GroupStatBlockLogic(LinkGroup group, StatBlock statBlock, IModifierFactory modifierFactory, StatBlockCondition condition)
@@ -78,7 +78,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                     .AddTo(_groupLifecycle);
             }
 
-            private void TrackMember(AttributeProcessor member)
+            private void TrackMember(Entity member)
             {
                 if (_memberSubscriptions.ContainsKey(member)) return;
 
@@ -94,7 +94,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                         {
                             return Observable.Create<Unit>(observer =>
                             {
-                                var activeBlock = _statBlock.ApplyToProcessor(member, _modifierFactory);
+                                var activeBlock = _statBlock.ApplyToEntity(member, _modifierFactory);
                                 return activeBlock; // This disposable is called when Switch unsubscribes
                             });
                         }
@@ -109,7 +109,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 _memberSubscriptions.Add(member, subscription);
             }
 
-            private void UntrackMember(AttributeProcessor member)
+            private void UntrackMember(Entity member)
             {
                 if (_memberSubscriptions.TryGetValue(member, out var sub))
                 {

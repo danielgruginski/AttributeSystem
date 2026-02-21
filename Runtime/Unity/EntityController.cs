@@ -7,41 +7,41 @@ using UnityEngine;
 
 namespace ReactiveSolutions.AttributeSystem.Unity
 {
-    public class AttributeController : MonoBehaviour
+    public class EntityController : MonoBehaviour
     {
         [SerializeField]
         [Tooltip("The ScriptableObject wrapper containing the entity's blueprint.")]
         private EntityProfileSO _profileSO;
 
-        private AttributeProcessor _processor;
-        public AttributeProcessor Processor => _processor;
+        private Entity _entity;
+        public Entity Instance => _entity;
 
         private IModifierFactory _modifierFactory;
 
         private void Awake()
         {
-            InitializeProcessor();
+            InitializeEntity();
         }
 
-        public void InitializeProcessor()
+        public void InitializeEntity()
         {
-            if (_processor != null) return;
+            if (_entity != null) return;
 
-            _processor = new AttributeProcessor();
+            _entity = new Entity();
             _modifierFactory = new ModifierFactory();
 
             if (_profileSO != null && _profileSO.Profile != null)
             {
                 // We pass the pure POCO data down into the core engine!
-                _processor.ApplyProfile(_profileSO.Profile, _modifierFactory);
+                _entity.ApplyProfile(_profileSO.Profile, _modifierFactory);
             }
             else
             {
-                Debug.LogWarning($"[AttributeController] No EntityProfileSO assigned on {gameObject.name}. Processor initialized completely empty.");
+                Debug.LogWarning($"[EntityController] No EntityProfileSO assigned on {gameObject.name}. Entity initialized completely empty.");
             }
         }
 
         public void AddAttribute(SemanticKey key, float v)
-        => Processor.GetOrCreateAttribute(key, v);
+        => Instance.GetOrCreateAttribute(key, v);
     }
 }

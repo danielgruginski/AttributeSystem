@@ -28,7 +28,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
             _arguments = arguments != null ? new List<ValueSource>(arguments) : new List<ValueSource>();
         }
 
-        public IObservable<float> GetMagnitude(AttributeProcessor processor)
+        public IObservable<float> GetMagnitude(Entity processor)
         {
             if (_arguments.Count == 0)
                 return Observable.Return(Calculate(Array.Empty<float>()));

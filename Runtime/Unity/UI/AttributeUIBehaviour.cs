@@ -12,9 +12,9 @@ namespace ReactiveSolutions.AttributeSystem.Unity.UI
     public abstract class AttributeUIBehaviour : MonoBehaviour
     {
         [Header("Targeting")]
-        [SerializeField] protected AttributeController _initialController;
+        [SerializeField] protected EntityController _initialController;
 
-        protected readonly ReactiveProperty<AttributeController> _targetController = new();
+        protected readonly ReactiveProperty<EntityController> _targetController = new();
         protected readonly CompositeDisposable _disposables = new();
 
         protected virtual void Awake()
@@ -28,7 +28,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity.UI
         /// <summary>
         /// Injects the controller to be watched.
         /// </summary>
-        public void SetController(AttributeController controller)
+        public void SetController(EntityController controller)
         {
             _targetController.Value = controller;
         }
@@ -43,7 +43,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity.UI
 
             _targetController
                 .Where(controller => controller != null)
-                .SelectMany(controller => controller.Processor.GetAttributeObservable(attributeName))
+                .SelectMany(controller => controller.Instance.GetAttributeObservable(attributeName))
                 .SelectMany(attribute => attribute.ObservableValue)
                 .Subscribe(onValueChanged)
                 .AddTo(_disposables);

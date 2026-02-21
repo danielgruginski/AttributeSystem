@@ -10,7 +10,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
 {
     public class AttributeDebuggerWindow : EditorWindow
     {
-        private AttributeController _selectedController;
+        private EntityController _selectedController;
         private Vector2 _scrollPosition;
         private bool _autoRefresh = true;
 
@@ -46,7 +46,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
                 return;
             }
 
-            if (_selectedController.Processor == null)
+            if (_selectedController.Instance == null)
             {
                 EditorGUILayout.HelpBox("Selected Controller has no Processor initialized.", MessageType.Warning);
                 return;
@@ -65,7 +65,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
 
         private void DrawProcessorTags()
         {
-            var tags = _selectedController.Processor.Tags;
+            var tags = _selectedController.Instance.Tags;
             if (tags.Count > 0)
             {
                 GUILayout.BeginHorizontal("box");
@@ -85,12 +85,12 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         {
             GUILayout.BeginHorizontal();
 
-            _selectedController = (AttributeController)EditorGUILayout.ObjectField("Controller", _selectedController, typeof(AttributeController), true);
+            _selectedController = (EntityController)EditorGUILayout.ObjectField("Controller", _selectedController, typeof(EntityController), true);
 
             if (GUILayout.Button("Find Player", GUILayout.Width(100)))
             {
                 var go = GameObject.FindWithTag("Player");
-                if (go) _selectedController = go.GetComponent<AttributeController>();
+                if (go) _selectedController = go.GetComponent<EntityController>();
             }
 
             GUILayout.EndHorizontal();
@@ -102,7 +102,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         {
             _scrollPosition = GUILayout.BeginScrollView(_scrollPosition);
 
-            var processor = _selectedController.Processor;
+            var processor = _selectedController.Instance;
 
             // Snapshot of keys to avoid modification errors during iteration
             // We use the raw dictionary from the processor
@@ -147,7 +147,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
                 EditorGUI.indentLevel++;
                 foreach (var mod in attr.Modifiers)
                 {
-                    DrawModifierEntry(mod, processor: _selectedController.Processor);
+                    DrawModifierEntry(mod, processor: _selectedController.Instance);
                 }
                 EditorGUI.indentLevel--;
             }
@@ -155,7 +155,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             GUILayout.EndVertical();
         }
 
-        private void DrawModifierEntry(IAttributeModifier mod, AttributeProcessor processor)
+        private void DrawModifierEntry(IAttributeModifier mod, Entity processor)
         {
             EditorGUILayout.BeginHorizontal();
 

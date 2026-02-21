@@ -12,7 +12,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
     /// </summary>
     public class AttributeConnection : IDisposable
     {
-        private readonly AttributeProcessor _localProcessor;
+        private readonly Entity _localProcessor;
         private readonly List<SemanticKey> _providerPath;
         private readonly SemanticKey _targetAttribute;
         private readonly IAttributeModifier _modifier;
@@ -23,7 +23,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
         private bool _isDisposed = false;
 
         public AttributeConnection(
-            AttributeProcessor localProcessor,
+            Entity localProcessor,
             List<SemanticKey> providerPath,
             SemanticKey targetAttribute,
             IAttributeModifier modifier,

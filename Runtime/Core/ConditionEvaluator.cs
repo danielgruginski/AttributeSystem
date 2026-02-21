@@ -11,7 +11,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
 {
     public static class ConditionEvaluator
     {
-        public static IObservable<bool> Observe(StatBlockCondition condition, AttributeProcessor context)
+        public static IObservable<bool> Observe(StatBlockCondition condition, Entity context)
         {
             if (condition == null || condition.Type == StatBlockCondition.Mode.Always)
                 return Observable.Return(true);
@@ -38,7 +38,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             }
         }
 
-        private static IObservable<bool> ObserveTag(StatBlockCondition cond, AttributeProcessor context)
+        private static IObservable<bool> ObserveTag(StatBlockCondition cond, Entity context)
         {
             // Resolve the target processor (Self or Remote)
             // Reuse the AttributeReference resolution logic, but we only need the processor, not an attribute.
@@ -46,7 +46,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             // 1. Determine Path
             var path = cond.TagTarget;
 
-            IObservable<AttributeProcessor> targetStream;
+            IObservable<Entity> targetStream;
 
             if (path == null || path.Count == 0)
             {
@@ -77,7 +77,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             .DistinctUntilChanged();
         }
 
-        private static IObservable<bool> ObserveComparison(StatBlockCondition cond, AttributeProcessor context)
+        private static IObservable<bool> ObserveComparison(StatBlockCondition cond, Entity context)
         {
             var streamA = cond.ValueA != null ? cond.ValueA.GetObservable(context) : Observable.Return(0f);
             var streamB = cond.ValueB != null ? cond.ValueB.GetObservable(context) : Observable.Return(0f);
@@ -106,7 +106,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             .DistinctUntilChanged();
         }
 
-        private static IObservable<bool> ObserveComposite(StatBlockCondition cond, AttributeProcessor context)
+        private static IObservable<bool> ObserveComposite(StatBlockCondition cond, Entity context)
         {
             if (cond.SubConditions == null || cond.SubConditions.Count == 0)
                 return Observable.Return(true);
@@ -128,13 +128,13 @@ namespace ReactiveSolutions.AttributeSystem.Core
         }
 
         // Helper to resolve processor path reactively
-        private static IObservable<AttributeProcessor> ObservePath(AttributeProcessor root, List<SemanticKey> path)
+        private static IObservable<Entity> ObservePath(Entity root, List<SemanticKey> path)
         {
             // This mimics PathConnection logic but purely functional
             return ResolvePathRecursively(root, path, 0);
         }
 
-        private static IObservable<AttributeProcessor> ResolvePathRecursively(AttributeProcessor current, List<SemanticKey> path, int index)
+        private static IObservable<Entity> ResolvePathRecursively(Entity current, List<SemanticKey> path, int index)
         {
             if (index >= path.Count)
                 return Observable.Return(current);
@@ -144,7 +144,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             return current.ObserveProvider(nextKey)
                 .Select(nextProcessor =>
                 {
-                    if (nextProcessor == null) return Observable.Return<AttributeProcessor>(null);
+                    if (nextProcessor == null) return Observable.Return<Entity>(null);
                     return ResolvePathRecursively(nextProcessor, path, index + 1);
                 })
                 .Switch();

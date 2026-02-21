@@ -11,8 +11,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 {
     public class RemotePointerTests
     {
-        private AttributeProcessor _localProcessor;
-        private AttributeProcessor _remoteProcessor;
+        private Entity _localProcessor;
+        private Entity _remoteProcessor;
 
         // Keys
         private SemanticKey _pointerKey;
@@ -23,8 +23,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         [SetUp]
         public void Setup()
         {
-            _localProcessor = new AttributeProcessor();
-            _remoteProcessor = new AttributeProcessor();
+            _localProcessor = new Entity();
+            _remoteProcessor = new Entity();
 
             _pointerKey = TestKeys.Mock("RemotePointer");
             _targetAttrKey = TestKeys.Mock("TargetStat");
@@ -113,7 +113,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void RemotePointer_NestedPath()
         {
             // Topology: Local -> Middle -> Remote -> TargetStat(100)
-            var middleProcessor = new AttributeProcessor();
+            var middleProcessor = new Entity();
 
             _remoteProcessor.SetOrUpdateBaseValue(_targetAttrKey, 100);
 
@@ -148,7 +148,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             public string SourceId => "SourceIDMock";
             public int Priority => 0;
             public float Modify(float val) => val + _val; // Simple implementation for test
-            public IObservable<float> GetMagnitude(AttributeProcessor context) => Observable.Return(_val);
+            public IObservable<float> GetMagnitude(Entity context) => Observable.Return(_val);
         }
     }
 }

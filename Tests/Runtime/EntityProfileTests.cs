@@ -61,7 +61,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var profile = CreateEmptyProfile();
             profile.BaseAttributes.Add(new BaseAttributeEntry { Attribute = _healthKey, BaseValue = 150f });
 
-            var processor = new AttributeProcessor();
+            var processor = new Entity();
             processor.ApplyProfile(profile, _modifierFactory);
 
             var attr = processor.GetAttribute(_healthKey);
@@ -75,7 +75,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var profile = CreateEmptyProfile();
             profile.InnateTags.Add(_undeadTag);
 
-            var processor = new AttributeProcessor();
+            var processor = new Entity();
             processor.ApplyProfile(profile, _modifierFactory);
 
             Assert.IsTrue(processor.HasTag(_undeadTag));
@@ -87,7 +87,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var profile = CreateEmptyProfile();
             profile.LinkGroups.Add(_inventoryGroupKey);
 
-            var processor = new AttributeProcessor();
+            var processor = new Entity();
             processor.ApplyProfile(profile, _modifierFactory);
 
             // Accessing GetLinkGroup returns the initialized group without creating a new one implicitly
@@ -107,7 +107,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var statBlock = CreateStatBlock(_healthKey, 50f);
             profile.InnateStatBlocks.Add(statBlock);
 
-            var processor = new AttributeProcessor();
+            var processor = new Entity();
             processor.ApplyProfile(profile, _modifierFactory);
 
             // Total should be 150
@@ -131,7 +131,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 ProviderPath = new List<SemanticKey>()
             });
 
-            var processor = new AttributeProcessor();
+            var processor = new Entity();
             processor.ApplyProfile(profile, _modifierFactory);
 
             var aliasAttr = processor.GetAttribute(maxHealthAlias);
@@ -155,7 +155,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             });
 
             // 3. Apply to Processor
-            var processor = new AttributeProcessor();
+            var processor = new Entity();
             processor.ApplyProfile(charProfile, _modifierFactory);
 
             // 4. Test nested attribute access via path
@@ -173,7 +173,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var buffBlock = CreateStatBlock(_healthKey, 100f);
             profile.InnateStatBlocks.Add(buffBlock);
 
-            var processor = new AttributeProcessor();
+            var processor = new Entity();
             processor.ApplyProfile(profile, _modifierFactory);
 
             Assert.AreEqual(100f, processor.GetAttribute(_healthKey).ObservableValue.Value);
@@ -200,7 +200,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 Profile = weaponProfile
             });
 
-            var processor = new AttributeProcessor();
+            var processor = new Entity();
             processor.ApplyProfile(charProfile, _modifierFactory);
 
             var path = new List<SemanticKey> { _rightHandKey };

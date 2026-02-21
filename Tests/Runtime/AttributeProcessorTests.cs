@@ -23,13 +23,13 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
     public class AttributeProcessorTests
     {
-        private AttributeProcessor _processor;
+        private Entity _processor;
         private IModifierFactory _factory;
 
         [SetUp]
         public void Setup()
         {
-            _processor = new AttributeProcessor();
+            _processor = new Entity();
             _factory = new ModifierFactory(); // Instantiate the specific factory implementation for this test context
         }
 
@@ -58,7 +58,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void ExternalProvider_CanBeAccessed_ViaDotNotation()
         {
             // 1. Create a secondary processor (e.g., the Player)
-            var ownerProcessor = new AttributeProcessor();
+            var ownerProcessor = new Entity();
             ownerProcessor.SetOrUpdateBaseValue(TestKeys.Mock("Strength"), 50f);
 
             // 2. Link it to the main processor (e.g., the Sword)
@@ -79,7 +79,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void ExternalProvider_ReactiveObservable_Works()
         {
             // 1. Setup
-            var ownerProcessor = new AttributeProcessor();
+            var ownerProcessor = new Entity();
             _processor.RegisterExternalProvider(TestKeys.Mock("Owner"), ownerProcessor);
 
             float lastValue = 0f;
@@ -164,7 +164,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             block.Modifiers = new List<AttributeModifierSpec> { spec };
 
             // Act
-            block.ApplyToProcessor(_processor, _factory);
+            block.ApplyToEntity(_processor, _factory);
 
             // Assert
             var finalValue = _processor.GetAttribute(TestKeys.Mock("Speed")).ObservableValue.Value;
@@ -208,7 +208,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 "Value should hold steady (Base Value) while waiting for external provider");
 
             // 4. Create Owner and Register (The "Late Arrival")
-            var ownerProcessor = new AttributeProcessor();
+            var ownerProcessor = new Entity();
             ownerProcessor.SetOrUpdateBaseValue(TestKeys.Mock("Strength"), 5f); // Owner arrives with 5 Strength
 
             _processor.RegisterExternalProvider(TestKeys.Mock("Owner"), ownerProcessor);

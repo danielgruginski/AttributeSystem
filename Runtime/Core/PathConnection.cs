@@ -12,13 +12,13 @@ namespace ReactiveSolutions.AttributeSystem.Core
     /// </summary>
     public abstract class PathConnection : IDisposable
     {
-        protected readonly AttributeProcessor _root;
+        protected readonly Entity _root;
         protected readonly List<SemanticKey> _path;
 
         private readonly SerialDisposable _pathSubscription = new SerialDisposable();
-        protected AttributeProcessor _currentTarget;
+        protected Entity _currentTarget;
 
-        protected PathConnection(AttributeProcessor root, List<SemanticKey> path)
+        protected PathConnection(Entity root, List<SemanticKey> path)
         {
             _root = root;
             _path = path ?? new List<SemanticKey>();
@@ -40,7 +40,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 .Subscribe(ApplyToTarget);
         }
 
-        private IObservable<AttributeProcessor> ResolvePathRecursively(AttributeProcessor current, int index)
+        private IObservable<Entity> ResolvePathRecursively(Entity current, int index)
         {
             if (index >= _path.Count)
                 return Observable.Return(current);
@@ -50,13 +50,13 @@ namespace ReactiveSolutions.AttributeSystem.Core
             return current.ObserveProvider(nextKey)
                 .Select(nextProcessor =>
                 {
-                    if (nextProcessor == null) return Observable.Return<AttributeProcessor>(null);
+                    if (nextProcessor == null) return Observable.Return<Entity>(null);
                     return ResolvePathRecursively(nextProcessor, index + 1);
                 })
                 .Switch();
         }
 
-        private void ApplyToTarget(AttributeProcessor newTarget)
+        private void ApplyToTarget(Entity newTarget)
         {
             if (_currentTarget != newTarget)
             {
@@ -77,12 +77,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// <summary>
         /// Called when a new valid target is found at the end of the path.
         /// </summary>
-        protected abstract void OnApplyToTarget(AttributeProcessor target);
+        protected abstract void OnApplyToTarget(Entity target);
 
         /// <summary>
         /// Called when the previous target is lost or replaced.
         /// </summary>
-        protected abstract void OnRemoveFromTarget(AttributeProcessor target);
+        protected abstract void OnRemoveFromTarget(Entity target);
 
         public virtual void Dispose()
         {

@@ -11,18 +11,18 @@ namespace ReactiveSolutions.AttributeSystem.Core
         private readonly SemanticKey _tag; // Using SemanticKey for consistency
 
         // Support passing SemanticKey directly if needed
-        public TagConnection(AttributeProcessor root, List<SemanticKey> path, SemanticKey tag) : base(root, path)
+        public TagConnection(Entity root, List<SemanticKey> path, SemanticKey tag) : base(root, path)
         {
             _tag = tag;
             Connect();
         }
 
-        protected override void OnApplyToTarget(AttributeProcessor target)
+        protected override void OnApplyToTarget(Entity target)
         {
             target.AddTag(_tag);
         }
 
-        protected override void OnRemoveFromTarget(AttributeProcessor target)
+        protected override void OnRemoveFromTarget(Entity target)
         {
             target.RemoveTag(_tag);
         }

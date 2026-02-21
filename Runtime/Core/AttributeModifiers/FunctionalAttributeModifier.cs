@@ -36,7 +36,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             Priority = priority;
         }
 
-        public IObservable<float> GetMagnitude(AttributeProcessor processor)
+        public IObservable<float> GetMagnitude(Entity processor)
         {
             return _source.GetObservable(processor)
                 .Select(value => _operation(value));

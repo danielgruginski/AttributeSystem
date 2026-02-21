@@ -27,7 +27,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// The live magnitude of the modifier. 
         /// This observable fires whenever the modifier's internal source changes.
         /// </summary>
-        IObservable<float> GetMagnitude(AttributeProcessor processor);
+        IObservable<float> GetMagnitude(Entity processor);
     }
 
 }

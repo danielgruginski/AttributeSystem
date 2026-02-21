@@ -11,7 +11,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 {
     public class ComplexPointerTests
     {
-        private AttributeProcessor _processor;
+        private Entity _processor;
 
         // Keys
         private SemanticKey _keyA;
@@ -24,7 +24,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         [SetUp]
         public void Setup()
         {
-            _processor = new AttributeProcessor();
+            _processor = new Entity();
 
             _keyA = TestKeys.Mock("A");
             _keyB = TestKeys.Mock("B");
@@ -133,7 +133,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             public int Priority => 0;
             public string SourceId => "SourceIDMock";
             public float Modify(float val) => val + _val; // Simple implementation
-            public IObservable<float> GetMagnitude(AttributeProcessor context) => Observable.Return(_val);
+            public IObservable<float> GetMagnitude(Entity context) => Observable.Return(_val);
         }
     }
 }

@@ -13,12 +13,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
     /// The core engine for an entity in the attribute system.
     /// (Tip: Rename this class to "Entity" using your IDE's refactor tool!)
     /// </summary>
-    public class AttributeProcessor : IDisposable
+    public class Entity : IDisposable
     {
         private readonly ReactiveDictionary<SemanticKey, Attribute> _attributes = new();
         public IReadOnlyReactiveDictionary<SemanticKey, Attribute> Attributes => _attributes;
 
-        private readonly Dictionary<SemanticKey, AttributeProcessor> _externalProviders = new();
+        private readonly Dictionary<SemanticKey, Entity> _externalProviders = new();
         private readonly Subject<SemanticKey> _onProviderRegistered = new();
 
         private readonly Dictionary<SemanticKey, LinkGroup> _linkGroups = new();
@@ -28,7 +28,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         // Tracks the lifecycle of Innate StatBlocks and Nested Entities
         private readonly CompositeDisposable _profileDisposables = new CompositeDisposable();
-        private readonly List<AttributeProcessor> _nestedEntities = new List<AttributeProcessor>();
+        private readonly List<Entity> _nestedEntities = new List<Entity>();
 
         public void ApplyProfile(EntityProfileSO profileSO, IModifierFactory modifierFactory)
         => ApplyProfile(profileSO.Profile, modifierFactory);
@@ -66,7 +66,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             {
                 if (nestedEntry.ProviderKey != null && nestedEntry.Profile != null)
                 {
-                    var childEntity = new AttributeProcessor();
+                    var childEntity = new Entity();
                     childEntity.ApplyProfile(nestedEntry.Profile, modifierFactory);
 
                     RegisterExternalProvider(nestedEntry.ProviderKey, childEntity);
@@ -88,7 +88,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             {
                 if (statBlock != null)
                 {
-                    var handle = statBlock.ApplyToProcessor(this, modifierFactory);
+                    var handle = statBlock.ApplyToEntity(this, modifierFactory);
                     if (handle != null)
                     {
                         _profileDisposables.Add(handle);
@@ -163,7 +163,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         // --- External Providers ---
 
-        public void RegisterExternalProvider(SemanticKey key, AttributeProcessor processor)
+        public void RegisterExternalProvider(SemanticKey key, Entity processor)
         {
             Debug.Assert(processor != null, $"[AttributeProcessor] Trying to register a null provider for key: {key}");
             _externalProviders[key] = processor;
@@ -179,7 +179,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             }
         }
 
-        public IObservable<AttributeProcessor> ObserveProvider(SemanticKey key)
+        public IObservable<Entity> ObserveProvider(SemanticKey key)
         {
             return _onProviderRegistered
                 .Where(k => k.Equals(key))

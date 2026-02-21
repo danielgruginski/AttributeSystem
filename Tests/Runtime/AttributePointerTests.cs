@@ -8,7 +8,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 {
     public class AttributePointerTests
     {
-        private AttributeProcessor _processor;
+        private Entity _processor;
 
         // Explicit keys for testing
         private readonly SemanticKey _attackKey = TestKeys.Mock("Attack");
@@ -28,7 +28,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         [SetUp]
         public void Setup()
         {
-            _processor = new AttributeProcessor();
+            _processor = new Entity();
         }
 
         [Test]

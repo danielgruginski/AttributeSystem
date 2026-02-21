@@ -55,8 +55,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void LinkGroup_ManageMembers_AddsAndRemoves()
         {
             var group = new LinkGroup();
-            var p1 = new AttributeProcessor();
-            var p2 = new AttributeProcessor();
+            var p1 = new Entity();
+            var p2 = new Entity();
 
             group.AddMember(p1);
             Assert.IsTrue(group.Contains(p1));
@@ -75,7 +75,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void ApplyStatBlock_AppliesToExistingMembers()
         {
             var group = new LinkGroup();
-            var processor = new AttributeProcessor();
+            var processor = new Entity();
             group.AddMember(processor);
 
             var statBlock = CreateStatBlock(10f);
@@ -100,7 +100,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // Act - Apply first, add member later
             using (group.ApplyStatBlock(statBlock, _modifierFactory))
             {
-                var processor = new AttributeProcessor();
+                var processor = new Entity();
 
                 // Should initially be 0 (or default)?
                 Assert.AreEqual(0f, processor.GetAttribute(_testAttr)?.ObservableValue.Value ?? 0f);
@@ -116,7 +116,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void ApplyStatBlock_RemovesModifier_WhenMemberRemoved()
         {
             var group = new LinkGroup();
-            var processor = new AttributeProcessor();
+            var processor = new Entity();
             group.AddMember(processor);
 
             var statBlock = CreateStatBlock(10f);
@@ -136,7 +136,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void ApplyStatBlock_WithCondition_ReactsToTagChanges()
         {
             var group = new LinkGroup();
-            var processor = new AttributeProcessor();
+            var processor = new Entity();
             group.AddMember(processor);
 
             var statBlock = CreateStatBlock(100f);
@@ -169,8 +169,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void ApplyStatBlock_Dispose_ClearsAllModifiers()
         {
             var group = new LinkGroup();
-            var p1 = new AttributeProcessor();
-            var p2 = new AttributeProcessor();
+            var p1 = new Entity();
+            var p2 = new Entity();
             group.AddMember(p1);
             group.AddMember(p2);
 
@@ -190,7 +190,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void LinkGroup_HandlesMultipleApplications()
         {
             var group = new LinkGroup();
-            var processor = new AttributeProcessor();
+            var processor = new Entity();
             group.AddMember(processor);
 
             var sb1 = CreateStatBlock(10f);

@@ -1,8 +1,9 @@
-﻿# AttributeProcessor Class Documentation
+﻿
+# Entity Class Documentation
 
 ## Overview
 
-The `AttributeProcessor` is the core engine of the Reactive Attribute System. It acts as the central container for a collection of `Attribute`s (like Health, Strength, Damage) and serves as the registry for external dependency links (e.g., linking a "Sword" processor to a "Player" processor).
+The `Entity` is the core engine of the Reactive Attribute System. It acts as the central container for a collection of `Attribute`s (like Health, Strength, Damage) and serves as the registry for external dependency links (e.g., linking a "Sword" entity to a "Player" entity).
 
 It is responsible for:
 
@@ -11,9 +12,9 @@ It is responsible for:
 2.  **Resolution:** Resolving complex paths to finding attributes on other entities (e.g., resolving `Owner` -> `Hireling` -> `Strength`).
     
 3.  **Modification:** Providing the API to add modifiers to attributes, managing the creation of `AttributeConnection`s for remote modifications.
-
+    
 4.  **Tagging:** Managing Entity Tags for categorization and status effects.
-
+    
 5.  **Aliasing:** Manages Attribute Pointers.
     
 
@@ -21,7 +22,7 @@ It is responsible for:
 
 -   **Reactive Storage:** Uses `ReactiveDictionary` to store attributes, allowing systems (like UI) to reactively detect when new attributes are added dynamically.
     
--   **Dependency Injection (Providers):** Allows registering other processors as "Providers" (e.g., `RegisterExternalProvider("Owner", playerProcessor)`), enabling cross-entity stat scaling.
+-   **Dependency Injection (Providers):** Allows registering other entities as "Providers" (e.g., `RegisterExternalProvider("Owner", playerEntity)`), enabling cross-entity stat scaling.
     
 -   **Handle-Based Modification:** Adding a modifier returns an `IDisposable` handle. Disposing this handle removes the modifier, ensuring clean lifecycle management without relying on string IDs.
     
@@ -31,7 +32,7 @@ It is responsible for:
 ## Class Definition
 
 ```
-public class AttributeProcessor
+public class Entity
 
 ```
 
@@ -44,11 +45,9 @@ Methods for retrieving or creating the attribute objects.
 -   **`GetAttribute(SemanticKey name)`**
     
     -   Retrieves a local attribute. Returns `null` if not found.
-
--   **`GetAttributeObservable(SemanticKey key)`** 
-
-  - Returns an `IObservable<float>` stream of the attribute's final value. Handles resolution of aliases automatically.
-
+        
+-   **`GetAttributeObservable(SemanticKey key)`** - Returns an `IObservable<float>` stream of the attribute's final value. Handles resolution of aliases automatically.
+    
 -   **`GetOrCreateAttribute(SemanticKey name, float defaultBaseIfMissing = 0f)`**
     
     -   Safely gets an attribute, creating it with the specified base value if it doesn't exist. Ideal for ensuring a stat exists before modifying it.
@@ -61,6 +60,7 @@ Methods for retrieving or creating the attribute objects.
     
     -   Access to the underlying `IReadOnlyReactiveDictionary`. Useful for debugging or listing all stats.
         
+
 ### 2. Pointer Management
 
 -   `SetPointer(SemanticKey alias, SemanticKey target)`: Creates or updates an alias.
@@ -70,11 +70,11 @@ Methods for retrieving or creating the attribute objects.
     -   Prevents circular dependencies (e.g., `A -> B -> A`, `A -> A`, `A -> B -> C -> A`).
         
 -   `RemovePointer(SemanticKey alias)`: Deletes the alias. This does **not** affect the Target attribute.
-
+    
 
 ### 3. Tag Management
 
-The processor now includes a Tag Manager to handle entity states.
+The entity now includes a Tag Manager to handle entity states.
 
 -   **`IReadOnlyReactiveDictionary<SemanticKey, int> Tags`**
     
@@ -91,6 +91,7 @@ The processor now includes a Tag Manager to handle entity states.
 -   **`bool HasTag(SemanticKey tag)`**
     
     -   Checks if the tag is currently active (count > 0).
+        
 
 ### 4. Reactive Access
 
@@ -113,7 +114,7 @@ Methods for observing values, even across complex chains.
 
 ### 5. Modifier Management (The Handle System)
 
-The processor manages the application of modifiers.
+The entity manages the application of modifiers.
 
 -   **`IDisposable AddModifier(string sourceId, IAttributeModifier modifier, SemanticKey attributeName)`**
     
@@ -134,9 +135,9 @@ The processor manages the application of modifiers.
 
 Methods for establishing relationships between entities.
 
--   **`RegisterExternalProvider(SemanticKey key, AttributeProcessor processor)`**
+-   **`RegisterExternalProvider(SemanticKey key, Entity entity)`**
     
-    -   Registers another processor under an alias (e.g., linking the Player as "Owner").
+    -   Registers another entity under an alias (e.g., linking the Player as "Owner").
         
     -   Triggers any pending observers or connections waiting for this key.
         
@@ -146,14 +147,14 @@ Methods for establishing relationships between entities.
         
 -   **`ObserveProvider(SemanticKey key)`**
     
-    -   Returns an `IObservable<AttributeProcessor>` that fires whenever the specific provider is registered, changed, or unregistered (resolving to null).
+    -   Returns an `IObservable<Entity>` that fires whenever the specific provider is registered, changed, or unregistered (resolving to null).
         
 
 ## Usage Example
 
 ```
-var player = new AttributeProcessor();
-var sword = new AttributeProcessor();
+var player = new Entity();
+var sword = new Entity();
 
 // 1. Setup Stats
 player.SetOrUpdateBaseValue(new SemanticKey("Strength"), 10f);
