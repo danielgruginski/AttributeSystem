@@ -40,8 +40,5 @@ namespace ReactiveSolutions.AttributeSystem.Unity
                 Debug.LogWarning($"[EntityController] No EntityProfileSO assigned on {gameObject.name}. Entity initialized completely empty.");
             }
         }
-
-        //public void AddAttribute(SemanticKey key, float v)
-        //=> Instance.GetOrCreateAttribute(key, v);
     }
 }
