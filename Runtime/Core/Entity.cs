@@ -127,13 +127,13 @@ namespace ReactiveSolutions.AttributeSystem.Core
         {
             if (alias == target && (path == null || path.Count == 0))
             {
-                Debug.LogWarning($"[AttributeProcessor] Cannot point alias '{alias}' to itself.");
+                Debug.LogWarning($"[Entity] Cannot point alias '{alias}' to itself.");
                 return Disposable.Empty;
             }
 
             if (IsLocallyCircular(alias, target))
             {
-                Debug.LogError($"[AttributeProcessor] Circular pointer detected: {alias} -> {target}");
+                Debug.LogError($"[Entity] Circular pointer detected: {alias} -> {target}");
                 return Disposable.Empty;
             }
 
@@ -165,7 +165,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         public void RegisterExternalProvider(SemanticKey key, Entity processor)
         {
-            Debug.Assert(processor != null, $"[AttributeProcessor] Trying to register a null provider for key: {key}");
+            Debug.Assert(processor != null, $"[Entity] Trying to register a null provider for key: {key}");
             _externalProviders[key] = processor;
             _onProviderRegistered.OnNext(key);
         }
