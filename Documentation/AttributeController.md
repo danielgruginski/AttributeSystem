@@ -1,4 +1,7 @@
-﻿# AttributeController Documentation
+﻿## Note
+This cocumentation remains until the new one is created, but it may not be up to date with the code.
+
+# AttributeController Documentation
 
 ## Overview
 
