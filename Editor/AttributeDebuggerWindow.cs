@@ -133,8 +133,8 @@ namespace ReactiveSolutions.AttributeSystem.Editor
 
             // Live Value
             float current = 0f;
-            if (attr.Value != null)
-                current = attr.Value.Value;
+            if (attr.ObservableValue != null)
+                current = attr.ObservableValue.Value;
 
             GUILayout.Label($"Value: {current:0.##}", EditorStyles.largeLabel);
             GUILayout.FlexibleSpace();

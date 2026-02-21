@@ -4,37 +4,7 @@ using UnityEngine;
 
 namespace ReactiveSolutions.AttributeSystem.Core
 {
-    // 1. HOW applied: How does this modifier combine with the previous value?
-    public enum AttributeMergeMode
-    {
-        Add,        // Value += Result
-        Multiply,   // Value *= Result
-        Override    // Value = Result
-    }
 
-    // 2. WHAT applied: What is the math logic?
-    public enum AttributeLogicType
-    {
-        // Basic
-        Constant,       // Just a raw number
-
-        // Formulas
-        Linear,         // (Coeff * Attribute) + Addend
-        Exponential,    // Base ^ Attribute
-
-        // Advanced
-        Ratio,          // A / B
-        Product,        // A * B
-        Curve,          // AnimationCurve(Attribute)
-
-        // Complex Curves
-        DiminishingReturns, // MaxBonus * (Input / (Input + SoftCap))
-        Segmented,          // Piecewise linear interpolation based on breakpoints
-        TriangularBonus,    // Floor((sqrt(8 * Input + 1) - 1) / 2)
-
-        // Transformers
-        Clamp,
-    }
     public enum ModifierType
     {
         Additive,        // Added to the base value or other additives

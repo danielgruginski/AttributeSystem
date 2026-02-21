@@ -43,13 +43,13 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.SetPointer(_keyB, _target);
 
             // 1. Verify reading via both pointers
-            Assert.AreEqual(100, _processor.GetAttribute(_keyA).Value.Value);
-            Assert.AreEqual(100, _processor.GetAttribute(_keyB).Value.Value);
+            Assert.AreEqual(100, _processor.GetAttribute(_keyA).ObservableValue.Value);
+            Assert.AreEqual(100, _processor.GetAttribute(_keyB).ObservableValue.Value);
 
             // 2. Modify Target
             _processor.SetOrUpdateBaseValue(_target, 50);
-            Assert.AreEqual(50, _processor.GetAttribute(_keyA).Value.Value);
-            Assert.AreEqual(50, _processor.GetAttribute(_keyB).Value.Value);
+            Assert.AreEqual(50, _processor.GetAttribute(_keyA).ObservableValue.Value);
+            Assert.AreEqual(50, _processor.GetAttribute(_keyB).ObservableValue.Value);
         }
 
         [Test]
@@ -61,7 +61,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.SetPointer(_keyC, _keyD);
             _processor.SetOrUpdateBaseValue(_keyD, 10);
 
-            Assert.AreEqual(10, _processor.GetAttribute(_keyA).Value.Value);
+            Assert.AreEqual(10, _processor.GetAttribute(_keyA).ObservableValue.Value);
 
             // Retarget B to point to E
             // New Chain: A -> B -> E.   (C -> D is isolated)
@@ -72,10 +72,10 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.SetPointer(_keyB, _keyE);
 
             // Verify A sees E (A -> B -> E)
-            Assert.AreEqual(999, _processor.GetAttribute(_keyA).Value.Value);
+            Assert.AreEqual(999, _processor.GetAttribute(_keyA).ObservableValue.Value);
 
             // Verify C still sees D (C was untouched)
-            Assert.AreEqual(10, _processor.GetAttribute(_keyC).Value.Value);
+            Assert.AreEqual(10, _processor.GetAttribute(_keyC).ObservableValue.Value);
         }
 
         [Test]
@@ -86,20 +86,20 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var bPointerHandle = _processor.SetPointer(_keyB, _keyC);
             _processor.SetOrUpdateBaseValue(_keyC, 100);
 
-            Assert.AreEqual(100, _processor.GetAttribute(_keyA).Value.Value);
+            Assert.AreEqual(100, _processor.GetAttribute(_keyA).ObservableValue.Value);
 
             // 1. Delete B's pointer to C (The middle link)
             // This exposes B's underlying base value (default 0)
             bPointerHandle.Dispose();
 
             // A -> B (Local Base 0)
-            Assert.AreEqual(0, _processor.GetAttribute(_keyA).Value.Value);
+            Assert.AreEqual(0, _processor.GetAttribute(_keyA).ObservableValue.Value);
 
             // 2. Give B a base value
             _processor.SetOrUpdateBaseValue(_keyB, 50);
 
             // A -> B (Local Base 50)
-            Assert.AreEqual(50, _processor.GetAttribute(_keyA).Value.Value);
+            Assert.AreEqual(50, _processor.GetAttribute(_keyA).ObservableValue.Value);
         }
 
         [Test]
@@ -114,14 +114,14 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.AddModifier("TestMod", simpleMod, _keyA);
 
             // Verify A reads 15 (10 from B + 5 from Modifier on A)
-            Assert.AreEqual(15, _processor.GetAttribute(_keyA).Value.Value);
+            Assert.AreEqual(15, _processor.GetAttribute(_keyA).ObservableValue.Value);
 
             // Verify B is untouched (10)
             // Unlike the previous test where we assumed "Proxying", the new architecture
             // stacks modifiers ON TOP of the resolved pointer value.
             // So A = (B.Value) + Modifiers_On_A.
             // B itself remains 10. This is actually more flexible/correct for RPGs.
-            Assert.AreEqual(10, _processor.GetAttribute(_keyB).Value.Value);
+            Assert.AreEqual(10, _processor.GetAttribute(_keyB).ObservableValue.Value);
         }
 
         // Helper Modifier for the test above

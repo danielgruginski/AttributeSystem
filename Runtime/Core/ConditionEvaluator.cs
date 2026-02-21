@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UniRx;
 using UnityEngine;
+using UnityEngine.Audio;
 
 namespace ReactiveSolutions.AttributeSystem.Core
 {
@@ -12,7 +13,11 @@ namespace ReactiveSolutions.AttributeSystem.Core
     {
         public static IObservable<bool> Observe(StatBlockCondition condition, AttributeProcessor context)
         {
-            if (condition == null) return Observable.Return(true);
+            if (condition == null || condition.Type == StatBlockCondition.Mode.Always)
+                return Observable.Return(true);
+
+            if (context == null)
+                return Observable.Return(false);
 
             switch (condition.Type)
             {

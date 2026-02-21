@@ -4,12 +4,13 @@ using ReactiveSolutions.AttributeSystem.Core.Data;
 using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using ReactiveSolutions.AttributeSystem.Unity;
 using SemanticKeys;
-using System.Collections.Generic;
+using sk;
 using System.Collections;
+using System.Collections.Generic;
 using UniRx;
 using UnityEngine;
+using UnityEngine.Audio;
 using UnityEngine.TestTools;
-using sk;
 
 namespace ReactiveSolutions.AttributeSystem.Tests
 {
@@ -53,7 +54,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var key = TestKeys.Mock("Health");
             _playerController.AddAttribute(key, 100f);
 
-            var attr = _playerController.GetAttribute(key);
+            var attr = _playerController.Processor.GetAttribute(key);
             Assert.IsNotNull(attr);
             Assert.AreEqual(100f, attr.BaseValue);
         }
@@ -65,8 +66,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _playerController.AddAttribute(key, 50f);
 
             float lastValue = 0f;
-            _playerController.GetAttributeObservable(key)
-                .SelectMany(a => a.Value)
+            _playerController.Processor.GetAttributeObservable(key)
+                .SelectMany(a => a.ObservableValue)
                 .Subscribe(v => lastValue = v);
 
             Assert.AreEqual(50f, lastValue);
@@ -114,14 +115,14 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             // 4. Verify initial state (Link missing, so Modifier adds 0 or waits)
             // 5 + 0 = 5
-            Assert.AreEqual(5f, _swordController.GetAttribute(dmgKey).Value.Value, "Should be base value before linking");
+            Assert.AreEqual(5f, _swordController.Processor.GetAttribute(dmgKey).ObservableValue.Value, "Should be base value before linking");
 
             // 5. LINK PROVIDERS
-            _swordController.LinkProvider(ownerKey, _playerController);
+            _swordController.Processor.RegisterExternalProvider(ownerKey, _playerController.Processor);
 
             // 6. Verify Resolved State
             // 5 + (10 * 2) = 25
-            Assert.AreEqual(25f, _swordController.GetAttribute(dmgKey).Value.Value, "Should include Strength scaling after linking");
+            Assert.AreEqual(25f, _swordController.Processor.GetAttribute(dmgKey).ObservableValue.Value, "Should include Strength scaling after linking");
         }
 
         // ========================================================================
@@ -175,7 +176,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             activeBlock.AddHandle(handle);
 
             // 3. Verify Modifier Applied (10 + 5 = 15)
-            Assert.AreEqual(15f, _playerController.GetAttribute(key).Value.Value);
+            Assert.AreEqual(15f, _playerController.Processor.GetAttribute(key).ObservableValue.Value);
 
             // 4. Simulate Linker Destroy/Unequip
             activeBlock.Dispose();
@@ -183,7 +184,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             yield return null; // Wait a frame (Rx updates are usually immediate, but good practice in UnityTest)
 
             // 5. Verify Modifier Removed (10 + 0 = 10)
-            Assert.AreEqual(10f, _playerController.GetAttribute(key).Value.Value, "Modifier should be removed after disposal");
+            Assert.AreEqual(10f, _playerController.Processor.GetAttribute(key).ObservableValue.Value, "Modifier should be removed after disposal");
         }
     }
 }

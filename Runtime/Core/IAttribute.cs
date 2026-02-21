@@ -16,7 +16,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// The observable final value (Base + Modifiers).
         /// Implements IReadOnlyReactiveProperty to allow both Subscription (Push) and direct Value reading (Pull).
         /// </summary>
-        IReadOnlyReactiveProperty<float> Value { get; }
+        IReadOnlyReactiveProperty<float> ObservableValue { get; }
 
         /// <summary>
         /// The base value of the attribute.

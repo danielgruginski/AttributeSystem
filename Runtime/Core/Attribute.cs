@@ -15,7 +15,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
         protected readonly ReactiveProperty<float> _baseValue;
         public virtual float BaseValue => _baseValue.Value;
 
-        public virtual IReadOnlyReactiveProperty<float> Value => _finalValue;
+        public virtual IReadOnlyReactiveProperty<float> ObservableValue => _finalValue;
         public bool IsDisposed { get; private set; }
 
         protected readonly ReactiveCollection<IAttributeModifier> _modifiers = new();
@@ -92,7 +92,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                     .Select(attr =>
                     {
                         if (attr == null) return Observable.Return(0f);
-                        return attr.Value;
+                        return attr.ObservableValue;
                     })
                     .Switch();
             }

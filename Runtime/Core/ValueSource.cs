@@ -46,7 +46,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 {
                     // FIX: Handle NULL attribute (e.g. missing provider or broken pointer)
                     if (attr == null) return Observable.Return(0f);
-                    return attr.Value;
+                    return attr.ObservableValue;
                 })
                 .Switch();
         }

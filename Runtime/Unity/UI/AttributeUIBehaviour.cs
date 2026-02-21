@@ -43,8 +43,8 @@ namespace ReactiveSolutions.AttributeSystem.Unity.UI
 
             _targetController
                 .Where(controller => controller != null)
-                .SelectMany(controller => controller.GetAttributeObservable(attributeName))
-                .SelectMany(attribute => attribute.Value)
+                .SelectMany(controller => controller.Processor.GetAttributeObservable(attributeName))
+                .SelectMany(attribute => attribute.ObservableValue)
                 .Subscribe(onValueChanged)
                 .AddTo(_disposables);
         }
