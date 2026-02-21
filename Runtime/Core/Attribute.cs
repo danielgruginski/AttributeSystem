@@ -15,7 +15,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
         protected readonly ReactiveProperty<float> _baseValue;
         public virtual float BaseValue => _baseValue.Value;
 
-        public virtual IReadOnlyReactiveProperty<float> Value => _finalValue;
+        public virtual IReadOnlyReactiveProperty<float> ObservableValue => _finalValue;
         public bool IsDisposed { get; private set; }
 
         protected readonly ReactiveCollection<IAttributeModifier> _modifiers = new();
@@ -23,7 +23,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         protected readonly ReactiveCollection<AttributeReference> _pointerStack = new();
 
-        protected readonly AttributeProcessor _processor;
+        protected readonly Entity _processor;
         protected readonly CompositeDisposable _calculationDisposable = new();
         private IDisposable _currentChainSubscription;
 
@@ -39,7 +39,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             }
         }
 
-        public Attribute(SemanticKey name, float initialBase, AttributeProcessor processor)
+        public Attribute(SemanticKey name, float initialBase, Entity processor)
         {
             Name = name;
             _processor = processor;
@@ -92,7 +92,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                     .Select(attr =>
                     {
                         if (attr == null) return Observable.Return(0f);
-                        return attr.Value;
+                        return attr.ObservableValue;
                     })
                     .Switch();
             }

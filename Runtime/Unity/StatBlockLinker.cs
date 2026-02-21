@@ -10,7 +10,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
     /// Links one or more StatBlocks (loaded from JSON by ID) to the AttributeProcessor on this object.
     /// This handles the lifecycle of the StatBlocks (Applying on Start, Disposing on Destroy).
     /// </summary>
-    [RequireComponent(typeof(AttributeController))]
+    [RequireComponent(typeof(EntityController))]
     public class StatBlockLinker : MonoBehaviour
     {
         [Tooltip("List of StatBlock IDs to apply (e.g. 'BaseStats', 'WarriorClass').")]
@@ -18,7 +18,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         public List<StatBlockID> StatBlockIds = new List<StatBlockID>();
 
         [SerializeField]
-        private AttributeController _controller;
+        private EntityController _controller;
         private List<ActiveStatBlock> _activeBlocks = new List<ActiveStatBlock>();
 
         // Cache the factory so we don't recreate it for every block
@@ -28,7 +28,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         {
             if(_controller == null)
             { 
-                _controller = GetComponent<AttributeController>();
+                _controller = GetComponent<EntityController>();
             }
             if(_modifierFactory == null)
             { 
@@ -54,7 +54,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         {
             ClearStatBlocks();
 
-            if (_controller == null || _controller.Processor == null)
+            if (_controller == null || _controller.Instance == null)
             {
                 Debug.LogWarning("[StatBlockLinker] No AttributeController/Processor found.");
                 return;
@@ -79,7 +79,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
             _activeBlocks.Clear();
         }
 
-        public void SetTarget(AttributeController controller)
+        public void SetTarget(EntityController controller)
         {
             _controller = controller;
         }
@@ -93,7 +93,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
             if (block != null)
             {
                 // Apply the block and store the handle
-                var activeHandle = block.ApplyToProcessor(_controller.Processor, _modifierFactory);
+                var activeHandle = block.ApplyToEntity(_controller.Instance, _modifierFactory);
                 _activeBlocks.Add(activeHandle);
             }
             else

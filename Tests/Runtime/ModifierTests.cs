@@ -10,7 +10,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 {
     public class ModifierTests
     {
-        private AttributeProcessor _processor;
+        private Entity _processor;
         private IModifierFactory _factory;
 
         // --- Helpers ---
@@ -55,7 +55,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         [SetUp]
         public void Setup()
         {
-            _processor = new AttributeProcessor();
+            _processor = new Entity();
             _factory = new ModifierFactory(); // Instantiate the service
         }
 

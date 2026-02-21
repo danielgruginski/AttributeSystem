@@ -8,7 +8,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
     {
         void Register(string id, ModifierBuilder builder);
         IAttributeModifier Create(string id, AttributeModifierSpec spec);
-        IAttributeModifier Create(AttributeModifierSpec spec, AttributeProcessor context);
+        IAttributeModifier Create(AttributeModifierSpec spec, Entity context);
         IEnumerable<string> GetAvailableTypes();
     }
 

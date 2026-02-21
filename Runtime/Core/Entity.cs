@@ -1,3 +1,5 @@
+using ReactiveSolutions.AttributeSystem.Core.Data;
+using ReactiveSolutions.AttributeSystem.Unity.Data;
 using SemanticKeys;
 using System;
 using System.Collections.Generic;
@@ -7,20 +9,117 @@ using UnityEngine;
 
 namespace ReactiveSolutions.AttributeSystem.Core
 {
-    public class AttributeProcessor
+    /// <summary>
+    /// The core engine for an entity in the attribute system.
+    /// (Tip: Rename this class to "Entity" using your IDE's refactor tool!)
+    /// </summary>
+    public class Entity : IDisposable
     {
         private readonly ReactiveDictionary<SemanticKey, Attribute> _attributes = new();
         public IReadOnlyReactiveDictionary<SemanticKey, Attribute> Attributes => _attributes;
 
-        private readonly Dictionary<SemanticKey, AttributeProcessor> _externalProviders = new();
+        private readonly Dictionary<SemanticKey, Entity> _externalProviders = new();
         private readonly Subject<SemanticKey> _onProviderRegistered = new();
+
+        private readonly Dictionary<SemanticKey, LinkGroup> _linkGroups = new();
 
         private readonly AttributeTagManager _tagManager = new AttributeTagManager();
         public IReadOnlyReactiveDictionary<SemanticKey, int> Tags => _tagManager.Tags;
 
+        // Tracks the lifecycle of Innate StatBlocks and Nested Entities
+        private readonly CompositeDisposable _profileDisposables = new CompositeDisposable();
+        private readonly List<Entity> _nestedEntities = new List<Entity>();
+
+        public void ApplyProfile(EntityProfileSO profileSO, IModifierFactory modifierFactory)
+        => ApplyProfile(profileSO.Profile, modifierFactory);
+
+        /// <summary>
+        /// Applies an EntityProfile to this processor, setting up base stats, tags, nested entities, and innate buffs.
+        /// </summary>
+        public void ApplyProfile(EntityProfile profile, IModifierFactory modifierFactory)
+        {
+            if (profile == null) return;
+
+            // 1. Base Attributes
+            foreach (var entry in profile.BaseAttributes)
+            {
+                if (entry.Attribute != null)
+                {
+                    SetOrUpdateBaseValue(entry.Attribute, entry.BaseValue);
+                }
+            }
+
+            // 2. Innate Tags
+            foreach (var tag in profile.InnateTags)
+            {
+                if (tag != null) AddTag(tag);
+            }
+
+            // 3. Link Groups
+            foreach (var groupKey in profile.LinkGroups)
+            {
+                if (groupKey != null) GetOrCreateLinkGroup(groupKey);
+            }
+
+            // 4. Nested Entities (Recursive Composition)
+            foreach (var nestedEntry in profile.NestedEntities)
+            {
+                if (nestedEntry.ProviderKey != null && nestedEntry.Profile != null)
+                {
+                    var childEntity = new Entity();
+                    childEntity.ApplyProfile(nestedEntry.Profile, modifierFactory);
+
+                    RegisterExternalProvider(nestedEntry.ProviderKey, childEntity);
+                    _nestedEntities.Add(childEntity);
+                }
+            }
+
+            // 5. Attribute Pointers
+            foreach (var pointer in profile.Pointers)
+            {
+                if (pointer.Alias != null && pointer.TargetAttribute != null)
+                {
+                    SetPointer(pointer.Alias, pointer.TargetAttribute, pointer.ProviderPath);
+                }
+            }
+
+            // 6. Innate Stat Blocks
+            foreach (var statBlock in profile.InnateStatBlocks)
+            {
+                if (statBlock != null)
+                {
+                    var handle = statBlock.ApplyToEntity(this, modifierFactory);
+                    if (handle != null)
+                    {
+                        _profileDisposables.Add(handle);
+                    }
+                }
+            }
+        }
+
+        // --- Tag Management ---
+
         public void AddTag(SemanticKey tag) => _tagManager.AddTag(tag);
         public void RemoveTag(SemanticKey tag) => _tagManager.RemoveTag(tag);
         public bool HasTag(SemanticKey tag) => _tagManager.HasTag(tag);
+
+        // --- Link Group Management ---
+
+        public LinkGroup GetOrCreateLinkGroup(SemanticKey key)
+        {
+            if (!_linkGroups.TryGetValue(key, out var group))
+            {
+                group = new LinkGroup();
+                _linkGroups[key] = group;
+            }
+            return group;
+        }
+
+        public LinkGroup GetLinkGroup(SemanticKey key)
+        {
+            _linkGroups.TryGetValue(key, out var group);
+            return group;
+        }
 
         // --- Pointer Management ---
 
@@ -28,14 +127,13 @@ namespace ReactiveSolutions.AttributeSystem.Core
         {
             if (alias == target && (path == null || path.Count == 0))
             {
-                Debug.LogWarning($"[AttributeProcessor] Cannot point alias '{alias}' to itself.");
+                Debug.LogWarning($"[Entity] Cannot point alias '{alias}' to itself.");
                 return Disposable.Empty;
             }
 
             if (IsLocallyCircular(alias, target))
             {
-                Debug.LogError($"[AttributeProcessor] Circular pointer detected: {alias} -> {target}");
-                // We return Empty disposable to avoid breaking the caller, but the pointer is NOT added.
+                Debug.LogError($"[Entity] Circular pointer detected: {alias} -> {target}");
                 return Disposable.Empty;
             }
 
@@ -45,28 +143,15 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         private bool IsLocallyCircular(SemanticKey alias, SemanticKey target)
         {
-            // We are about to set Alias -> Target.
-            // Check if Target eventually points back to Alias.
             var currentKey = target;
             int safeguard = 0;
 
-            // Traverse the chain
             while (_attributes.TryGetValue(currentKey, out var attr))
             {
-                // Does this attribute point somewhere else?
                 var pointerTarget = attr.ActivePointerTarget;
-                if (pointerTarget == null)
-                {
-                    // It's a concrete attribute (end of chain)
-                    return false;
-                }
+                if (pointerTarget == null) return false;
 
-                // If it points remotely, we can't easily check cycles synchronously here.
-                // We assume remote chains are checked by the remote processor or handled elsewhere.
-                if (pointerTarget.Value.Path != null && pointerTarget.Value.Path.Count > 0)
-                {
-                    return false;
-                }
+                if (pointerTarget.Value.Path != null && pointerTarget.Value.Path.Count > 0) return false;
 
                 currentKey = pointerTarget.Value.Name;
 
@@ -76,16 +161,11 @@ namespace ReactiveSolutions.AttributeSystem.Core
             return false;
         }
 
-        public void RemovePointer(SemanticKey alias)
-        {
-            // Legacy support if needed.
-        }
-
         // --- External Providers ---
 
-        public void RegisterExternalProvider(SemanticKey key, AttributeProcessor processor)
+        public void RegisterExternalProvider(SemanticKey key, Entity processor)
         {
-            Debug.Assert(processor != null, $"[AttributeProcessor] Trying to register a null provider for key: {key}");
+            Debug.Assert(processor != null, $"[Entity] Trying to register a null provider for key: {key}");
             _externalProviders[key] = processor;
             _onProviderRegistered.OnNext(key);
         }
@@ -99,7 +179,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             }
         }
 
-        public IObservable<AttributeProcessor> ObserveProvider(SemanticKey key)
+        public IObservable<Entity> ObserveProvider(SemanticKey key)
         {
             return _onProviderRegistered
                 .Where(k => k.Equals(key))
@@ -147,8 +227,6 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 return updates.Subscribe(observer);
             });
         }
-
-        public IObservable<Attribute> OnAttributeAdded => _attributes.ObserveAdd().Select(evt => evt.Value);
 
         public Attribute GetAttribute(SemanticKey name) => GetAttribute(name, null);
 
@@ -198,6 +276,19 @@ namespace ReactiveSolutions.AttributeSystem.Core
             {
                 return new AttributeConnection(this, providerPath, attributeName, modifier, sourceId);
             }
+        }
+
+        public void Dispose()
+        {
+            // Clean up profile stat blocks
+            _profileDisposables.Dispose();
+
+            // Cascade disposal to nested entities
+            foreach (var nested in _nestedEntities)
+            {
+                nested.Dispose();
+            }
+            _nestedEntities.Clear();
         }
     }
 }

@@ -4,12 +4,13 @@ using ReactiveSolutions.AttributeSystem.Core.Data;
 using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using ReactiveSolutions.AttributeSystem.Unity;
 using SemanticKeys;
-using System.Collections.Generic;
+using sk;
 using System.Collections;
+using System.Collections.Generic;
 using UniRx;
 using UnityEngine;
+using UnityEngine.Audio;
 using UnityEngine.TestTools;
-using sk;
 
 namespace ReactiveSolutions.AttributeSystem.Tests
 {
@@ -17,8 +18,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
     {
         private GameObject _playerGO;
         private GameObject _swordGO;
-        private AttributeController _playerController;
-        private AttributeController _swordController;
+        private EntityController _playerController;
+        private EntityController _swordController;
 
         [SetUp]
         public void Setup()
@@ -26,8 +27,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _playerGO = new GameObject("Player");
             _swordGO = new GameObject("Sword");
 
-            _playerController = _playerGO.AddComponent<AttributeController>();
-            _swordController = _swordGO.AddComponent<AttributeController>();
+            _playerController = _playerGO.AddComponent<EntityController>();
+            _swordController = _swordGO.AddComponent<EntityController>();
         }
 
         [TearDown]
@@ -44,16 +45,16 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         [Test]
         public void Controller_Initializes_Processor()
         {
-            Assert.IsNotNull(_playerController.Processor, "Processor should be auto-created.");
+            Assert.IsNotNull(_playerController.Instance, "Processor should be auto-created.");
         }
 
         [Test]
         public void Controller_AddAttribute_SetsBaseValue()
         {
             var key = TestKeys.Mock("Health");
-            _playerController.AddAttribute(key, 100f);
+            _playerController.Instance.GetOrCreateAttribute(key, 100f);
 
-            var attr = _playerController.GetAttribute(key);
+            var attr = _playerController.Instance.GetAttribute(key);
             Assert.IsNotNull(attr);
             Assert.AreEqual(100f, attr.BaseValue);
         }
@@ -62,17 +63,17 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void Controller_GetAttributeObservable_ResolvesReactiveValues()
         {
             var key = TestKeys.Mock("Mana");
-            _playerController.AddAttribute(key, 50f);
+            _playerController.Instance.GetOrCreateAttribute(key, 50f);
 
             float lastValue = 0f;
-            _playerController.GetAttributeObservable(key)
-                .SelectMany(a => a.Value)
+            _playerController.Instance.GetAttributeObservable(key)
+                .SelectMany(a => a.ObservableValue)
                 .Subscribe(v => lastValue = v);
 
             Assert.AreEqual(50f, lastValue);
 
             // Update value
-            _playerController.Processor.SetOrUpdateBaseValue(key, 75f);
+            _playerController.Instance.SetOrUpdateBaseValue(key, 75f);
             Assert.AreEqual(75f, lastValue);
         }
 
@@ -81,11 +82,11 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         {
             // 1. Setup Player Strength
             var strKey = TestKeys.Mock("Strength");
-            _playerController.AddAttribute(strKey, 10f);
+            _playerController.Instance.GetOrCreateAttribute(strKey, 10f);
 
             // 2. Setup Sword Damage (Base 5)
             var dmgKey = TestKeys.Mock("Damage");
-            _swordController.AddAttribute(dmgKey, 5f);
+            _swordController.Instance.GetOrCreateAttribute(dmgKey, 5f);
 
             // 3. Add Modifier to Sword: Damage += Owner.Strength * 2
             // We use the raw Processor API as requested (no extensions)
@@ -110,18 +111,18 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // Note: Assuming 'LinearModifier' logic is available via manual instantiation or Factory
             var mod = new LinearModifier(spec);
 
-            _swordController.Processor.AddModifier("Scaling", mod, dmgKey);
+            _swordController.Instance.AddModifier("Scaling", mod, dmgKey);
 
             // 4. Verify initial state (Link missing, so Modifier adds 0 or waits)
             // 5 + 0 = 5
-            Assert.AreEqual(5f, _swordController.GetAttribute(dmgKey).Value.Value, "Should be base value before linking");
+            Assert.AreEqual(5f, _swordController.Instance.GetAttribute(dmgKey).ObservableValue.Value, "Should be base value before linking");
 
             // 5. LINK PROVIDERS
-            _swordController.LinkProvider(ownerKey, _playerController);
+            _swordController.Instance.RegisterExternalProvider(ownerKey, _playerController.Instance);
 
             // 6. Verify Resolved State
             // 5 + (10 * 2) = 25
-            Assert.AreEqual(25f, _swordController.GetAttribute(dmgKey).Value.Value, "Should include Strength scaling after linking");
+            Assert.AreEqual(25f, _swordController.Instance.GetAttribute(dmgKey).ObservableValue.Value, "Should include Strength scaling after linking");
         }
 
         // ========================================================================
@@ -154,7 +155,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             // 1. Setup
             var key = TestKeys.Mock("TestStat");
-            _playerController.AddAttribute(key, 10f);
+            _playerController.Instance.GetOrCreateAttribute(key, 10f);
 
             // 2. Create a "Fake" applied stat block (Manual simulation of Linker internals)
             var activeBlock = new ActiveStatBlock();
@@ -170,12 +171,12 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             };
 
             var mod = new StaticAttributeModifier(spec);
-            var handle = _playerController.Processor.AddModifier("TestSource", mod, key);
+            var handle = _playerController.Instance.AddModifier("TestSource", mod, key);
 
             activeBlock.AddHandle(handle);
 
             // 3. Verify Modifier Applied (10 + 5 = 15)
-            Assert.AreEqual(15f, _playerController.GetAttribute(key).Value.Value);
+            Assert.AreEqual(15f, _playerController.Instance.GetAttribute(key).ObservableValue.Value);
 
             // 4. Simulate Linker Destroy/Unequip
             activeBlock.Dispose();
@@ -183,7 +184,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             yield return null; // Wait a frame (Rx updates are usually immediate, but good practice in UnityTest)
 
             // 5. Verify Modifier Removed (10 + 0 = 10)
-            Assert.AreEqual(10f, _playerController.GetAttribute(key).Value.Value, "Modifier should be removed after disposal");
+            Assert.AreEqual(10f, _playerController.Instance.GetAttribute(key).ObservableValue.Value, "Modifier should be removed after disposal");
         }
     }
 }

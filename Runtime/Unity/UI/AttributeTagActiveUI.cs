@@ -13,7 +13,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity.UI
     public class AttributeTagActiveUI : MonoBehaviour
     {
         [Header("References")]
-        [SerializeField] private AttributeController _sourceController;
+        [SerializeField] private EntityController _sourceController;
         [Tooltip("The GameObject to enable/disable.")]
         [SerializeField] private GameObject _targetObject;
 
@@ -30,7 +30,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity.UI
             {
                 Debug.LogWarning($"{nameof(AttributeTagActiveUI)} on {gameObject.name}: Target Object is set to self. Will stop wprking once set to Disable by this component", this);
             }
-            if (_sourceController == null) _sourceController = GetComponentInParent<AttributeController>();
+            if (_sourceController == null) _sourceController = GetComponentInParent<EntityController>();
         }
 
         private void OnEnable()
@@ -46,7 +46,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity.UI
             _disposables.Clear();
         }
 
-        public void SetSource(AttributeController controller)
+        public void SetSource(EntityController controller)
         {
             _sourceController = controller;
             if (isActiveAndEnabled)
@@ -55,11 +55,11 @@ namespace ReactiveSolutions.AttributeSystem.Unity.UI
             }
         }
 
-        private void BindToController(AttributeController controller)
+        private void BindToController(EntityController controller)
         {
             _disposables.Clear();
 
-            if (controller == null || controller.Processor == null) return;
+            if (controller == null || controller.Instance == null) return;
 
 
             // Observe the tag dictionary directly
@@ -67,23 +67,23 @@ namespace ReactiveSolutions.AttributeSystem.Unity.UI
             // However, we just want to know if the key exists and has count > 0.
 
             // Initial State
-            UpdateState(controller.Processor.HasTag(_tag));
+            UpdateState(controller.Instance.HasTag(_tag));
 
             // Subscribe to dictionary changes
-            controller.Processor.Tags.ObserveCountChanged().Subscribe(_ =>
+            controller.Instance.Tags.ObserveCountChanged().Subscribe(_ =>
             {
                 // This fires on count of KEYS changes, not necessarily the ref count value of a specific key.
                 // But ObserveAdd/Remove/Replace covers key existence.
                 // We also need to check the INT value (ref count) changes if we care about > 0, 
                 // but TagManager removes the key entirely when count hits 0.
                 // So checking Key Existence is sufficient with the current TagManager implementation.
-                UpdateState(controller.Processor.HasTag(_tag));
+                UpdateState(controller.Instance.HasTag(_tag));
             })
             .AddTo(_disposables);
 
             // Also listen specifically for add/remove of our target tag to be responsive
-            controller.Processor.Tags.ObserveAdd().Where(evt => evt.Key == _tag).Subscribe(_ => UpdateState(true)).AddTo(_disposables);
-            controller.Processor.Tags.ObserveRemove().Where(evt => evt.Key == _tag).Subscribe(_ => UpdateState(false)).AddTo(_disposables);
+            controller.Instance.Tags.ObserveAdd().Where(evt => evt.Key == _tag).Subscribe(_ => UpdateState(true)).AddTo(_disposables);
+            controller.Instance.Tags.ObserveRemove().Where(evt => evt.Key == _tag).Subscribe(_ => UpdateState(false)).AddTo(_disposables);
 
             // Note: ObserveReplace isn't strictly needed if removal happens at 0, 
             // but if ref count goes 1->2->1, the key remains.

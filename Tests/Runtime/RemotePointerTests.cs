@@ -11,8 +11,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 {
     public class RemotePointerTests
     {
-        private AttributeProcessor _localProcessor;
-        private AttributeProcessor _remoteProcessor;
+        private Entity _localProcessor;
+        private Entity _remoteProcessor;
 
         // Keys
         private SemanticKey _pointerKey;
@@ -23,8 +23,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         [SetUp]
         public void Setup()
         {
-            _localProcessor = new AttributeProcessor();
-            _remoteProcessor = new AttributeProcessor();
+            _localProcessor = new Entity();
+            _remoteProcessor = new Entity();
 
             _pointerKey = TestKeys.Mock("RemotePointer");
             _targetAttrKey = TestKeys.Mock("TargetStat");
@@ -43,13 +43,13 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _localProcessor.SetPointer(_pointerKey, _targetAttrKey, path);
 
             // Initially, provider is missing, so value should be 0
-            Assert.AreEqual(0, _localProcessor.GetAttribute(_pointerKey).Value.Value);
+            Assert.AreEqual(0, _localProcessor.GetAttribute(_pointerKey).ObservableValue.Value);
 
             // Act: Register Remote Processor as Provider
             _localProcessor.RegisterExternalProvider(_providerKey, _remoteProcessor);
 
             // Assert: Value should now mirror remote (100)
-            Assert.AreEqual(100, _localProcessor.GetAttribute(_pointerKey).Value.Value);
+            Assert.AreEqual(100, _localProcessor.GetAttribute(_pointerKey).ObservableValue.Value);
         }
 
         [Test]
@@ -60,13 +60,13 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _localProcessor.RegisterExternalProvider(_providerKey, _remoteProcessor);
             _localProcessor.SetPointer(_pointerKey, _targetAttrKey, new List<SemanticKey> { _providerKey });
 
-            Assert.AreEqual(50, _localProcessor.GetAttribute(_pointerKey).Value.Value);
+            Assert.AreEqual(50, _localProcessor.GetAttribute(_pointerKey).ObservableValue.Value);
 
             // Act: Unregister Provider
             _localProcessor.UnregisterExternalProvider(_providerKey);
 
             // Assert: Fallback to 0 (Missing Provider)
-            Assert.AreEqual(0, _localProcessor.GetAttribute(_pointerKey).Value.Value);
+            Assert.AreEqual(0, _localProcessor.GetAttribute(_pointerKey).ObservableValue.Value);
         }
 
         [Test]
@@ -77,15 +77,15 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // Connect -> 100
             _remoteProcessor.SetOrUpdateBaseValue(_targetAttrKey, 100);
             _localProcessor.RegisterExternalProvider(_providerKey, _remoteProcessor);
-            Assert.AreEqual(100, _localProcessor.GetAttribute(_pointerKey).Value.Value);
+            Assert.AreEqual(100, _localProcessor.GetAttribute(_pointerKey).ObservableValue.Value);
 
             // Disconnect -> 0
             _localProcessor.UnregisterExternalProvider(_providerKey);
-            Assert.AreEqual(0, _localProcessor.GetAttribute(_pointerKey).Value.Value);
+            Assert.AreEqual(0, _localProcessor.GetAttribute(_pointerKey).ObservableValue.Value);
 
             // Reconnect -> 100
             _localProcessor.RegisterExternalProvider(_providerKey, _remoteProcessor);
-            Assert.AreEqual(100, _localProcessor.GetAttribute(_pointerKey).Value.Value);
+            Assert.AreEqual(100, _localProcessor.GetAttribute(_pointerKey).ObservableValue.Value);
         }
 
         [Test]
@@ -101,19 +101,19 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _localProcessor.AddModifier("TestMod", mod, _pointerKey);
 
             // 1. Verify Local reads 15 (10 Remote + 5 Local Mod)
-            Assert.AreEqual(15, _localProcessor.GetAttribute(_pointerKey).Value.Value);
+            Assert.AreEqual(15, _localProcessor.GetAttribute(_pointerKey).ObservableValue.Value);
 
             // 2. Verify Remote is UNTOUCHED (Remains 10)
             // In the new Stack architecture, modifiers are applied to the result of the pointer,
             // they are not forwarded to the source.
-            Assert.AreEqual(10, _remoteProcessor.GetAttribute(_targetAttrKey).Value.Value);
+            Assert.AreEqual(10, _remoteProcessor.GetAttribute(_targetAttrKey).ObservableValue.Value);
         }
 
         [Test]
         public void RemotePointer_NestedPath()
         {
             // Topology: Local -> Middle -> Remote -> TargetStat(100)
-            var middleProcessor = new AttributeProcessor();
+            var middleProcessor = new Entity();
 
             _remoteProcessor.SetOrUpdateBaseValue(_targetAttrKey, 100);
 
@@ -128,15 +128,15 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _localProcessor.SetPointer(_pointerKey, _targetAttrKey, path);
 
             // Verify resolution A -> B -> C -> Value
-            Assert.AreEqual(100, _localProcessor.GetAttribute(_pointerKey).Value.Value);
+            Assert.AreEqual(100, _localProcessor.GetAttribute(_pointerKey).ObservableValue.Value);
 
             // Break the chain at C (Remove Remote from Middle)
             middleProcessor.UnregisterExternalProvider(_nestedProviderKey);
-            Assert.AreEqual(0, _localProcessor.GetAttribute(_pointerKey).Value.Value);
+            Assert.AreEqual(0, _localProcessor.GetAttribute(_pointerKey).ObservableValue.Value);
 
             // Restore
             middleProcessor.RegisterExternalProvider(_nestedProviderKey, _remoteProcessor);
-            Assert.AreEqual(100, _localProcessor.GetAttribute(_pointerKey).Value.Value);
+            Assert.AreEqual(100, _localProcessor.GetAttribute(_pointerKey).ObservableValue.Value);
         }
 
         // Helper Modifier
@@ -148,7 +148,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             public string SourceId => "SourceIDMock";
             public int Priority => 0;
             public float Modify(float val) => val + _val; // Simple implementation for test
-            public IObservable<float> GetMagnitude(AttributeProcessor context) => Observable.Return(_val);
+            public IObservable<float> GetMagnitude(Entity context) => Observable.Return(_val);
         }
     }
 }

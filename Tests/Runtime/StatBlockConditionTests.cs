@@ -10,7 +10,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 {
     public class StatBlockConditionTests
     {
-        private AttributeProcessor _processor;
+        private Entity _processor;
         private IModifierFactory _factory;
 
         private SemanticKey Strength = TestKeys.Mock("Strength");
@@ -30,7 +30,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         [SetUp]
         public void Setup()
         {
-            _processor = new AttributeProcessor();
+            _processor = new Entity();
             _factory = new ModifierFactory();
         }
 
@@ -48,13 +48,13 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             });
 
             // Act
-            statBlock.ApplyToProcessor(_processor, _factory);
+            statBlock.ApplyToEntity(_processor, _factory);
 
 
             _processor.SetOrUpdateBaseValue(Strength, 0);
 
             // Assert
-            Assert.AreEqual(5, _processor.GetAttribute(Strength).Value.Value);
+            Assert.AreEqual(5, _processor.GetAttribute(Strength).ObservableValue.Value);
         }
 
         [Test]
@@ -78,12 +78,12 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 Arguments = new List<ValueSource> { Const(10) }
             });
 
-            statBlock.ApplyToProcessor(_processor, _factory);
+            statBlock.ApplyToEntity(_processor, _factory);
 
 
             _processor.SetOrUpdateBaseValue(Strength, 0);
 
-            Assert.AreEqual(10, _processor.GetAttribute(Strength).Value.Value);
+            Assert.AreEqual(10, _processor.GetAttribute(Strength).ObservableValue.Value);
         }
 
         [Test]
@@ -110,9 +110,9 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             _processor.SetOrUpdateBaseValue(Strength, 0);
 
-            var activeStatBlock = statBlock.ApplyToProcessor(_processor, _factory);
+            var activeStatBlock = statBlock.ApplyToEntity(_processor, _factory);
 
-            Assert.AreEqual(0, _processor.GetAttribute(Strength).Value.Value);
+            Assert.AreEqual(0, _processor.GetAttribute(Strength).ObservableValue.Value);
         }
 
         [Test]
@@ -137,15 +137,15 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 Arguments = new List<ValueSource> { Const(5) }
             });
 
-            statBlock.ApplyToProcessor(_processor, _factory);
+            statBlock.ApplyToEntity(_processor, _factory);
 
             _processor.SetOrUpdateBaseValue(Stealth, 0);
 
-            Assert.AreEqual(5, _processor.GetAttribute(Stealth).Value.Value);
+            Assert.AreEqual(5, _processor.GetAttribute(Stealth).ObservableValue.Value);
 
             // Add tag -> Should deactivate
             _processor.AddTag(tag);
-            Assert.AreEqual(0, _processor.GetAttribute(Stealth).Value.Value);
+            Assert.AreEqual(0, _processor.GetAttribute(Stealth).ObservableValue.Value);
         }
 
         [Test]
@@ -169,17 +169,17 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 Arguments = new List<ValueSource> { Const(10) }
             });
 
-            statBlock.ApplyToProcessor(_processor, _factory);
+            statBlock.ApplyToEntity(_processor, _factory);
 
 
             _processor.SetOrUpdateBaseValue(DamageBonus, 0);
 
             // 50 > 30 -> Active
-            Assert.AreEqual(10, _processor.GetAttribute(DamageBonus).Value.Value);
+            Assert.AreEqual(10, _processor.GetAttribute(DamageBonus).ObservableValue.Value);
 
             // Lower Health -> Inactive
             _processor.SetOrUpdateBaseValue(Health, 20);
-            Assert.AreEqual(0, _processor.GetAttribute(DamageBonus).Value.Value);
+            Assert.AreEqual(0, _processor.GetAttribute(DamageBonus).ObservableValue.Value);
         }
 
         [Test]
@@ -209,25 +209,25 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 Arguments = new List<ValueSource> { Const(100) }
             });
 
-            statBlock.ApplyToProcessor(_processor, _factory);
+            statBlock.ApplyToEntity(_processor, _factory);
 
 
             _processor.SetOrUpdateBaseValue(Defense, 0);
 
             // Initially false
-            Assert.AreEqual(0, _processor.GetAttribute(Defense).Value.Value);
+            Assert.AreEqual(0, _processor.GetAttribute(Defense).ObservableValue.Value);
 
             // Add A -> True
             _processor.AddTag(tagA);
-            Assert.AreEqual(100, _processor.GetAttribute(Defense).Value.Value);
+            Assert.AreEqual(100, _processor.GetAttribute(Defense).ObservableValue.Value);
 
             // Remove A -> False
             _processor.RemoveTag(tagA);
-            Assert.AreEqual(0, _processor.GetAttribute(Defense).Value.Value);
+            Assert.AreEqual(0, _processor.GetAttribute(Defense).ObservableValue.Value);
 
             // Add B -> True
             _processor.AddTag(tagB);
-            Assert.AreEqual(100, _processor.GetAttribute(Defense).Value.Value);
+            Assert.AreEqual(100, _processor.GetAttribute(Defense).ObservableValue.Value);
         }
     }
 }

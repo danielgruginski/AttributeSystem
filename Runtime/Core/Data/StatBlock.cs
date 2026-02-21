@@ -52,7 +52,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         /// <summary>
         /// Populates a processor and returns an ActiveStatBlock handle to manage the lifecycle of applied modifiers.
         /// </summary>
-        public ActiveStatBlock ApplyToProcessor(AttributeProcessor processor, IModifierFactory factory)
+        public ActiveStatBlock ApplyToEntity(Entity entity, IModifierFactory factory)
         {
             factory ??= new ModifierFactory();
             var activeBlockHandle = new ActiveStatBlock();
@@ -64,7 +64,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
             {
                 if (!string.IsNullOrEmpty(entry.Name))
                 {
-                    processor.SetOrUpdateBaseValue(entry.Name, entry.Value);
+                    entity.SetOrUpdateBaseValue(entry.Name, entry.Value);
                 }
             }
 
@@ -77,7 +77,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
 
             // Default to 'Always' if null
             var conditionStream = ActivationCondition != null
-                ? ConditionEvaluator.Observe(ActivationCondition, processor)
+                ? ConditionEvaluator.Observe(ActivationCondition, entity)
                 : Observable.Return(true);
 
             var subscription = conditionStream
@@ -88,7 +88,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
                     {
                         // ACTIVATE: Apply everything and store the receipt in the SerialDisposable
                         // This automatically disposes any previous receipt if it existed (though Distinct prevents thrashing)
-                        innerHandleSerial.Disposable = ApplyContent(processor, factory);
+                        innerHandleSerial.Disposable = ApplyContent(entity, factory);
                     }
                     else
                     {
@@ -105,7 +105,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         /// <summary>
         /// Helper to apply the actual modifiers/tags. Returns a disposable handle for them.
         /// </summary>
-        private IDisposable ApplyContent(AttributeProcessor processor, IModifierFactory factory)
+        private IDisposable ApplyContent(Entity processor, IModifierFactory factory)
         {
             var contentHandle = new ActiveStatBlock();
 

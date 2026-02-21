@@ -8,7 +8,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 {
     public class AttributePointerTests
     {
-        private AttributeProcessor _processor;
+        private Entity _processor;
 
         // Explicit keys for testing
         private readonly SemanticKey _attackKey = TestKeys.Mock("Attack");
@@ -28,7 +28,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         [SetUp]
         public void Setup()
         {
-            _processor = new AttributeProcessor();
+            _processor = new Entity();
         }
 
         [Test]
@@ -53,7 +53,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             Assert.IsNotNull(attackAttr, "Failed to retrieve attribute via alias (Attack). It returned null.");
 
             // Check Value (Reactive Property)
-            Assert.AreEqual(10, attackAttr.Value.Value);
+            Assert.AreEqual(10, attackAttr.ObservableValue.Value);
         }
 
         [Test]
@@ -77,7 +77,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // However, for this test, let's modify the TARGET and verify the Alias updates.
 
             _processor.SetOrUpdateBaseValue(_intelligenceKey, 20);
-            Assert.AreEqual(20, _processor.GetAttribute(_mainStatKey).Value.Value);
+            Assert.AreEqual(20, _processor.GetAttribute(_mainStatKey).ObservableValue.Value);
         }
 
         [Test]
@@ -88,7 +88,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.SetPointer(_aliasB, _realStat);
             _processor.SetOrUpdateBaseValue(_realStat, 50);
 
-            Assert.AreEqual(50, _processor.GetAttribute(_aliasA).Value.Value);
+            Assert.AreEqual(50, _processor.GetAttribute(_aliasA).ObservableValue.Value);
         }
 
         [Test]
@@ -121,14 +121,14 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.SetOrUpdateBaseValue(_alias, 5); // Hidden base value of alias
 
             // Verify Pointer Active
-            Assert.AreEqual(100, _processor.GetAttribute(_alias).Value.Value);
+            Assert.AreEqual(100, _processor.GetAttribute(_alias).ObservableValue.Value);
 
             // 2. Remove Pointer (Dispose handle)
             handle.Dispose();
 
             // 3. Verify Fallback to Local Base
-            Assert.AreEqual(5, _processor.GetAttribute(_alias).Value.Value);
-            Assert.AreEqual(100, _processor.GetAttribute(_target).Value.Value);
+            Assert.AreEqual(5, _processor.GetAttribute(_alias).ObservableValue.Value);
+            Assert.AreEqual(100, _processor.GetAttribute(_target).ObservableValue.Value);
         }
     }
 }

@@ -36,7 +36,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
 
         public string SourceId => _sourceID;
 
-        public IObservable<float> GetMagnitude(AttributeProcessor processor)
+        public IObservable<float> GetMagnitude(Entity processor)
         {
             // Sort segments by threshold descending so we find the highest met threshold first
             var sortedSegments = _segments.OrderByDescending(s => s.Threshold).ToList();

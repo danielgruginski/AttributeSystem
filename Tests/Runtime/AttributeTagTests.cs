@@ -9,12 +9,12 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 {
     public class AttributeTagTests
     {
-        private AttributeProcessor _processor;
+        private Entity _processor;
 
         [SetUp]
         public void Setup()
         {
-            _processor = new AttributeProcessor();
+            _processor = new Entity();
         }
 
         // ========================================================================
@@ -92,7 +92,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             };
 
             // Apply
-            var handle = block.ApplyToProcessor(_processor, null);
+            var handle = block.ApplyToEntity(_processor, null);
 
             // Assert Tags Applied
             Assert.IsTrue(_processor.HasTag(TestKeys.Mock("Cursed")));
@@ -114,7 +114,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.AddTag(TestKeys.Mock("Buffed")); // Count 1 (Base state)
 
             // Apply Block
-            var handle = block.ApplyToProcessor(_processor, null);
+            var handle = block.ApplyToEntity(_processor, null);
             Assert.AreEqual(2, _processor.Tags[TestKeys.Mock("Buffed")], "Count should be 2 (Base + Block)");
 
             // Dispose Block (Unequip)

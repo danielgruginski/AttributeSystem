@@ -9,16 +9,16 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 {
     public class RemoteTagTests
     {
-        private AttributeProcessor _weaponProcessor;
-        private AttributeProcessor _playerProcessor;
-        private AttributeProcessor _newPlayerProcessor;
+        private Entity _weaponProcessor;
+        private Entity _playerProcessor;
+        private Entity _newPlayerProcessor;
 
         [SetUp]
         public void Setup()
         {
-            _weaponProcessor = new AttributeProcessor();
-            _playerProcessor = new AttributeProcessor();
-            _newPlayerProcessor = new AttributeProcessor();
+            _weaponProcessor = new Entity();
+            _playerProcessor = new Entity();
+            _newPlayerProcessor = new Entity();
         }
 
         [Test]
@@ -44,7 +44,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             };
 
             // 3. Apply
-            var handle = block.ApplyToProcessor(_weaponProcessor, null);
+            var handle = block.ApplyToEntity(_weaponProcessor, null);
 
             // 4. Assert Player has Tag
             Assert.IsTrue(_playerProcessor.HasTag(blessedTag), "Player should have 'Blessed' tag");
@@ -67,7 +67,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 }
             };
 
-            var handle = block.ApplyToProcessor(_weaponProcessor, null);
+            var handle = block.ApplyToEntity(_weaponProcessor, null);
             Assert.IsTrue(_playerProcessor.HasTag(blessedTag));
 
             // 2. Dispose (Unequip)
@@ -91,7 +91,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                     new TagModifierSpec { Tag = blessedTag, TargetPath = new List<SemanticKey> { ownerKey } }
                 }
             };
-            var handle = block.ApplyToProcessor(_weaponProcessor, null);
+            var handle = block.ApplyToEntity(_weaponProcessor, null);
 
             Assert.IsFalse(_playerProcessor.HasTag(blessedTag));
 
@@ -133,8 +133,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 }
             };
 
-            var handle1 = block1.ApplyToProcessor(_weaponProcessor, null);
-            var handle2 = block2.ApplyToProcessor(_weaponProcessor, null);
+            var handle1 = block1.ApplyToEntity(_weaponProcessor, null);
+            var handle2 = block2.ApplyToEntity(_weaponProcessor, null);
 
             // Assert Count 2
             Assert.IsTrue(_playerProcessor.HasTag(stunnedTag));

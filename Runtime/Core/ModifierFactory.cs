@@ -109,7 +109,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// <summary>
         /// Creates the modifier using the provided Factory service.
         /// </summary>
-        public IAttributeModifier Create(AttributeModifierSpec spec, AttributeProcessor context = null)
+        public IAttributeModifier Create(AttributeModifierSpec spec, Entity context = null)
         {
             // 1. Prepare Arguments
             var finalArgs = new List<ValueSource>();

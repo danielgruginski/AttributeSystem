@@ -23,13 +23,13 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
     public class AttributeProcessorTests
     {
-        private AttributeProcessor _processor;
+        private Entity _processor;
         private IModifierFactory _factory;
 
         [SetUp]
         public void Setup()
         {
-            _processor = new AttributeProcessor();
+            _processor = new Entity();
             _factory = new ModifierFactory(); // Instantiate the specific factory implementation for this test context
         }
 
@@ -58,7 +58,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void ExternalProvider_CanBeAccessed_ViaDotNotation()
         {
             // 1. Create a secondary processor (e.g., the Player)
-            var ownerProcessor = new AttributeProcessor();
+            var ownerProcessor = new Entity();
             ownerProcessor.SetOrUpdateBaseValue(TestKeys.Mock("Strength"), 50f);
 
             // 2. Link it to the main processor (e.g., the Sword)
@@ -79,7 +79,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void ExternalProvider_ReactiveObservable_Works()
         {
             // 1. Setup
-            var ownerProcessor = new AttributeProcessor();
+            var ownerProcessor = new Entity();
             _processor.RegisterExternalProvider(TestKeys.Mock("Owner"), ownerProcessor);
 
             float lastValue = 0f;
@@ -89,7 +89,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // 2. Subscribe BEFORE the attribute even exists on the owner
             // This tests your reactive pipeline's robustness
             _processor.GetAttributeObservable(AttributeName, ProviderPath)
-                .SelectMany(attr => attr.Value)
+                .SelectMany(attr => attr.ObservableValue)
                 .Subscribe(val => lastValue = val);
 
             // 3. Now create/update the value on the owner
@@ -125,7 +125,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             // Assert
             // 10 (Base) + 5 (Mod) = 15
-            Assert.AreEqual(15f, _processor.GetAttribute(TestKeys.Mock("Speed")).Value.Value);
+            Assert.AreEqual(15f, _processor.GetAttribute(TestKeys.Mock("Speed")).ObservableValue.Value);
         }
 
         [Test]
@@ -164,10 +164,10 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             block.Modifiers = new List<AttributeModifierSpec> { spec };
 
             // Act
-            block.ApplyToProcessor(_processor, _factory);
+            block.ApplyToEntity(_processor, _factory);
 
             // Assert
-            var finalValue = _processor.GetAttribute(TestKeys.Mock("Speed")).Value.Value;
+            var finalValue = _processor.GetAttribute(TestKeys.Mock("Speed")).ObservableValue.Value;
             Assert.AreEqual(15f, finalValue, $"Expected 15, but got {finalValue}. Check if ModifierType.Multiplicative is handled correctly.");
         }
 
@@ -204,18 +204,18 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             // 3. Verify Intermediate State
             // The pipeline for "Damage" is now waiting for "Owner.Strength".
-            Assert.AreEqual(10f, _processor.GetAttribute(TestKeys.Mock("Damage")).Value.Value,
+            Assert.AreEqual(10f, _processor.GetAttribute(TestKeys.Mock("Damage")).ObservableValue.Value,
                 "Value should hold steady (Base Value) while waiting for external provider");
 
             // 4. Create Owner and Register (The "Late Arrival")
-            var ownerProcessor = new AttributeProcessor();
+            var ownerProcessor = new Entity();
             ownerProcessor.SetOrUpdateBaseValue(TestKeys.Mock("Strength"), 5f); // Owner arrives with 5 Strength
 
             _processor.RegisterExternalProvider(TestKeys.Mock("Owner"), ownerProcessor);
 
             // 5. Assert Final Update
             // Now the link is established, the modifier calculates (5 * 1 + 0 = 5), and Damage becomes 10 + 5 = 15.
-            Assert.AreEqual(15f, _processor.GetAttribute(TestKeys.Mock("Damage")).Value.Value,
+            Assert.AreEqual(15f, _processor.GetAttribute(TestKeys.Mock("Damage")).ObservableValue.Value,
                 "Value should automatically update once the external provider is registered");
         }
 
