@@ -11,7 +11,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
     {
         [SerializeField]
         [Tooltip("The ScriptableObject wrapper containing the entity's blueprint.")]
-        private EntityProfileSO _profileSO;
+        public EntityProfileSO _profileSO;
 
         private Entity _entity;
         public Entity Instance => _entity;
