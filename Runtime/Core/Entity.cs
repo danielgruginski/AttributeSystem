@@ -74,6 +74,24 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 }
             }
 
+            // 4.5 LinkGroup Population
+            foreach (var memberEntry in profile.LinkGroupMembers)
+            {
+                if (memberEntry.ProviderKey != null && memberEntry.GroupKey != null)
+                {
+                    if (_externalProviders.TryGetValue(memberEntry.ProviderKey, out var childEntity))
+                    {
+                        var group = GetOrCreateLinkGroup(memberEntry.GroupKey);
+                        group.AddMember(childEntity);
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[Entity] Could not add '{memberEntry.ProviderKey}' to LinkGroup '{memberEntry.GroupKey}' because it is not a registered provider.");
+                    }
+                }
+            }
+
+
             // 5. Attribute Pointers
             foreach (var pointer in profile.Pointers)
             {

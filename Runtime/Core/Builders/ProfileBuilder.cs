@@ -85,6 +85,16 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
             return this;
         }
 
+        public ProfileBuilder AddNestedEntityToGroup(SemanticKey providerKey, SemanticKey groupKey)
+        {
+            _profile.LinkGroupMembers.Add(new LinkGroupMemberEntry
+            {
+                ProviderKey = providerKey,
+                GroupKey = groupKey
+            });
+            return this;
+        }
+
         /// <summary>
         /// Creates a nested entity inline using another builder.
         /// </summary>

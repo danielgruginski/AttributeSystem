@@ -74,9 +74,9 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
         /// <summary>
         /// Quickly configures this modifier as a Flat Additive modifier (e.g., +10 Health).
         /// </summary>
-        public ModifierBuilder MakeFlat(SemanticKey targetAttr, float value)
+        public ModifierBuilder MakeFlat(SemanticKey targetAttr, float value, params SemanticKey[] targetPath)
         {
-            return SetTarget(targetAttr)
+            return SetTarget(targetAttr, targetPath)
                   .SetLogic(sk.Modifiers.Static, ModifierType.Additive)
                   .AddConstantArg(value);
         }
@@ -84,9 +84,9 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
         /// <summary>
         /// Quickly configures this modifier as a Multiplier (e.g., 0.5f for +50% scaling).
         /// </summary>
-        public ModifierBuilder MakeMultiplier(SemanticKey targetAttr, float percentage)
+        public ModifierBuilder MakeMultiplier(SemanticKey targetAttr, float percentage, params SemanticKey[] targetPath)
         {
-            return SetTarget(targetAttr)
+            return SetTarget(targetAttr, targetPath)
                   .SetLogic(sk.Modifiers.Static, ModifierType.Multiplicative)
                   .AddConstantArg(percentage);
         }
@@ -105,6 +105,17 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
                   .SetLogic(sk.Modifiers.Linear, ModifierType.Additive) // Assuming "Linear" is registered in your factory
                   .AddAttributeArg(sourceAttr, sourcePath) // Arg 0: The attribute reference
                   .AddConstantArg(multiplier);             // Arg 1: The coefficient
+        }
+
+        /// <summary>
+        /// Quickly configures this modifier to linearly scale based on another attribute, and applies it to a remote target.
+        /// </summary>
+        public ModifierBuilder MakeRemoteLinearScaling(SemanticKey targetAttr, SemanticKey[] targetPath, SemanticKey sourceAttr, float multiplier, params SemanticKey[] sourcePath)
+        {
+            return SetTarget(targetAttr, targetPath)
+                  .SetLogic(sk.Modifiers.Linear, ModifierType.Additive)
+                  .AddAttributeArg(sourceAttr, sourcePath)
+                  .AddConstantArg(multiplier);
         }
 
         public AttributeModifierSpec Build() => _spec;

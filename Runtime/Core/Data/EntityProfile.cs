@@ -48,6 +48,18 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
     }
 
 
+    [Serializable]
+    public struct LinkGroupMemberEntry
+    {
+        [Tooltip("The key of the LinkGroup to add the entity to.")]
+        public SemanticKey GroupKey;
+
+        [Tooltip("The ProviderKey of the nested entity to add to the group.")]
+        public SemanticKey ProviderKey;
+    }
+
+
+
     /// <summary>
     /// A pure C# POCO blueprint for initializing an Entity.
     /// Fully serializable to JSON/YAML for saving, loading, or modding.
@@ -77,6 +89,10 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         [Header("Nested Entities")]
         [Tooltip("Child entities generated and owned completely by this profile (registered as External Providers).")]
         public List<NestedEntityEntry> NestedEntities = new List<NestedEntityEntry>();
+
+        [Header("Link Group Members")]
+        [Tooltip("Maps nested entities (by ProviderKey) to LinkGroups (by GroupKey) upon initialization.")]
+        public List<LinkGroupMemberEntry> LinkGroupMembers = new List<LinkGroupMemberEntry>();
 
         [Header("Attribute Pointers")]
         [Tooltip("Map local attribute aliases to other attributes (local or remote).")]
