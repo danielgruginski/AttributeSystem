@@ -290,5 +290,22 @@ namespace ReactiveSolutions.AttributeSystem.Core
             }
             _nestedEntities.Clear();
         }
+
+        public void AddActiveStatBlock(StatBlock statBlock, IModifierFactory modifierFactory)
+        {
+            Debug.Assert(statBlock != null, "Entity: Cannot apply a null StatBlock.");
+            Debug.Assert(modifierFactory != null, "Entity: ModifierFactory is required to apply a StatBlock.");
+
+            if (statBlock == null || modifierFactory == null) return;
+
+            // 'this' works perfectly here assuming Entity implements IAttributeController
+            var handle = statBlock.ApplyToEntity(this, modifierFactory);
+
+            if (handle != null)
+            {
+                // Store the handle so it can be cleaned up when the Entity dies or the buff expires
+                _profileDisposables.Add(handle);
+            }
+        }
     }
 }

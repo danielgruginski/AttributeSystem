@@ -53,10 +53,10 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
     /// Fully serializable to JSON/YAML for saving, loading, or modding.
     /// </summary>
     [Serializable]
-    public class EntityProfile : ScriptableObject
+    public class EntityProfile
     {
 
-        public string ProfileName;
+        public string name;
 
         [Header("Base Stats")]
         [Tooltip("Initial attributes and their base values.")]

@@ -1,9 +1,10 @@
 ﻿using ReactiveSolutions.AttributeSystem.Core.Data;
 using SemanticKeys;
+using sk; // Included to match your test files (e.g., Modifiers.Static)
 using System;
 using System.Collections.Generic;
+using Unity.VisualScripting.YamlDotNet.Core.Tokens;
 using UnityEngine;
-using sk; // Included to match your test files (e.g., Modifiers.Static)
 
 namespace ReactiveSolutions.AttributeSystem.Core.Builders
 {
@@ -43,14 +44,16 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
             return this;
         }
 
-        public StatBlockBuilder AddModifier(SemanticKey targetAttr, SemanticKey logicType, ModifierType type, params ValueSource[] args)
+        public StatBlockBuilder AddModifier(SemanticKey targetAttr, SemanticKey logicType, ModifierType type, List<ValueSource> args, List<SemanticKey> path = null)
         {
             _statBlock.Modifiers.Add(new AttributeModifierSpec
             {
                 TargetAttribute = targetAttr,
                 LogicType = logicType,
                 Type = type,
-                Arguments = new List<ValueSource>(args)
+                Arguments = new List<ValueSource>(args),
+                TargetPath = path
+
             });
             return this;
         }
@@ -60,7 +63,8 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
         /// </summary>
         public StatBlockBuilder AddFlatModifier(SemanticKey targetAttr, float value)
         {
-            return AddModifier(targetAttr, sk.Modifiers.Static, ModifierType.Additive, Const(value));
+            var argList = new List<ValueSource> { Const(value) };
+            return AddModifier(targetAttr, sk.Modifiers.Static, ModifierType.Additive, argList);
         }
 
         /// <summary>
@@ -68,7 +72,8 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
         /// </summary>
         public StatBlockBuilder AddMultiplierModifier(SemanticKey targetAttr, float percentage)
         {
-            return AddModifier(targetAttr, sk.Modifiers.Static, ModifierType.Multiplicative, Const(percentage));
+            var argList = new List<ValueSource> { Const(percentage) };
+            return AddModifier(targetAttr, sk.Modifiers.Static, ModifierType.Multiplicative, argList);
         }
 
         public StatBlockBuilder AddTag(SemanticKey tag)
