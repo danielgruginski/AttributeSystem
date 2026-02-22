@@ -98,8 +98,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.SetPointer(_keyA, _keyB);
 
             // Expect the error log or warning depending on implementation
-            // The logic inside AttributeProcessor.SetPointer checks IsLocallyCircular.
-            LogAssert.Expect(LogType.Error, $"[AttributeProcessor] Circular pointer detected: {_keyB} -> {_keyA}");
+            // The logic inside Entity.SetPointer checks IsLocallyCircular.
+            LogAssert.Expect(LogType.Error, $"[Entity] Circular pointer detected: {_keyB} -> {_keyA}");
 
             // Attempt to point B -> A (Loop)
             _processor.SetPointer(_keyB, _keyA);
@@ -108,7 +108,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         [Test]
         public void SelfCircularDependency_IsPrevented()
         {
-            LogAssert.Expect(LogType.Warning, $"[AttributeProcessor] Cannot point alias '{_keyA}' to itself.");
+            LogAssert.Expect(LogType.Warning, $"[Entity] Cannot point alias '{_keyA}' to itself.");
             _processor.SetPointer(_keyA, _keyA);
         }
 
