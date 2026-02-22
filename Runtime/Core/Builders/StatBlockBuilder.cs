@@ -59,6 +59,26 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
         }
 
         /// <summary>
+        /// Creates a modifier inline using the ModifierBuilder API.
+        /// </summary>
+        public StatBlockBuilder AddModifier(Action<ModifierBuilder> buildAction)
+        {
+            var modBuilder = ModifierBuilder.Create();
+            buildAction?.Invoke(modBuilder);
+            return AddModifier(modBuilder.Build());
+        }
+
+        /// <summary>
+        /// Adds a fully built modifier specification.
+        /// </summary>
+        public StatBlockBuilder AddModifier(AttributeModifierSpec spec)
+        {
+            _statBlock.Modifiers.Add(spec);
+            return this;
+        }
+
+
+        /// <summary>
         /// Quick helper to add a basic static additive modifier (+10 Health).
         /// </summary>
         public StatBlockBuilder AddFlatModifier(SemanticKey targetAttr, float value)
