@@ -32,7 +32,7 @@ Paste: https://github.com/danielgruginski/AttributeSystem.git
 
 In your main project, tag your static constants class:
 
-using DanielGruginski.AttributeSystem;
+using ReactiveSolutions.AttributeSystem;
 
 [AttributeProvider]
 public static class MyAttributes 
