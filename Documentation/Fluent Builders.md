@@ -1,11 +1,11 @@
 ﻿
 # Fluent Builders
 
-The Fluent Builder API provides a powerful, code-driven way to generate `StatBlock` POCOs (Plain Old C# Objects) and `EntityProfile`s.
+The Fluent Builder API provides a powerful, code-driven way to generate `StatBlock` POCOs (Plain Old C# Objects), `EntityProfile`s and `Effect`s.
 
 While the Unity Inspector is great for visually tweaking single entities, it quickly becomes tedious when managing hundreds of items, characters, or procedurally generated content. The Fluent Builders allow you to define complex relational data, nested entities, and reactive modifiers entirely in C#, giving you compile-time safety, auto-complete, and the ability to use loops and variables to mass-generate content.
 
-The builders are also how JSON files are read: each property of a StatBlock or profile file is a builder call (`"tags": ["Magical"]` is `AddTag(Tags.Magical)`). See [JSON Format](JSON%20Format.md).
+The builders are also how JSON files are read: each property of a StatBlock, profile or effect file is a builder call (`"tags": ["Magical"]` is `AddTag(Tags.Magical)`). See [JSON Format](JSON%20Format.md).
 
 ## 1. StatBlockBuilder
 
@@ -155,7 +155,32 @@ EntityProfile bossProfile = ProfileBuilder.Create("GiantSkeletonBoss")
 
 When the profile is applied, the nested weapon becomes its own `Entity`, registered as a provider under `Links.RightHand` (so the pointer can reach it) and disposed together with the boss. `AddInnateStatBlock` and `AddNestedEntity` also accept an already-built `StatBlock` or `EntityProfile`, or the ID of a JSON file: `AddInnateStatBlock("Auras/Boss")` and `AddNestedEntity(Links.RightHand, "Weapons/BoneCleaver")` (see [EntityProfile](EntityProfile.md)).
 
-## 4. Integration Workflow (The Data/Asset Split)
+## 4. EffectBuilder
+
+The `EffectBuilder` creates [Effects](Effects.md): one-off changes from a source entity to a target, such as a hit, a spell or a potion. Everything an effect reads or changes is reached through its source or its target: `Effect.Source(Stats.SpellPower)`, `Effect.Target(Stats.Health)`.
+
+```csharp
+Effect fireball = EffectBuilder.Create("Fireball")
+    .SetCondition(StatBlockCondition.LacksTag(Tags.Silenced, EffectRoles.Source)) // Not while the caster is Silenced
+    .AddCost(Effect.Source(Stats.Mana), 15f)                                      // Paid first, or nothing happens
+    .Reduce(Effect.Target(Stats.Health), new LinearLogic { Input = Effect.Source(Stats.SpellPower), Coefficient = 1.5f })
+    .Build();
+
+Effect potion = EffectBuilder.Create("Healing Potion")
+    .Add(Effect.Target(Stats.Health), 40f)
+    .Build();
+
+EffectResult result = fireball.Apply(mage, goblin);
+```
+
+-   `Add`, `Reduce` and `Set` take an amount: a number, an attribute (`Effect.Source(Stats.AttackPower)`) or a logic. After it come an optional condition and chance (0 to 1): `.Reduce(Effect.Target(Stats.Health), 10f, chance: Effect.Source(Stats.CritChance))`.
+    
+-   `AddAction(target, type, logic, condition, chance)` is the general form.
+    
+-   A path that doesn't start with the source or the target throws an `ArgumentException`.
+    
+
+## 5. Integration Workflow (The Data/Asset Split)
 
 The builders create their objects in memory: `StatBlockBuilder` outputs a plain, serializable `StatBlock`, and `ProfileBuilder` a plain, serializable `EntityProfile`. You can use these built objects in two primary ways:
 
@@ -167,7 +192,7 @@ The builders create their objects in memory: `StatBlockBuilder` outputs a plain,
     
     ```
     
-2.  **Editor Generation Scripts:** Write a custom Unity Editor script that builds the data in code and saves it as JSON files with `StatBlockJson.ToJson` and `EntityProfileJson.ToJson`. The Stat Block Editor, the Entity Profile Editor and the ID dropdowns (such as an `EntityController`'s **Profile Id**) then pick them up. An ID is the file's path in its folder without the extension.
+2.  **Editor Generation Scripts:** Write a custom Unity Editor script that builds the data in code and saves it as JSON files with `StatBlockJson.ToJson`, `EntityProfileJson.ToJson` and `EffectJson.ToJson`. The editor windows and the ID dropdowns (such as an `EntityController`'s **Profile Id**) then pick them up. An ID is the file's path in its folder without the extension.
     
     ```csharp
     // Example inside an Editor script:

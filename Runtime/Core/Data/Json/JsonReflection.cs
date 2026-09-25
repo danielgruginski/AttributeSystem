@@ -119,8 +119,10 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
     /// </summary>
     internal static class LogicTypes
     {
-        /// <summary>The names of a modifier's other properties, which a logic can't use as its short name.</summary>
-        private static readonly string[] ReservedNames = { "target", "type", "priority", "source" };
+        /// <summary>
+        /// The names of a modifier's or an effect action's other properties, which a logic can't use as its short name.
+        /// </summary>
+        private static readonly string[] ReservedNames = { "target", "type", "priority", "source", "condition", "chance" };
 
         private static readonly object Gate = new object();
         private static Dictionary<string, List<Type>> _byName;

@@ -11,8 +11,8 @@ using UnityEngine;
 namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
 {
     /// <summary>
-    /// Builds StatBlocks and EntityProfiles from JSON by calling their builders: each property of the file is a
-    /// builder call ("tags": ["Magical"] is AddTag(Magical), a modifier is AddModifier(...)). Keys are written by
+    /// Builds StatBlocks, EntityProfiles and Effects from JSON by calling their builders: each property of the file is
+    /// a builder call ("tags": ["Magical"] is AddTag(Magical), a modifier is AddModifier(...)). Keys are written by
     /// name and resolved with the file's "keys" table. Every error says where it is: its path in the file, line
     /// and column. See Documentation/JSON Format.md.
     /// </summary>
@@ -25,7 +25,9 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
             "profile", "templates", "parentKey", "baseAttributes", "pools", "innateTags", "linkGroups", "nestedEntities",
             "pointers", "innateStatBlocks", "keys"
         };
+        private static readonly string[] EffectProperties = { "effect", "condition", "costs", "actions", "keys" };
         private static readonly string[] ModifierProperties = { "target", "type", "priority", "source" };
+        private static readonly string[] ActionProperties = { "target", "type", "condition", "chance" };
         private static readonly string[] ConditionKinds = { "hasTag", "lacksTag", "compare", "all", "any" };
 
         private const string AttributeExample = "an attribute such as \"Strength\" or \"Owner/Strength\"";
@@ -34,9 +36,13 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
 
         private readonly KeyTableReader _keys;
 
-        private DataJsonReader(KeyTableReader keys)
+        // In an effect, every path starts with a role: "Source/Mana", "Target/Health".
+        private readonly bool _roles;
+
+        private DataJsonReader(KeyTableReader keys, bool roles)
         {
             _keys = keys;
+            _roles = roles;
         }
 
         public static StatBlock ReadStatBlock(string json, Func<string, SemanticKey> findKey)
@@ -51,11 +57,17 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
             return Create(root, findKey).Profile(root, "", isRoot: true);
         }
 
-        private static DataJsonReader Create(JsonNode root, Func<string, SemanticKey> findKey)
+        public static Effect ReadEffect(string json, Func<string, SemanticKey> findKey)
+        {
+            var root = JsonParser.Parse(json);
+            return Create(root, findKey, roles: true).Effect(root, "");
+        }
+
+        private static DataJsonReader Create(JsonNode root, Func<string, SemanticKey> findKey, bool roles = false)
         {
             if (root.Kind != JsonKind.Object) throw Error(root, "", $"expected an object ({{ ... }}), found {root.Describe()}");
             CheckDuplicates(root, "");
-            return new DataJsonReader(new KeyTableReader(root.Find("keys"), findKey));
+            return new DataJsonReader(new KeyTableReader(root.Find("keys"), findKey), roles);
         }
 
         // ---------------------------------------------------------------- StatBlocks and profiles
@@ -126,8 +138,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
                         break;
 
                     default:
-                        throw UnknownProperty(property, at, StatBlockProperties,
-                            isRoot && Match(property.Key, ProfileProperties) != null ? " (is this an entity profile file?)" : "");
+                        throw UnknownProperty(property, at, StatBlockProperties, isRoot ? FileKindHint(property.Key, "StatBlock") : "");
                 }
             }
 
@@ -253,8 +264,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
                         break;
 
                     default:
-                        throw UnknownProperty(property, at, ProfileProperties,
-                            isRoot && Match(property.Key, StatBlockProperties) != null ? " (is this a StatBlock file?)" : "");
+                        throw UnknownProperty(property, at, ProfileProperties, isRoot ? FileKindHint(property.Key, "profile") : "");
                 }
             }
 
@@ -292,6 +302,121 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
 
             if (!hasMax) throw Error(node, path, "a pool needs a \"max\": an attribute such as \"MaxHealth\", or a number");
             return (max, onMaxChange);
+        }
+
+        /// <summary>
+        /// " (is this an effect file?)" when <paramref name="property"/> belongs to other kinds of file than
+        /// <paramref name="kind"/> (a StatBlock, a profile or an effect), or "".
+        /// </summary>
+        private static string FileKindHint(string property, string kind)
+        {
+            var kinds = new List<string>();
+            if (kind != "StatBlock" && Match(property, StatBlockProperties) != null) kinds.Add("a StatBlock");
+            if (kind != "profile" && Match(property, ProfileProperties) != null) kinds.Add("an entity profile");
+            if (kind != "effect" && Match(property, EffectProperties) != null) kinds.Add("an effect");
+            return kinds.Count == 0 ? "" : $" (is this {string.Join(" or ", kinds)} file?)";
+        }
+
+        // ---------------------------------------------------------------- Effects
+
+        private Effect Effect(JsonNode node, string path)
+        {
+            ExpectObject(node, path, "an effect");
+            CheckDuplicates(node, path);
+
+            var name = node.Find("effect");
+            var builder = EffectBuilder.Create(name != null ? String(name, Child(path, "effect")) ?? "" : "");
+
+            foreach (var property in node.Properties)
+            {
+                string at = Child(path, property.Key);
+                var value = property.Value;
+
+                switch (Match(property.Key, EffectProperties))
+                {
+                    case "effect":
+                    case "keys":
+                        break;
+
+                    case "condition":
+                        builder.SetCondition(Condition(value, at));
+                        break;
+
+                    case "costs":
+                        foreach (var entry in Map(value, at, "resources and how much of each is spent, e.g. { \"Source/Mana\": 15 }"))
+                        {
+                            string entryPath = Child(at, entry.Key);
+                            var resource = ParsePath(entry.Key, entry.Value, entryPath, isName: true);
+                            builder.AddCost(resource, ValueSource(entry.Value, entryPath));
+                        }
+                        break;
+
+                    case "actions":
+                        foreach (var (item, itemPath) in Array(value, at, "an array of actions"))
+                        {
+                            Action(builder, item, itemPath);
+                        }
+                        break;
+
+                    default:
+                        throw UnknownProperty(property, at, EffectProperties, FileKindHint(property.Key, "effect"));
+                }
+            }
+
+            return builder.Build();
+        }
+
+        private void Action(EffectBuilder builder, JsonNode node, string path)
+        {
+            ExpectObject(node, path, "an action, e.g. { \"target\": \"Target/Health\", \"type\": \"Reduce\", \"value\": 10 }");
+            CheckDuplicates(node, path);
+
+            var target = new AttributeReference(SemanticKey.None);
+            var type = EffectActionType.Add;
+            StatBlockCondition condition = null;
+            ValueSource chance = null;
+            ModifierLogic logic = null;
+            string logicProperty = null;
+
+            foreach (var property in node.Properties)
+            {
+                string at = Child(path, property.Key);
+                var value = property.Value;
+
+                switch (Match(property.Key, ActionProperties))
+                {
+                    case "target":
+                        target = Reference(value, at, AttributeExample);
+                        break;
+                    case "type":
+                        type = (EffectActionType)Enum(typeof(EffectActionType), value, at);
+                        break;
+                    case "condition":
+                        condition = Condition(value, at);
+                        break;
+                    case "chance":
+                        chance = ValueSource(value, at);
+                        break;
+                    default:
+                        // Any other property is the amount's logic, named after its class: "linear": { ... }
+                        var logicType = LogicTypes.Find(property.Key, out string ambiguity);
+                        if (logicType == null)
+                        {
+                            throw NameError(property, at, ambiguity ??
+                                $"'{property.Key}' is neither an action property ({string.Join(", ", ActionProperties)}) nor a logic. " +
+                                $"The logic names are: {string.Join(", ", LogicTypes.AllNames())}");
+                        }
+                        if (logicProperty != null)
+                        {
+                            throw NameError(property, at, $"an action has one logic, but this one has both '{logicProperty}' and '{property.Key}'");
+                        }
+                        logicProperty = property.Key;
+                        logic = Logic(logicType, value, at);
+                        break;
+                }
+            }
+
+            builder.AddAction(target, type, logic, condition, chance);
         }
 
         // ---------------------------------------------------------------- Modifiers and logic
@@ -683,14 +808,37 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
         {
             if (node.Kind == JsonKind.Null) return new AttributeReference(SemanticKey.None);
             if (node.Kind != JsonKind.String) throw Error(node, path, $"expected {expected}, found {node.Describe()}");
+            return ParsePath(node.Text, node, path, isName: false);
+        }
 
-            var steps = node.Text.Split('/');
+        /// <summary>
+        /// The path in <paramref name="text"/>: a value, or a property name (<paramref name="isName"/>) such as the
+        /// "Source/Mana" of a cost. In an effect, its first step is a role: Source or Target.
+        /// </summary>
+        private AttributeReference ParsePath(string text, JsonNode at, string path, bool isName)
+        {
+            JsonFormatException PathError(string message) =>
+                isName && at.NameLine > 0 ? new JsonFormatException($"{path}: {message}", at.NameLine, at.NameColumn) : Error(at, path, message);
+
+            var steps = text.Split('/');
             var keys = new List<SemanticKey>(steps.Length);
-            foreach (var step in steps)
+            for (int i = 0; i < steps.Length; i++)
             {
-                string name = step.Trim();
-                if (name.Length == 0) throw Error(node, path, $"\"{node.Text}\" has an empty step: a path is key names separated by '/'");
-                keys.Add(_keys.Resolve(name, node, path));
+                string name = steps[i].Trim();
+                if (name.Length == 0) throw PathError($"\"{text}\" has an empty step: a path is key names separated by '/'");
+
+                if (_roles && i == 0)
+                {
+                    var role = EffectRoles.Find(name);
+                    if (role == SemanticKey.None || steps.Length < 2)
+                    {
+                        throw PathError($"in an effect, \"{text}\" must start with Source or Target, the entity it is on: " +
+                                        $"e.g. \"Target/{(role == SemanticKey.None ? name : "Health")}\"");
+                    }
+                    keys.Add(role);
+                    continue;
+                }
+                keys.Add(_keys.Resolve(name, at, path));
             }
 
             var target = keys[keys.Count - 1];

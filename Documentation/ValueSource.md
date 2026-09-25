@@ -2,7 +2,7 @@
 
 ## Overview
 
-`ValueSource` is the fundamental "Atom" of the Attribute System's modifier logic. It represents a single numerical input of a logic class (e.g., the "5" in "+5 Damage" or the "Strength" in "+10% of Strength"; see [Modifier Logic](Modifier%20Logic.md)). Stat block conditions and pools use it too.
+`ValueSource` is the fundamental "Atom" of the Attribute System's modifier logic. It represents a single numerical input of a logic class (e.g., the "5" in "+5 Damage" or the "Strength" in "+10% of Strength"; see [Modifier Logic](Modifier%20Logic.md)). Stat block conditions, pools and effects use it too.
 
 It can be one of three things:
 
@@ -145,7 +145,7 @@ var mitigated = new RatioLogic
 
 ### 5. In JSON Files
 
-In StatBlock and entity profile files, a constant is a number and an attribute is its name, after the names of its provider path's steps: a Linear logic whose Input is the Dexterity of the Owner's Driver, with a Coefficient of 15, is
+In StatBlock, entity profile and effect files, a constant is a number and an attribute is its name, after the names of its provider path's steps: a Linear logic whose Input is the Dexterity of the Owner's Driver, with a Coefficient of 15, is
 
 ```json
 "linear": { "input": "Owner/Driver/Dexterity", "coefficient": 15 }
@@ -170,6 +170,8 @@ A logic computes one value from its inputs, and each input can be a logic of its
 -   **They work wherever a ValueSource does.** That covers the inputs of logic, both sides of a condition's comparison (`{ "compare": [{ "ratio": { "dividend": "Health", "divisor": "MaxHealth" } }, "<", 0.5] }`) and a pool's maximum. For a pool's maximum, write the formula in `"max"`: `"Health": { "max": { "linear": ... } }`.
     
 -   **They stay reactive.** A change of any input, however deep, recomputes the formula.
+    
+-   **Effects combine the source's and the target's attributes** in one formula this way (see [Effects](Effects.md)).
     
 -   **In the Inspector**, set an input's mode to **Formula** and pick its logic. The logic's fields appear below it.
 

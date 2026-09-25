@@ -72,6 +72,8 @@ health.Depleted.Subscribe(_ => Debug.Log("The hero falls")); // Each time Health
 
 `AttributeProgressBar` works with pools as with any attribute: bind it to Health and MaxHealth.
 
+Damage and healing can also be data: an [effect](Effects.md) whose action Reduces or Adds to `"Target/Health"` changes the pool the same way, and a cost of `"Source/Mana"` spends like `TrySpend`.
+
 ## Good to Know
 
 -   **Don't set a pool's attribute in base attributes.** A pool starts full; to start it at another amount, call `Set` after the entity is created. A base value written after the pool exists counts as using the pool, and is kept within the maximum it has at that moment.

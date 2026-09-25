@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e68a6191930f610478778e7936293652, type: 3}
+  m_Name: EffectRoles
+  m_EditorClassIdentifier: 
+  _domainName: Effect Roles
+  _guid: 6deb057c-36ea-4382-860a-14006f138443
+  _keys:
+  - _name: Source
+    _guid: 00ad666d-e0de-4b82-bda8-034cd7de8f46
+    _description: The entity an effect comes from (the attacker, the caster). Paths in effects start with Source or Target.
+  - _name: Target
+    _guid: ae486b69-3a61-473f-9530-1fc6497b681e
+    _description: The entity an effect is applied to. Paths in effects start with Source or Target.
