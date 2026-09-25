@@ -21,18 +21,11 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         private EntityController _controller;
         private List<ActiveStatBlock> _activeBlocks = new List<ActiveStatBlock>();
 
-        // Cache the factory so we don't recreate it for every block
-        private IModifierFactory _modifierFactory;
-
         private void Awake()
         {
             if(_controller == null)
             { 
                 _controller = GetComponent<EntityController>();
-            }
-            if(_modifierFactory == null)
-            { 
-                _modifierFactory = new ModifierFactory(); 
             }
         }
 
@@ -98,7 +91,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
             StatBlockJsonLoader.LoadIntoStatBlock(statBlockID, block);
 
             // Apply the block and store the handle
-            var activeHandle = block.ApplyToEntity(_controller.Instance, _modifierFactory);
+            var activeHandle = block.ApplyToEntity(_controller.Instance);
             _activeBlocks.Add(activeHandle);
         }
     }

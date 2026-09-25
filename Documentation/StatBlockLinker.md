@@ -74,8 +74,6 @@ There is no "apply on awake" option: the listed blocks are always applied in `St
     -   _Note:_ Does not re-apply. Call it before `Start`, or call `ApplyStatBlocks()` afterwards (which also removes the blocks from the previous target).
         
 
-The linker creates its own `ModifierFactory` (with the built-in logic types) in `Awake`; there is no method to inject a different factory.
-
 ## Usage Examples
 
 ### 1. Standard Usage (Equipment)
@@ -119,7 +117,7 @@ The class manages a private `List<ActiveStatBlock> _activeBlocks`, one handle pe
     ```csharp
     ClearStatBlocks(); // Clean up old stats
     // ...then, for each loaded block:
-    var activeHandle = block.ApplyToEntity(_controller.Instance, _modifierFactory); // Apply new
+    var activeHandle = block.ApplyToEntity(_controller.Instance); // Apply new
     _activeBlocks.Add(activeHandle); // Save receipt
     
     ```

@@ -36,29 +36,26 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// Applies a StatBlock to every member of this group.
         /// </summary>
         /// <param name="statBlock">The data to apply.</param>
-        /// <param name="modifierFactory">Factory required to instantiate modifiers from the StatBlock.</param>
         /// <param name="condition">Optional condition (e.g. Tags) to filter application.</param>
-        public IDisposable ApplyStatBlock(StatBlock statBlock, IModifierFactory modifierFactory, StatBlockCondition condition = null)
+        public IDisposable ApplyStatBlock(StatBlock statBlock, StatBlockCondition condition = null)
         {
-            return new GroupStatBlockLogic(this, statBlock, modifierFactory, condition);
+            return new GroupStatBlockLogic(this, statBlock, condition);
         }
 
         private class GroupStatBlockLogic : IDisposable
         {
             private readonly LinkGroup _group;
             private readonly StatBlock _statBlock;
-            private readonly IModifierFactory _modifierFactory;
             private readonly StatBlockCondition _condition;
 
             // Map members to their specific logic subscription
             private readonly Dictionary<Entity, IDisposable> _memberSubscriptions = new Dictionary<Entity, IDisposable>();
             private readonly CompositeDisposable _groupLifecycle = new CompositeDisposable();
 
-            public GroupStatBlockLogic(LinkGroup group, StatBlock statBlock, IModifierFactory modifierFactory, StatBlockCondition condition)
+            public GroupStatBlockLogic(LinkGroup group, StatBlock statBlock, StatBlockCondition condition)
             {
                 _group = group;
                 _statBlock = statBlock;
-                _modifierFactory = modifierFactory;
                 _condition = condition;
 
                 // 1. Existing members
@@ -94,7 +91,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                         {
                             return Observable.Create<Unit>(observer =>
                             {
-                                var activeBlock = _statBlock.ApplyToEntity(member, _modifierFactory);
+                                var activeBlock = _statBlock.ApplyToEntity(member);
                                 return activeBlock; // This disposable is called when Switch unsubscribes
                             });
                         }

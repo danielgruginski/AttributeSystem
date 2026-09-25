@@ -1,0 +1,95 @@
+# Modifier Logic Documentation
+
+## Overview
+
+Every modifier in a StatBlock (an `AttributeModifierSpec`) has a **Logic**: a small serializable class that computes the modifier's value. The modifier's **Type** then decides what the value does to the attribute (add to it, multiply it, replace it, clamp it) and its **Priority** decides when; see [Attribute Modifiers](Attribute%20Modifiers.md).
+
+-   **Nothing to register.** Every `[Serializable]` class that derives from `ModifierLogic` and has a parameterless constructor appears in the **Logic** dropdown of the Inspector and the Stat Block Editor, and is saved with the StatBlock.
+    
+-   **Named inputs.** Each input is its own field (`Input`, `Coefficient`, ...), so there is no argument order to remember.
+    
+-   **Any settings.** Inputs are `ValueSource`s (a constant, or an attribute's value), and a logic class can also have plain numbers, lists, curves or any other serializable field.
+    
+
+Namespace: `ReactiveSolutions.AttributeSystem.Core.Modifiers`. Keys such as `Stats.Damage` come from classes generated from KeyDomains (see [Semantic Keys](Semantic%20Keys.md)).
+
+## Built-in Logic
+
+| Logic | Fields | Value |
+| ----- | ----- | ----- |
+| `ValueLogic` | `Value` | The value itself: a constant (`+5`) or an attribute (`+ Strength`). The default for new modifiers. |
+| `LinearLogic` | `Input`, `Coefficient` (1), `Addend` | `Input * Coefficient + Addend` |
+| `PolynomialLogic` | `Input`, `Power` (1), `Scale` (1), `Flat` | `Input ^ Power * Scale + Flat` |
+| `ClampLogic` | `Input`, `Min`, `Max` | `Input` limited to [Min, Max]. To limit the attribute itself (e.g. Health to MaxHealth), use a modifier of Type **Clamp Max** instead. |
+| `MinLogic` / `MaxLogic` | `A`, `B` | The smaller / larger of A and B. |
+| `FloorLogic` | `Input` | `Input` rounded down to a whole number. |
+| `StepLogic` | `Input`, `Threshold` | 1 if `Input >= Threshold`, otherwise 0. |
+| `RatioLogic` | `Dividend`, `Divisor` (1) | `Dividend / Divisor`, or `Dividend` if the divisor is (almost) 0. |
+| `ExponentialLogic` | `Base` (1), `Exponent` (1) | `Base ^ Exponent` |
+| `DiminishingReturnsLogic` | `Input`, `MaxBonus`, `SoftCap` | `MaxBonus * Input / (Input + SoftCap)`: approaches MaxBonus, half of it at `Input = SoftCap`. A negative input counts as 0, and the result is 0 when `Input + SoftCap <= 0`. |
+| `ScaledTriangularLogic` | `Input`, `Scale` (1) | `Scale * 0.5 * (sqrt(1 + 8 * Input / Scale) - 1)`, never more than `Input`. A negative input counts as 0. |
+| `SegmentedLogic` | `Input`, `Default` (1), `Segments` | Breakpoints: the `Value` of the highest `Threshold` that Input reaches, or `Default` below all of them. |
+
+All fields are `ValueSource`s except `SegmentedLogic`'s `Default` and `Segments`. Defaults are in parentheses; the others default to 0. The dropdown shows the names without the "Logic" suffix (e.g. "Diminishing Returns").
+
+## Writing Your Own Logic
+
+For a formula over inputs, derive from `FormulaLogic`: list the `ValueSource` fields in `Inputs`, and compute the value from their current values. It is recomputed whenever one of them changes.
+
+```csharp
+using System;
+using System.Collections.Generic;
+using ReactiveSolutions.AttributeSystem.Core;
+using ReactiveSolutions.AttributeSystem.Core.Modifiers;
+
+// +2 per meter closer than MaxRange
+[Serializable]
+public class DistanceBonusLogic : FormulaLogic
+{
+    public ValueSource Distance = ValueSource.Const(0f);
+    public float MaxRange = 10f;
+    public float BonusPerMeter = 2f;
+
+    protected override IEnumerable<ValueSource> Inputs => new[] { Distance };
+
+    protected override float Compute(IList<float> inputs) =>
+        inputs[0] >= MaxRange ? 0f : (MaxRange - inputs[0]) * BonusPerMeter;
+}
+```
+
+-   Keep the `[Serializable]` attribute and a parameterless constructor, or the class can't be picked in the Inspector or saved.
+    
+-   For a value that doesn't come from inputs (e.g. from a game system), derive from `ModifierLogic` and implement `IObservable<float> Observe(Entity context)`: the value on subscribe, then every change. Attribute inputs should be read from `context`.
+    
+-   A logic object is shared data: a StatBlock applies the same object to every entity, so `Observe` must not change its fields.
+    
+-   The copy made by `Clone()` is shallow. Override it if each copy needs its own lists or other objects (as `SegmentedLogic` does for `Segments`).
+    
+
+Use your logic like the built-ins, in the Inspector or in code:
+
+```csharp
+var scope = StatBlockBuilder.Create("Sniper Scope")
+    .AddModifier(Stats.Damage, new DistanceBonusLogic { Distance = ValueSource.FromAttribute(Stats.TargetDistance) })
+    .Build();
+```
+
+To apply logic without a StatBlock, wrap it in a `LogicModifier` (see [Attribute Modifiers](Attribute%20Modifiers.md#logicmodifier)).
+
+## Where Inputs Are Read
+
+A StatBlock's modifiers read their attribute inputs from the entity the block is applied to, even when `TargetPath` sends the modifier to another entity's attribute. For example, a sword's StatBlock can have a modifier with target `Owner` / `Strength` whose input is the sword's own `Sharpness`. Give an input a provider path to read from elsewhere (e.g. `Owner` / `Strength`, read from the sword).
+
+## Saving, and Renaming a Logic Class
+
+StatBlocks store the logic with `[SerializeReference]`: assets, scenes and JSON files record each logic's class name, namespace and assembly. If you rename or move a logic class, add Unity's `[MovedFrom]` attribute (namespace `UnityEngine.Scripting.APIUpdating`) so existing data still finds it:
+
+```csharp
+[Serializable, MovedFrom(false, sourceClassName: "ProximityBonusLogic")]
+public class DistanceBonusLogic : FormulaLogic
+{
+    ...
+}
+```
+
+In the Inspector, a modifier whose logic class can't be found shows a warning. When its StatBlock is applied, it is skipped with a warning (`skipped a modifier on '...' with no Logic`).

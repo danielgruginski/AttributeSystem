@@ -59,7 +59,7 @@ private ActiveStatBlock _activeHandle;
 public void Equip()
 {
     // Apply returns the handle
-    _activeHandle = myStatBlock.ApplyToEntity(myEntity, factory);
+    _activeHandle = myStatBlock.ApplyToEntity(myEntity);
 }
 
 public void Unequip()
@@ -78,7 +78,7 @@ If you are writing a custom spell system (`Stats.Intelligence` and `Stats.FireDa
 ```csharp
 using Game.Constants; // Namespace of your generated key classes (Stats)
 using ReactiveSolutions.AttributeSystem.Core;
-using ReactiveSolutions.AttributeSystem.Core.Modifiers; // StaticAttributeModifier
+using ReactiveSolutions.AttributeSystem.Core.Modifiers; // LogicModifier, ValueLogic
 using UnityEngine;
 
 public class FireBuffSpell : MonoBehaviour
@@ -91,21 +91,13 @@ public class FireBuffSpell : MonoBehaviour
         _buffHandle = new ActiveStatBlock();
 
         // Add Effect 1: +10 Intelligence
-        var mod1 = target.AddModifier("Spell_Int", new StaticAttributeModifier(new AttributeModifierSpec
-        {
-            SourceId = "Spell_Int",
-            Type = ModifierType.Additive,
-            Arguments = { ValueSource.Const(10f) }
-        }), Stats.Intelligence);
+        var mod1 = target.AddModifier("Spell_Int",
+            new LogicModifier(new ValueLogic(10f), ModifierType.Additive, sourceId: "Spell_Int"), Stats.Intelligence);
         _buffHandle.AddHandle(mod1);
 
         // Add Effect 2: +5% Fire Damage
-        var mod2 = target.AddModifier("Spell_Fire", new StaticAttributeModifier(new AttributeModifierSpec
-        {
-            SourceId = "Spell_Fire",
-            Type = ModifierType.Multiplicative,
-            Arguments = { ValueSource.Const(1.05f) }
-        }), Stats.FireDamage);
+        var mod2 = target.AddModifier("Spell_Fire",
+            new LogicModifier(new ValueLogic(1.05f), ModifierType.Multiplicative, sourceId: "Spell_Fire"), Stats.FireDamage);
         _buffHandle.AddHandle(mod2);
     }
 

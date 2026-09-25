@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using ReactiveSolutions.AttributeSystem.Unity;
 using ReactiveSolutions.AttributeSystem.Core;
+using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using System.Linq;
 using System.Collections.Generic;
 using SemanticKeys;
@@ -167,7 +168,10 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         {
             EditorGUILayout.BeginHorizontal();
 
-            var typeName = mod.GetType().Name;
+            // For modifiers from StatBlocks (or LogicModifier), the logic class says more than the wrapper's.
+            var typeName = mod is LogicModifier logicModifier
+                ? ModifierLogic.GetDisplayName(logicModifier.Logic.GetType())
+                : mod.GetType().Name;
             var opType = mod.Type.ToString();
 
             // Basic Info

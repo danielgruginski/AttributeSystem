@@ -31,8 +31,6 @@ namespace ReactiveSolutions.AttributeSystem.Unity
             }
         }
 
-        private IModifierFactory _modifierFactory;
-
         private void Awake()
         {
             InitializeEntity();
@@ -49,15 +47,14 @@ namespace ReactiveSolutions.AttributeSystem.Unity
             if (_entity != null) return;
 
             _entity = new Entity();
-            _modifierFactory = new ModifierFactory();
 
             if (!string.IsNullOrEmpty(ProfileId))
             {
                 // The loader logs an error if the JSON can't be loaded; the entity then starts from the inline profile.
-                _entity.ApplyProfile(EntityProfileJsonLoader.Load(ProfileId), _modifierFactory);
+                _entity.ApplyProfile(EntityProfileJsonLoader.Load(ProfileId));
             }
 
-            _entity.ApplyProfile(Profile, _modifierFactory);
+            _entity.ApplyProfile(Profile);
         }
     }
 }

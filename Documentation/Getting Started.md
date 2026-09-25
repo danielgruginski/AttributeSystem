@@ -2,13 +2,11 @@
 
 Welcome! This guide will walk you through setting up a basic character, creating an equipment item (a Sword) using the visual editor, and displaying stats on the screen.
 
-**Before you start:** attribute names, aliases and modifier logic types are [Semantic Keys](Semantic%20Keys.md): you pick them from dropdowns in the Inspector and reference them in code through generated classes. Create these KeyDomains (**Create > SemanticKeys > Key Domain**):
+**Before you start:** attribute names and aliases are [Semantic Keys](Semantic%20Keys.md): you pick them from dropdowns in the Inspector and reference them in code through generated classes. Create these KeyDomains (**Create > SemanticKeys > Key Domain**):
 
 -   `Stats` with the keys `Health`, `MaxHealth`, `Strength` and `Damage`. Select it and click **Generate Static Class**: the script below uses `Stats.Health` and `Stats.Strength`.
     
 -   `Links` with the key `Owner`.
-    
--   `Modifiers` with the keys `Static` and `Linear`. The package doesn't ship this domain; the modifier factory finds the built-in logic types by key name.
     
 
 ## 1. Setup Your Character
@@ -63,9 +61,9 @@ We will use the visual editor to create our Sword's stats.
         
     -   **Target Attribute:** Select **"Damage"**.
         
-    -   **Logic Type:** Select **"Static"**.
+    -   **Type:** Leave **Additive**.
         
-    -   **Value:** Set to **5**.
+    -   **Logic:** Leave **"Value"** (the default), and set its **Value** to **5**.
         
 4.  **Add Strength Scaling:**
     
@@ -73,7 +71,7 @@ We will use the visual editor to create our Sword's stats.
         
     -   **Target Attribute:** Select **"Damage"**.
         
-    -   **Logic Type:** Select **"Linear"**. The parameters are now labelled **Input**, **Coefficient** and **Addend**.
+    -   **Logic:** Select **"Linear"**. Its fields are **Input**, **Coefficient** and **Addend**.
         
     -   **Input:** Change Mode to **Attribute**.
         
@@ -119,7 +117,7 @@ Now, let's put the sword in the game.
     
 -   The **ContextLinker** told the Sword that "Owner" is the Player (in `Awake`).
     
--   The system calculated Damage: `5 (Base) + (10 (Player Strength) * 0.5) = 10`. The order in which the scripts run doesn't matter: until the Player's Strength exists it reads as 0, and Damage updates as soon as it is set.
+-   The system calculated Damage: `5 (the Value modifier) + 10 (Player Strength) * 0.5 = 10`. The order in which the scripts run doesn't matter: until the Player's Strength exists it reads as 0, and Damage updates as soon as it is set.
     
 
 ## 4. Display Stats (UI)
@@ -143,7 +141,9 @@ Finally, let's see the result.
 
 -   **Profiles:** Instead of setting stats in a script, save them as a JSON profile with **Window > Attribute System > Entity Profile Editor** and pick it in the `EntityController`'s **Profile Id** (see [EntityProfile](EntityProfile.md)).
     
--   **Health Bars:** Use `AttributeProgressBar` to display "Health" / "MaxHealth".
+-   **Health Bars:** Use `AttributeProgressBar` to display "Health" / "MaxHealth". To keep Health from going above MaxHealth, give it a modifier of Type **Clamp Max** whose Value reads MaxHealth (see [Attribute Modifiers](Attribute%20Modifiers.md)).
+    
+-   **Your Own Logic:** Write a small `[Serializable]` class to compute a modifier's value; it shows up in the **Logic** dropdown (see [Modifier Logic](Modifier%20Logic.md)).
     
 -   **Custom Logic:** Inherit from `AttributeUIBehaviour` to make damage numbers pop up.
     

@@ -57,7 +57,7 @@ Both are read once, when the entity is created; changing them later has no effec
         
 -   **`void InitializeEntity()`**
     
-    -   Creates the `Entity` and `ModifierFactory`, then applies the **Profile Id**'s JSON profile (if set) and the inline **Profile**.
+    -   Creates the `Entity`, then applies the **Profile Id**'s JSON profile (if set) and the inline **Profile**.
         
     -   _Note:_ This is called automatically in `Awake()` or by the first access to `Instance`, whichever comes first, and does nothing once the entity exists. You rarely need to call it yourself.
         
@@ -66,7 +66,7 @@ Both are read once, when the entity is created; changing them later has no effec
 
 Because the wrapper methods have been removed, all interaction goes directly through the `.Instance` property.
 
-The examples are methods of a `MonoBehaviour` and assume `using ReactiveSolutions.AttributeSystem.Core;`, `using ReactiveSolutions.AttributeSystem.Unity;`, `using UniRx;` and `using Game.Constants;`. `Stats.Health` and `Links.Owner` are keys from classes generated from KeyDomains (see [Semantic Keys](Semantic%20Keys.md)).
+The examples are methods of a `MonoBehaviour` and assume `using ReactiveSolutions.AttributeSystem.Core;`, `using ReactiveSolutions.AttributeSystem.Core.Modifiers;`, `using ReactiveSolutions.AttributeSystem.Unity;`, `using UniRx;` and `using Game.Constants;`. `Stats.Health` and `Links.Owner` are keys from classes generated from KeyDomains (see [Semantic Keys](Semantic%20Keys.md)).
 
 ### 1. Listening to a Stat (in a Character Script)
 
@@ -108,8 +108,8 @@ public void TakeDamage(float amount)
 {
     var controller = GetComponent<EntityController>();
     
-    // A modifier that adds -amount to Health (no registered logic type needed)
-    var damageMod = new FunctionalAttributeModifier("CombatSystem", ValueSource.Const(amount), value => -value, ModifierType.Additive);
+    // A modifier that adds -amount to Health
+    var damageMod = new LogicModifier(new ValueLogic(-amount), ModifierType.Additive, sourceId: "CombatSystem");
     
     // AddModifier returns an IDisposable handle: disposing it removes the modifier again
     controller.Instance.AddModifier("CombatSystem", damageMod, Stats.Health);

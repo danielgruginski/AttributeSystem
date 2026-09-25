@@ -1,6 +1,8 @@
-﻿using SemanticKeys;
+﻿using ReactiveSolutions.AttributeSystem.Core.Modifiers;
+using SemanticKeys;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace ReactiveSolutions.AttributeSystem.Core.Data
@@ -62,7 +64,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
     /// Entity Profile Editor and load it with EntityProfileJsonLoader, or author it inline on an EntityController.
     /// </summary>
     [Serializable]
-    public class EntityProfile
+    public class EntityProfile : ISerializationCallbackReceiver
     {
         public string ProfileName;
 
@@ -96,5 +98,13 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         [Header("Attribute Pointers")]
         [Tooltip("Map local attribute aliases to other attributes (local or remote).")]
         public List<PointerEntry> Pointers = new List<PointerEntry>();
+
+        public void OnBeforeSerialize() { }
+
+        // An inline StatBlock duplicated in the Inspector can share modifier logic objects with the original.
+        public void OnAfterDeserialize() =>
+            ModifierLogic.Unshare((InnateStatBlocks ?? new List<StatBlock>())
+                .Where(block => block?.Modifiers != null)
+                .SelectMany(block => block.Modifiers));
     }
 }

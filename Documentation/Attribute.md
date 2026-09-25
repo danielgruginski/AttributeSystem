@@ -10,7 +10,7 @@ Unlike a simple `float` variable, an `Attribute` is a **Reactive Stream**. It ma
 
 -   **Reactive Pipeline:** Uses `UniRx` to combine multiple data streams (Base Value + Modifiers) into a single output stream.
     
--   **Priority-Based Sorting:** Modifiers are strictly ordered before calculation, ensuring consistent math: by `Priority` (ascending, lower runs first), then by `Type` (Additive, then Multiplicative, then Override), then by the order they were added. At equal priority, flat bonuses are therefore applied before multipliers, no matter which was added first.
+-   **Priority-Based Sorting:** Modifiers are strictly ordered before calculation, ensuring consistent math: by `Priority` (ascending, lower runs first), then by `Type` (Additive, Multiplicative, Override, Clamp Min, Clamp Max), then by the order they were added. At equal priority, flat bonuses are therefore applied before multipliers, and clamps last, no matter which was added first.
     
 -   **Incremental Updates:** Each modifier is subscribed once, when it is added. Adding or removing a modifier only inserts or removes that modifier, and a base-value change only recalculates; nothing is torn down or re-subscribed.
     
@@ -21,6 +21,10 @@ Unlike a simple `float` variable, an `Attribute` is a **Reactive Stream**. It ma
     -   **Multiplicative:** `Val *= Mod`
         
     -   **Override:** `Val = Mod`
+        
+    -   **Clamp Min:** `Val = Max(Val, Mod)` (at least Mod)
+        
+    -   **Clamp Max:** `Val = Min(Val, Mod)` (at most Mod, e.g. Health at most MaxHealth)
         
 -   **Missing Inputs Read as 0:** A modifier argument or pointer target that names an attribute or provider that doesn't exist (yet) reads as 0 instead of blocking the pipeline, and the real value is picked up as soon as it appears.
     
@@ -107,7 +111,7 @@ The core of this class is `Recalculate()`, which runs `CalculatePipeline()` when
     
     -   **Input:** The latest source value (base value or pointer target) and the latest magnitude of every modifier.
         
-    -   **Sorting:** Done once, on insertion: `Priority` (ascending), then `Type` (Additive, then Multiplicative, then Override), then insertion order. For example, with a base of 10, a `+10` and a `x2` at the same priority give `(10 + 10) * 2 = 40` in either insertion order; if the `x2` has priority 0 and the `+10` has priority 10, the result is `(10 * 2) + 10 = 30`.
+    -   **Sorting:** Done once, on insertion: `Priority` (ascending), then `Type` (Additive, Multiplicative, Override, Clamp Min, Clamp Max), then insertion order. For example, with a base of 10, a `+10` and a `x2` at the same priority give `(10 + 10) * 2 = 40` in either insertion order; if the `x2` has priority 0 and the `+10` has priority 10, the result is `(10 * 2) + 10 = 30`.
         
     -   **Execution:** The loop iterates through the sorted modifiers applying operations. A modifier whose magnitude hasn't emitted yet contributes nothing:
         
@@ -121,6 +125,8 @@ The core of this class is `Recalculate()`, which runs `CalculatePipeline()` when
                 case ModifierType.Additive: result += slot.Magnitude; break;
                 case ModifierType.Multiplicative: result *= slot.Magnitude; break;
                 case ModifierType.Override: result = slot.Magnitude; break;
+                case ModifierType.ClampMin: result = Math.Max(result, slot.Magnitude); break;
+                case ModifierType.ClampMax: result = Math.Min(result, slot.Magnitude); break;
             }
         }
         
@@ -133,9 +139,9 @@ The core of this class is `Recalculate()`, which runs `CalculatePipeline()` when
 
 -   **Circular dependencies:** If an attribute's final value feeds back into its own calculation (directly, or through modifiers and pointers on other attributes or entities), each update re-enters the calculation until the value settles. If it doesn't settle within `Attribute.MaxRecalculationDepth` (32) nested re-entries, the attribute stops and logs `[Attribute] Circular dependency on '<name>': ...` instead of overflowing the stack. A modifier on `MaxHealth` whose input is `MaxHealth` with a coefficient of 1 or more never settles; slowly converging loops can hit the limit too.
     
--   **Modifiers that read their own attribute see its _final_ value.** A "+10% of self" modifier (Linear on `MaxHealth` with Input = `MaxHealth`, Coefficient = 0.1) converges to a fixed point: 111.1 for a base of 100 (`100 + 0.1 * 111.1`), not 110. For an exact +10%, use a `Multiplicative` modifier of 1.1 (it scales the running value), or read a separate attribute that holds the base amount (e.g. `Stats.BaseMaxHealth`).
+-   **Modifiers that read their own attribute see its _final_ value.** That is how a circular definition resolves: a "+10% of self" modifier (Linear on `MaxHealth` with Input = `MaxHealth`, Coefficient = 0.1) settles at the fixed point 111.1 for a base of 100 (`100 + 0.1 * 111.1`). To add 10% once, use a `Multiplicative` modifier of 1.1 (it scales the running value: 110).
     
--   **There is no "clamp the running value" operation yet.** A `Clamp` modifier reads its inputs' final values, so an Override that clamps an attribute using its own value (`Health = Clamp(Health, 0, MaxHealth)`) is a self-reference: it latches at the clamped value.
+-   **Clamp with the clamp types, not with a self-reference.** An Override whose value clamps the attribute's own value (`Health = Clamp(Health, 0, MaxHealth)`) is a self-reference and latches at the clamped value. A `ClampMax` modifier whose value is `MaxHealth` limits the running value instead, and lets it go down again.
     
 -   **Intermediate values:** Updates are pushed one dependency at a time, so an attribute that depends on the same source through two paths can briefly emit an intermediate value before settling.
     
@@ -145,10 +151,9 @@ The core of this class is `Recalculate()`, which runs `CalculatePipeline()` when
 While `Attribute` is rarely instantiated directly (the `Entity` handles that), understanding its direct usage is useful for debugging. `Stats.Health` comes from a static class generated from a KeyDomain; see [Semantic Keys](Semantic%20Keys.md).
 
 ```csharp
-using System.Collections.Generic;
 using Game.Constants; // The namespace of your generated key classes (Stats)
 using ReactiveSolutions.AttributeSystem.Core;
-using ReactiveSolutions.AttributeSystem.Core.Modifiers; // StaticAttributeModifier
+using ReactiveSolutions.AttributeSystem.Core.Modifiers; // LogicModifier, ValueLogic
 using UniRx;
 using UnityEngine;
 
@@ -165,12 +170,7 @@ health.SetBaseValue(150f);
 // Logs: "Health is: 150"
 
 // 4. Adding a Modifier (e.g. +10 Flat Bonus)
-var bonus = new StaticAttributeModifier(new AttributeModifierSpec
-{
-    SourceId = "FlatBonus",
-    Type = ModifierType.Additive,
-    Arguments = new List<ValueSource> { ValueSource.Const(10f) }
-});
+var bonus = new LogicModifier(new ValueLogic(10f), ModifierType.Additive, sourceId: "FlatBonus");
 var handle = health.AddModifier(bonus);
 // Logs: "Health is: 160"
 

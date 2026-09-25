@@ -11,7 +11,7 @@ An `EntityProfile` is the blueprint of an entity: its base attributes, innate ta
 -   build it in code with `ProfileBuilder` (see [Fluent Builders](Fluent%20Builders.md)).
     
 
-`entity.ApplyProfile(profile, modifierFactory)` applies it (see [Entity](Entity.md)). Applying never modifies the profile, so one profile can create any number of entities.
+`entity.ApplyProfile(profile)` applies it (see [Entity](Entity.md)). Applying never modifies the profile, so one profile can create any number of entities.
 
 Namespace: `ReactiveSolutions.AttributeSystem.Core.Data`. Keys such as `Links.RightHand` come from classes generated from KeyDomains (see [Semantic Keys](Semantic%20Keys.md)).
 
@@ -46,7 +46,7 @@ using ReactiveSolutions.AttributeSystem.Core;
 using ReactiveSolutions.AttributeSystem.Core.Data;
 
 var goblin = new Entity();
-goblin.ApplyProfile(EntityProfileJsonLoader.Load("Monsters/Goblin"), new ModifierFactory()); // A null profile is ignored
+goblin.ApplyProfile(EntityProfileJsonLoader.Load("Monsters/Goblin")); // A null profile is ignored
 ```
 
 The JSON stores each key with its GUID, cached name and domain GUID. Read [Identity vs. value](Semantic%20Keys.md#identity-vs-value) before editing files by hand.

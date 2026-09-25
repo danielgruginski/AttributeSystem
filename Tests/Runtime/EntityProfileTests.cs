@@ -1,8 +1,8 @@
 ﻿using NUnit.Framework;
 using ReactiveSolutions.AttributeSystem.Core;
+using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using ReactiveSolutions.AttributeSystem.Core.Data;
 using SemanticKeys;
-using sk; // Using the namespace identified in your previous tests
 using System.Collections.Generic;
 using UniRx;
 using UnityEngine;
@@ -11,7 +11,6 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 {
     public class EntityProfileTests
     {
-        private ModifierFactory _modifierFactory;
         private SemanticKey _healthKey;
         private SemanticKey _undeadTag;
         private SemanticKey _inventoryGroupKey;
@@ -21,7 +20,6 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         [SetUp]
         public void Setup()
         {
-            _modifierFactory = new ModifierFactory();
             _healthKey = new SemanticKey("Health", "Health", null);
             _undeadTag = new SemanticKey("Undead", "Undead", null);
             _inventoryGroupKey = new SemanticKey("Inventory", "Inventory", null);
@@ -40,10 +38,9 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             var spec = new AttributeModifierSpec
             {
-                LogicType = Modifiers.Static,
                 TargetAttribute = targetAttr,
                 Type = ModifierType.Additive,
-                Arguments = new List<ValueSource> { Const(value) }
+                Logic = new ValueLogic(Const(value))
             };
 
             statBlock.Modifiers.Add(spec);
@@ -62,7 +59,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             profile.BaseAttributes.Add(new BaseAttributeEntry { Attribute = _healthKey, BaseValue = 150f });
 
             var processor = new Entity();
-            processor.ApplyProfile(profile, _modifierFactory);
+            processor.ApplyProfile(profile);
 
             var attr = processor.GetAttribute(_healthKey);
             Assert.IsNotNull(attr);
@@ -76,7 +73,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             profile.InnateTags.Add(_undeadTag);
 
             var processor = new Entity();
-            processor.ApplyProfile(profile, _modifierFactory);
+            processor.ApplyProfile(profile);
 
             Assert.IsTrue(processor.HasTag(_undeadTag));
         }
@@ -88,7 +85,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             profile.LinkGroups.Add(_inventoryGroupKey);
 
             var processor = new Entity();
-            processor.ApplyProfile(profile, _modifierFactory);
+            processor.ApplyProfile(profile);
 
             // Accessing GetLinkGroup returns the initialized group without creating a new one implicitly
             var group = processor.GetLinkGroup(_inventoryGroupKey);
@@ -108,7 +105,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             profile.InnateStatBlocks.Add(statBlock);
 
             var processor = new Entity();
-            processor.ApplyProfile(profile, _modifierFactory);
+            processor.ApplyProfile(profile);
 
             // Total should be 150
             Assert.AreEqual(150f, processor.GetAttribute(_healthKey).ObservableValue.Value);
@@ -132,7 +129,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             });
 
             var processor = new Entity();
-            processor.ApplyProfile(profile, _modifierFactory);
+            processor.ApplyProfile(profile);
 
             var aliasAttr = processor.GetAttribute(maxHealthAlias);
             Assert.IsNotNull(aliasAttr);
@@ -156,7 +153,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             // 3. Apply to Processor
             var processor = new Entity();
-            processor.ApplyProfile(charProfile, _modifierFactory);
+            processor.ApplyProfile(charProfile);
 
             // 4. Test nested attribute access via path
             var path = new List<SemanticKey> { _rightHandKey };
@@ -174,7 +171,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             profile.InnateStatBlocks.Add(buffBlock);
 
             var processor = new Entity();
-            processor.ApplyProfile(profile, _modifierFactory);
+            processor.ApplyProfile(profile);
 
             Assert.AreEqual(100f, processor.GetAttribute(_healthKey).ObservableValue.Value);
 
@@ -201,7 +198,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             });
 
             var processor = new Entity();
-            processor.ApplyProfile(charProfile, _modifierFactory);
+            processor.ApplyProfile(charProfile);
 
             var path = new List<SemanticKey> { _rightHandKey };
 

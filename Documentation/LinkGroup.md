@@ -42,12 +42,11 @@ inventory.RemoveMember(shield);
 
 ### 2. Applying a StatBlock to the Group
 
-To apply a `StatBlock` to all members of a group, use the `ApplyStatBlock` method. This method requires the `StatBlock` itself and an `IModifierFactory` (e.g. a `new ModifierFactory()`, which knows the built-in modifier types).
+To apply a `StatBlock` to all members of a group, use the `ApplyStatBlock` method.
 
 ```csharp
 // Applies the "Sharpen" buff to all weapons in the inventory
-var modifierFactory = new ModifierFactory();
-IDisposable buffHandle = inventory.ApplyStatBlock(sharpenStatBlock, modifierFactory);
+IDisposable buffHandle = inventory.ApplyStatBlock(sharpenStatBlock);
 
 // When the buff ends (e.g., the spell expires), simply Dispose it:
 buffHandle.Dispose(); // Clears the buff from ALL items in the group
@@ -72,7 +71,7 @@ StatBlockCondition isLegalItemCondition = new StatBlockCondition
 };
 
 // Apply the blessing to the group with the condition
-IDisposable blessingHandle = inventory.ApplyStatBlock(lawBlessingStatBlock, modifierFactory, isLegalItemCondition);
+IDisposable blessingHandle = inventory.ApplyStatBlock(lawBlessingStatBlock, isLegalItemCondition);
 
 ```
 

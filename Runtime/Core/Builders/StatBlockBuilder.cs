@@ -1,9 +1,6 @@
 ﻿using ReactiveSolutions.AttributeSystem.Core.Data;
+using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using SemanticKeys;
-using System;
-using System.Collections.Generic;
-using UnityEngine;
-using sk; // Included to match your test files (e.g., Modifiers.Static)
 
 namespace ReactiveSolutions.AttributeSystem.Core.Builders
 {
@@ -28,10 +25,6 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
             return builder;
         }
 
-        //private SemanticKey Key(string name) => new SemanticKey(name, name, null);
-
-        private ValueSource Const(float val) => new ValueSource { Mode = ValueSource.SourceMode.Constant, ConstantValue = val };
-
         public StatBlockBuilder SetCondition(StatBlockCondition.Mode mode, SemanticKey tag, bool invert = false)
         {
             _statBlock.ActivationCondition = new StatBlockCondition
@@ -43,14 +36,18 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
             return this;
         }
 
-        public StatBlockBuilder AddModifier(SemanticKey targetAttr, SemanticKey logicType, ModifierType type, params ValueSource[] args)
+        /// <summary>
+        /// Adds a modifier to <paramref name="targetAttr"/>: <paramref name="logic"/> computes the value, and
+        /// <paramref name="type"/> says what it does to the attribute (e.g. new LinearLogic { ... }, ModifierType.Additive).
+        /// </summary>
+        public StatBlockBuilder AddModifier(SemanticKey targetAttr, ModifierLogic logic, ModifierType type = ModifierType.Additive, int priority = 0)
         {
             _statBlock.Modifiers.Add(new AttributeModifierSpec
             {
                 TargetAttribute = targetAttr,
-                LogicType = logicType,
+                Logic = logic,
                 Type = type,
-                Arguments = new List<ValueSource>(args)
+                Priority = priority
             });
             return this;
         }
@@ -60,7 +57,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
         /// </summary>
         public StatBlockBuilder AddFlatModifier(SemanticKey targetAttr, float value)
         {
-            return AddModifier(targetAttr, sk.Modifiers.Static, ModifierType.Additive, Const(value));
+            return AddModifier(targetAttr, new ValueLogic(value));
         }
 
         /// <summary>
@@ -69,7 +66,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
         /// </summary>
         public StatBlockBuilder AddMultiplierModifier(SemanticKey targetAttr, float percentage)
         {
-            return AddModifier(targetAttr, sk.Modifiers.Static, ModifierType.Multiplicative, Const(1f + percentage));
+            return AddModifier(targetAttr, new ValueLogic(1f + percentage), ModifierType.Multiplicative);
         }
 
         public StatBlockBuilder AddTag(SemanticKey tag)

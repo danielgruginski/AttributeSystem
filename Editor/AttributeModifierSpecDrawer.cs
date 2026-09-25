@@ -1,84 +1,40 @@
-﻿using ReactiveSolutions.AttributeSystem.Core;
-using ReactiveSolutions.AttributeSystem.Core.Data;
-using SemanticKeys;
-using System.Collections.Generic;
-using System.Linq;
+using ReactiveSolutions.AttributeSystem.Core;
 using UnityEditor;
 using UnityEngine;
 
-
-
 namespace ReactiveSolutions.AttributeSystem.Editor
 {
+    /// <summary>
+    /// Draws an AttributeModifierSpec in a box: target, Type and Priority, Source Id, then the Logic dropdown
+    /// and the chosen logic's fields.
+    /// </summary>
     [CustomPropertyDrawer(typeof(AttributeModifierSpec))]
     public class AttributeModifierSpecDrawer : PropertyDrawer
     {
-        private float LineH => EditorGUIUtility.singleLineHeight;
-        private float Spacing => EditorGUIUtility.standardVerticalSpacing;
+        private const float Padding = 5f;
 
-        /// <summary>
-        /// The factory key for the spec's LogicType: the SemanticKey's string value ("_value"), e.g. "Linear".
-        /// </summary>
-        private static string GetLogicKey(SerializedProperty logicTypeProp)
-        {
-            var valueProp = logicTypeProp?.FindPropertyRelative("_value");
-            string key = valueProp != null ? valueProp.stringValue : null;
-            return string.IsNullOrEmpty(key) ? "Static" : key;
-        }
-
-        /// <summary>
-        /// A warning (unknown logic type) or a "remove unused arguments" button is shown above the arguments.
-        /// </summary>
-        private static bool HasArgumentsNotice(SerializedProperty argsProp, string logicKey)
-        {
-            if (!ModifierFactory.TryGetParameterNames(logicKey, out var names)) return true;
-            return argsProp.arraySize > names.Length;
-        }
+        private static float LineH => EditorGUIUtility.singleLineHeight;
+        private static float Spacing => EditorGUIUtility.standardVerticalSpacing;
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
-            float h = 0;
+            float h = Padding * 2;
 
-            // 1. Header
+            // Header
             h += LineH + Spacing;
 
-            // 2. Logic Type (SemanticKey)
-            var logicProp = property.FindPropertyRelative("LogicType");
-            h += (logicProp != null ? EditorGUI.GetPropertyHeight(logicProp) : LineH) + Spacing;
+            // Target
+            h += EditorGUI.GetPropertyHeight(property.FindPropertyRelative("TargetAttribute")) + Spacing;
+            h += EditorGUI.GetPropertyHeight(property.FindPropertyRelative("TargetPath"), true) + Spacing;
 
-            // 3. Target Section
-            var targetProp = property.FindPropertyRelative("TargetAttribute");
-            h += (targetProp != null ? EditorGUI.GetPropertyHeight(targetProp) : LineH) + Spacing;
-
-            var targetPathProp = property.FindPropertyRelative("TargetPath");
-            if (targetPathProp != null)
-                h += EditorGUI.GetPropertyHeight(targetPathProp, true) + Spacing;
-
-            // 4. Priority & Type
+            // Type & Priority, Source Id
+            h += LineH + Spacing;
             h += LineH + Spacing;
 
-            // 5. Arguments List
-            var argsProp = property.FindPropertyRelative("Arguments");
-            if (argsProp != null)
-            {
-                // Calculate height based on CURRENT array size. 
-                // Do not guess or resize here. Trust the serialized data.
-                int arraySize = argsProp.arraySize;
+            // Logic
+            h += ModifierLogicGUI.GetHeight(property.FindPropertyRelative("Logic"));
 
-                // Header "Parameters"
-                h += LineH + Spacing;
-
-                if (HasArgumentsNotice(argsProp, GetLogicKey(logicProp)))
-                    h += LineH + Spacing;
-
-                for (int i = 0; i < arraySize; i++)
-                {
-                    var element = argsProp.GetArrayElementAtIndex(i);
-                    h += (element != null ? EditorGUI.GetPropertyHeight(element, true) : LineH) + Spacing;
-                }
-            }
-
-            return h + 10; // Padding
+            return h;
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
@@ -88,123 +44,42 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             // --- Background Box ---
             GUI.Box(position, GUIContent.none, EditorStyles.helpBox);
 
-            Rect contentPos = new Rect(position.x + 5, position.y + 5, position.width - 10, position.height - 10);
-            float currentY = contentPos.y;
+            Rect content = new Rect(position.x + Padding, position.y + Padding, position.width - Padding * 2, position.height - Padding * 2);
+            float currentY = content.y;
 
             Rect NextRect(float height)
             {
-                Rect r = new Rect(contentPos.x, currentY, contentPos.width, height);
+                Rect r = new Rect(content.x, currentY, content.width, height);
                 currentY += height + Spacing;
                 return r;
             }
 
-            // --- 1. Header ---
-            EditorGUI.LabelField(NextRect(LineH), "Modifier Spec", EditorStyles.boldLabel);
+            // --- Header ---
+            EditorGUI.LabelField(NextRect(LineH), string.IsNullOrEmpty(label.text) ? "Modifier" : label.text, EditorStyles.boldLabel);
 
-            // --- 2. Logic Type ---
-            var logicTypeProp = property.FindPropertyRelative("LogicType");
-            string currentLogic = "Static";
-
-            if (logicTypeProp != null)
-            {
-                float logicH = EditorGUI.GetPropertyHeight(logicTypeProp);
-
-                EditorGUI.BeginChangeCheck();
-                EditorGUI.PropertyField(NextRect(logicH), logicTypeProp, new GUIContent("Logic Operation"));
-                if (EditorGUI.EndChangeCheck())
-                {
-                    property.serializedObject.ApplyModifiedProperties();
-                    property.serializedObject.Update();
-                }
-
-                currentLogic = GetLogicKey(logicTypeProp);
-            }
-
-            // --- 3. Target Section ---
+            // --- Target ---
             var targetProp = property.FindPropertyRelative("TargetAttribute");
-            if (targetProp != null)
-                EditorGUI.PropertyField(NextRect(EditorGUI.GetPropertyHeight(targetProp)), targetProp);
+            EditorGUI.PropertyField(NextRect(EditorGUI.GetPropertyHeight(targetProp)), targetProp);
 
             var targetPathProp = property.FindPropertyRelative("TargetPath");
-            if (targetPathProp != null)
-            {
-                EditorGUI.PropertyField(NextRect(EditorGUI.GetPropertyHeight(targetPathProp, true)), targetPathProp, new GUIContent("Target Path"), true);
-            }
+            EditorGUI.PropertyField(NextRect(EditorGUI.GetPropertyHeight(targetPathProp, true)), targetPathProp, true);
 
-            // --- 4. Configuration Row ---
-            var priorityProp = property.FindPropertyRelative("Priority");
-            var modTypeProp = property.FindPropertyRelative("Type");
+            // --- Type & Priority ---
+            Rect row = NextRect(LineH);
+            float half = row.width / 2f;
+            float oldLabelWidth = EditorGUIUtility.labelWidth;
+            EditorGUIUtility.labelWidth = 40;
+            EditorGUI.PropertyField(new Rect(row.x, row.y, half - 2, row.height), property.FindPropertyRelative("Type"));
+            EditorGUIUtility.labelWidth = 50;
+            EditorGUI.PropertyField(new Rect(row.x + half + 2, row.y, half - 2, row.height), property.FindPropertyRelative("Priority"));
+            EditorGUIUtility.labelWidth = oldLabelWidth;
 
-            if (priorityProp != null && modTypeProp != null)
-            {
-                Rect rowRect = NextRect(LineH);
-                float colW = rowRect.width / 2f;
+            // --- Source Id ---
+            EditorGUI.PropertyField(NextRect(LineH), property.FindPropertyRelative("SourceId"), new GUIContent("Source Id"));
 
-                Rect typeRect = new Rect(rowRect.x, rowRect.y, colW - 2, rowRect.height);
-                Rect priRect = new Rect(rowRect.x + colW + 2, rowRect.y, colW - 2, rowRect.height);
-
-                float oldLabelW = EditorGUIUtility.labelWidth;
-                EditorGUIUtility.labelWidth = 40;
-                EditorGUI.PropertyField(typeRect, modTypeProp, new GUIContent("Type"));
-                EditorGUIUtility.labelWidth = 30;
-                EditorGUI.PropertyField(priRect, priorityProp, new GUIContent("Pri"));
-                EditorGUIUtility.labelWidth = oldLabelW;
-            }
-
-            // --- 5. Arguments List ---
-            var argsProp = property.FindPropertyRelative("Arguments");
-            if (argsProp != null)
-            {
-                bool isKnownLogic = ModifierFactory.TryGetParameterNames(currentLogic, out var paramNames);
-                if (!isKnownLogic) paramNames = new string[0];
-
-                // Only ever GROW the list automatically. Shrinking here would silently delete serialized
-                // arguments whenever this editor session doesn't know the logic type (e.g. a custom modifier
-                // registered at runtime); removing extras is an explicit button below.
-                if (isKnownLogic && argsProp.arraySize < paramNames.Length)
-                {
-                    // Resize immediately and Apply.
-                    argsProp.arraySize = paramNames.Length;
-                    property.serializedObject.ApplyModifiedProperties();
-
-                    // Exit to let the next repaint handle drawing with correct sizes.
-                    // This prevents "Invalid GUILayout state" from mismatching array sizes.
-                    EditorGUI.EndProperty();
-                    return;
-                }
-
-                EditorGUI.LabelField(NextRect(LineH), "Parameters", EditorStyles.boldLabel);
-
-                if (!isKnownLogic)
-                {
-                    EditorGUI.HelpBox(NextRect(LineH), $"Unknown logic type '{currentLogic}': arguments are kept as they are.", MessageType.Warning);
-                }
-                else if (argsProp.arraySize > paramNames.Length)
-                {
-                    int unused = argsProp.arraySize - paramNames.Length;
-                    if (GUI.Button(NextRect(LineH), $"Remove {unused} unused argument(s)"))
-                    {
-                        argsProp.arraySize = paramNames.Length;
-                        property.serializedObject.ApplyModifiedProperties();
-                        EditorGUI.EndProperty();
-                        return;
-                    }
-                }
-
-                EditorGUI.indentLevel++;
-                for (int i = 0; i < argsProp.arraySize; i++)
-                {
-                    var element = argsProp.GetArrayElementAtIndex(i);
-                    if (element != null)
-                    {
-                        string paramLabel = !isKnownLogic ? $"Argument {i}"
-                            : i < paramNames.Length ? paramNames[i] : $"Unused ({i})";
-                        float elHeight = EditorGUI.GetPropertyHeight(element, true);
-                        EditorGUI.PropertyField(NextRect(elHeight), element, new GUIContent(paramLabel), true);
-                    }
-                }
-                EditorGUI.indentLevel--;
-            }
+            // --- Logic ---
+            var logicProp = property.FindPropertyRelative("Logic");
+            ModifierLogicGUI.Draw(NextRect(ModifierLogicGUI.GetHeight(logicProp)), logicProp);
 
             EditorGUI.EndProperty();
         }

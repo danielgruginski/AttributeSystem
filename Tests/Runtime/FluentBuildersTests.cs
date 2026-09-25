@@ -1,9 +1,9 @@
 ﻿using NUnit.Framework;
 using ReactiveSolutions.AttributeSystem.Core;
+using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using ReactiveSolutions.AttributeSystem.Core.Builders;
 using ReactiveSolutions.AttributeSystem.Core.Data;
 using SemanticKeys;
-using sk;
 using System.Linq;
 
 namespace ReactiveSolutions.AttributeSystem.Tests
@@ -164,10 +164,9 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             var spec = statBlock.Modifiers[0];
             Assert.AreEqual(_healthKey, spec.TargetAttribute);
-            Assert.AreEqual(Modifiers.Static, spec.LogicType);
+            Assert.IsInstanceOf<ValueLogic>(spec.Logic);
             Assert.AreEqual(ModifierType.Additive, spec.Type);
-            Assert.AreEqual(1, spec.Arguments.Count);
-            Assert.AreEqual(100f, spec.Arguments[0].ConstantValue);
+            Assert.AreEqual(100f, ((ValueLogic)spec.Logic).Value.ConstantValue);
         }
 
         [Test]
@@ -181,9 +180,9 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             var spec = statBlock.Modifiers[0];
             Assert.AreEqual(_speedKey, spec.TargetAttribute);
-            Assert.AreEqual(Modifiers.Static, spec.LogicType);
+            Assert.IsInstanceOf<ValueLogic>(spec.Logic);
             Assert.AreEqual(ModifierType.Multiplicative, spec.Type);
-            Assert.AreEqual(1.25f, spec.Arguments[0].ConstantValue); // +25% => x1.25
+            Assert.AreEqual(1.25f, ((ValueLogic)spec.Logic).Value.ConstantValue); // +25% => x1.25
         }
 
         [Test]

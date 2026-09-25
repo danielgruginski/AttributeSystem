@@ -24,13 +24,11 @@ namespace ReactiveSolutions.AttributeSystem.Tests
     public class AttributeProcessorTests
     {
         private Entity _processor;
-        private IModifierFactory _factory;
 
         [SetUp]
         public void Setup()
         {
             _processor = new Entity();
-            _factory = new ModifierFactory(); // Instantiate the specific factory implementation for this test context
         }
 
         [Test]
@@ -109,16 +107,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // Using LinearAttributeModifier since we have the source
             var source = new ValueSource { Mode = ValueSource.SourceMode.Constant, ConstantValue = 5f };
 
-            var scalingSpec = new AttributeModifierSpec
-            {
-                SourceId = "SpeedScaling",
-                Type = ModifierType.Additive,
-                Priority = 0,
-                LogicType = sk.Modifiers.Linear,
-                Arguments = new List<ValueSource> { source, ValueSource.Const(1f), ValueSource.Const(0f) }
-            };
-
-            var mod = new LinearModifier(scalingSpec);
+            var mod = new LogicModifier(new LinearLogic { Input = source }, ModifierType.Additive, 0, "SpeedScaling");
 
             // Act
             _processor.AddModifier("TestIDforSpeed", mod, TestKeys.Mock("Speed"));
@@ -149,22 +138,13 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 Type = ModifierType.Multiplicative,
                 Priority = 100,
 
-                // NEW ARCHITECTURE: Define LogicType and Arguments
-                LogicType = sk.Modifiers.Linear,
-
-                // Argument Order for Linear: [Input, Coeff, Addend]
-                Arguments = new List<ValueSource>
-                {
-                    ValueSource.Const(1.5f), // Input
-                    ValueSource.Const(1.0f), // Coeff
-                    ValueSource.Const(0.0f)  // Addend
-                }
+                Logic = new LinearLogic { Input = 1.5f, Coefficient = 1f, Addend = 0f }
             };
 
             block.Modifiers = new List<AttributeModifierSpec> { spec };
 
             // Act
-            block.ApplyToEntity(_processor, _factory);
+            block.ApplyToEntity(_processor);
 
             // Assert
             var finalValue = _processor.GetAttribute(TestKeys.Mock("Speed")).ObservableValue.Value;
@@ -188,17 +168,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 AttributeRef = new AttributeReference(TestKeys.Mock("Strength"), new List<SemanticKey> { TestKeys.Mock("Owner") })              
             };
 
-            var scalingSpec = new AttributeModifierSpec
-            {
-                SourceId = "StrengthScaling",
-                Type = ModifierType.Additive,
-                Priority = 0,
-                LogicType = sk.Modifiers.Linear,
-                Arguments = new List<ValueSource> { source, ValueSource.Const(1f), ValueSource.Const(0f) }
-            };
-
-
-            var mod = new LinearModifier(scalingSpec);
+            var mod = new LogicModifier(new LinearLogic { Input = source }, ModifierType.Additive, 0, "StrengthScaling");
 
             _processor.AddModifier("ScalingMod", mod, TestKeys.Mock("Damage"));
 

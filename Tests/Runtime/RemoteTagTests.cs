@@ -44,7 +44,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             };
 
             // 3. Apply
-            var handle = block.ApplyToEntity(_weaponProcessor, null);
+            var handle = block.ApplyToEntity(_weaponProcessor);
 
             // 4. Assert Player has Tag
             Assert.IsTrue(_playerProcessor.HasTag(blessedTag), "Player should have 'Blessed' tag");
@@ -67,7 +67,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 }
             };
 
-            var handle = block.ApplyToEntity(_weaponProcessor, null);
+            var handle = block.ApplyToEntity(_weaponProcessor);
             Assert.IsTrue(_playerProcessor.HasTag(blessedTag));
 
             // 2. Dispose (Unequip)
@@ -91,7 +91,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                     new TagModifierSpec { Tag = blessedTag, TargetPath = new List<SemanticKey> { ownerKey } }
                 }
             };
-            var handle = block.ApplyToEntity(_weaponProcessor, null);
+            var handle = block.ApplyToEntity(_weaponProcessor);
 
             Assert.IsFalse(_playerProcessor.HasTag(blessedTag));
 
@@ -133,8 +133,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 }
             };
 
-            var handle1 = block1.ApplyToEntity(_weaponProcessor, null);
-            var handle2 = block2.ApplyToEntity(_weaponProcessor, null);
+            var handle1 = block1.ApplyToEntity(_weaponProcessor);
+            var handle2 = block2.ApplyToEntity(_weaponProcessor);
 
             // Assert Count 2
             Assert.IsTrue(_playerProcessor.HasTag(stunnedTag));

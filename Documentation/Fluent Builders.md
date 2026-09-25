@@ -30,33 +30,29 @@ StatBlock poisonDebuff = StatBlockBuilder.Create("Poison_Debuff")
 
 ```
 
--   `AddFlatModifier` adds a Static, Additive modifier. `AddMultiplierModifier` adds a Static, Multiplicative modifier that multiplies the attribute by `1 + percentage`: `0.5f` is +50% (x1.5) and `-0.25f` is -25% (x0.75).
+-   `AddFlatModifier` adds an Additive modifier with `ValueLogic`. `AddMultiplierModifier` adds a Multiplicative one that multiplies the attribute by `1 + percentage`: `0.5f` is +50% (x1.5) and `-0.25f` is -25% (x0.75). Each multiplier applies on its own, so two +10% modifiers make x1.21.
     
--   The builder leaves `Priority` at 0, and modifiers on an attribute are evaluated by `Priority`, then by type (Additive, then Multiplicative, then Override): flat bonuses are added before multipliers apply, whatever order you call the methods in.
+-   `AddFlatModifier` and `AddMultiplierModifier` leave `Priority` at 0, and modifiers on an attribute are evaluated by `Priority`, then by type (Additive, Multiplicative, Override, Clamp Min, Clamp Max): flat bonuses are added before multipliers apply, whatever order you call the methods in.
     
--   New blocks start with an `Always` condition. `SetCondition(mode, tag, invert)` sets an `Always` or `Tag` condition (the tag is checked on the entity itself); for value comparisons, composite conditions or a `TagTarget` path, set `ActivationCondition` on the built `StatBlock`. Anything else the builder doesn't cover (base values, pointers, remote tags, or a modifier's `Priority`, `SourceId` and `TargetPath`) can also be set on the built `StatBlock`.
+-   New blocks start with an `Always` condition. `SetCondition(mode, tag, invert)` sets an `Always` or `Tag` condition (the tag is checked on the entity itself); for value comparisons, composite conditions or a `TagTarget` path, set `ActivationCondition` on the built `StatBlock`. Anything else the builder doesn't cover (base values, pointers, remote tags, or a modifier's `SourceId` and `TargetPath`) can also be set on the built `StatBlock`.
     
 
 ### Advanced Modifiers
 
-You can use the generic `AddModifier` method with any logic type your `ModifierFactory` knows: the built-in ones (`sk.Modifiers.Linear`, `sk.Modifiers.Clamp`, ...) or custom `LogicType` keys you registered. Arguments are `ValueSource`s: constants, or attributes read from the entity the StatBlock is applied to (a missing attribute reads as 0).
+The generic `AddModifier(target, logic, type = Additive, priority = 0)` takes any logic object: a built-in one (`LinearLogic`, `ClampLogic`, ...) or your own class (see [Modifier Logic](Modifier%20Logic.md); namespace `ReactiveSolutions.AttributeSystem.Core.Modifiers`). Its `ValueSource` inputs are constants, or attributes read from the entity the StatBlock is applied to (a missing attribute reads as 0).
 
 ```csharp
-// Built-in logic type: Damage += Strength * 2 + 0 (Linear: Input, Coefficient, Addend)
-var strength = new ValueSource { Mode = ValueSource.SourceMode.Attribute, AttributeRef = new AttributeReference(Stats.Strength) };
-
+// Damage += Strength * 2
 StatBlock bruteForce = StatBlockBuilder.Create("BruteForce")
-    .AddModifier(Stats.Damage, sk.Modifiers.Linear, ModifierType.Additive, strength, ValueSource.Const(2f), ValueSource.Const(0f))
+    .AddModifier(Stats.Damage, new LinearLogic { Input = ValueSource.FromAttribute(Stats.Strength), Coefficient = 2f })
     .Build();
 
-// Custom logic type: a key from your own KeyDomain
-StatBlock executeBuff = StatBlockBuilder.Create("Execute")
-    .AddModifier(Stats.Health, Modifiers.Execute, ModifierType.Additive, new ValueSource { Mode = ValueSource.SourceMode.Constant, ConstantValue = 50f })
+// Health at most MaxHealth, after everything else
+StatBlock vitality = StatBlockBuilder.Create("Vitality")
+    .AddModifier(Stats.Health, new ValueLogic(ValueSource.FromAttribute(Stats.MaxHealth)), ModifierType.ClampMax, priority: 1000)
     .Build();
 
 ```
-
-The factory finds builders by the key's name, so `Modifiers.Execute` (a key in a `Modifiers` KeyDomain you created) needs a builder registered under `"Execute"` with `factory.Register` (see [ModifierFactory](ModifierFactory.md)). An unknown name logs a warning and falls back to Static.
 
 ## 2. ProfileBuilder
 
@@ -128,8 +124,8 @@ The builders create their objects in memory: `StatBlockBuilder` outputs a plain,
 1.  **Runtime Generation:** Generate profiles on the fly when your game boots up or when procedurally generating a dungeon. You can immediately pass the built profile directly to an `Entity`, and apply built StatBlocks the same way. Applying never modifies the profile or the StatBlock, so one instance can be used for any number of entities:
     
     ```csharp
-    _entity.ApplyProfile(bossProfile, _modifierFactory);
-    ActiveStatBlock poisonHandle = poisonDebuff.ApplyToEntity(_entity, _modifierFactory);
+    _entity.ApplyProfile(bossProfile);
+    ActiveStatBlock poisonHandle = poisonDebuff.ApplyToEntity(_entity);
     
     ```
     

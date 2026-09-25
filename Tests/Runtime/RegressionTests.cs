@@ -44,14 +44,13 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         {
             TargetAttribute = target,
             Type = ModifierType.Additive,
-            LogicType = sk.Modifiers.Linear,
-            Arguments = new List<ValueSource> { input, Const(coeff), Const(0f) }
+            Logic = new LinearLogic { Input = input, Coefficient = coeff }
         };
 
-        private static IAttributeModifier Linear(ValueSource input, float coeff) => new LinearModifier(LinearSpec(SemanticKey.None, input, coeff));
+        private static IAttributeModifier Linear(ValueSource input, float coeff) => new LogicModifier(new LinearLogic { Input = input, Coefficient = coeff });
 
         private static IAttributeModifier Constant(float value, ModifierType type = ModifierType.Additive, int priority = 0) =>
-            new StaticAttributeModifier(new AttributeModifierSpec { Type = type, Priority = priority, Arguments = new List<ValueSource> { Const(value) } });
+            new LogicModifier(new ValueLogic(value), type, priority);
 
         private class CountingModifier : IAttributeModifier
         {
@@ -73,9 +72,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 .AddInnateStatBlock(new StatBlock { Modifiers = { LinearSpec(Damage, Attr(Strength), 1f) } })
                 .Build();
 
-            var factory = new ModifierFactory();
-            var goblinA = new Entity(); goblinA.ApplyProfile(goblinProfile, factory);
-            var goblinB = new Entity(); goblinB.ApplyProfile(goblinProfile, factory);
+            var goblinA = new Entity(); goblinA.ApplyProfile(goblinProfile);
+            var goblinB = new Entity(); goblinB.ApplyProfile(goblinProfile);
 
             goblinB.SetOrUpdateBaseValue(Strength, 2f);            // goblin B gets weakened
             goblinA.AddModifier("Potion", Constant(5f), Damage);   // goblin A drinks a +5 damage potion
@@ -93,7 +91,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var mage = new Entity(); mage.SetOrUpdateBaseValue(Strength, 5f);
             group.AddMember(warrior);
             group.AddMember(mage);
-            group.ApplyStatBlock(aura, new ModifierFactory());
+            group.ApplyStatBlock(aura);
 
             warrior.AddModifier("Potion", Constant(5f), Damage);
 
@@ -161,11 +159,11 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                     Type = StatBlockCondition.Mode.ValueComparison,
                     ValueA = Attr(Health), CompareOp = StatBlockCondition.Comparison.Less, ValueB = Const(50f)
                 },
-                Modifiers = { new AttributeModifierSpec { TargetAttribute = Health, LogicType = sk.Modifiers.Static, Arguments = { Const(100f) } } }
+                Modifiers = { new AttributeModifierSpec { TargetAttribute = Health, Logic = new ValueLogic(100f) } }
             };
 
             LogAssert.Expect(LogType.Error, new Regex("'Last Stand' was disabled"));
-            lastStand.ApplyToEntity(e, new ModifierFactory());
+            lastStand.ApplyToEntity(e);
 
             Assert.AreEqual(0, e.GetAttribute(Health).Modifiers.Count(), "The block must not stay applied while its condition is false.");
             Assert.AreEqual(40f, Value(e, Health));
@@ -257,7 +255,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             profile.LinkGroups.Add(SemanticKey.None);
 
             var e = new Entity();
-            e.ApplyProfile(profile, new ModifierFactory());
+            e.ApplyProfile(profile);
 
             Assert.AreEqual(0, e.Attributes.Count);
             Assert.AreEqual(0, e.Tags.Count);
@@ -270,12 +268,12 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var block = new StatBlock
             {
                 BaseValues = { new StatBlock.BaseValueEntry { Value = 5f } },   // Name left unassigned
-                Modifiers = { new AttributeModifierSpec { LogicType = sk.Modifiers.Static, Arguments = { Const(1f) } } } // no target
+                Modifiers = { new AttributeModifierSpec { Logic = new ValueLogic(1f) } } // no target
             };
             var e = new Entity();
 
-            LogAssert.Expect(LogType.Warning, new Regex("skipped a 'Static' modifier with no Target Attribute"));
-            block.ApplyToEntity(e, new ModifierFactory());
+            LogAssert.Expect(LogType.Warning, new Regex("skipped a 'Value' modifier with no Target Attribute"));
+            block.ApplyToEntity(e);
 
             Assert.AreEqual(0, e.Attributes.Count);
         }
@@ -286,72 +284,88 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             Assert.AreEqual("Orc", ProfileBuilder.Create("Orc").Build().ProfileName);
         }
 
-        // --- Builders and factory --------------------------------------------------------------
+        // --- Builders and logic --------------------------------------------------------------
 
         [Test]
         public void AddMultiplierModifier_HalfMeansPlusFiftyPercent()
         {
             var e = new Entity();
             e.SetOrUpdateBaseValue(Speed, 10f);
-            StatBlockBuilder.Create("Haste").AddMultiplierModifier(Speed, 0.5f).Build().ApplyToEntity(e, new ModifierFactory());
+            StatBlockBuilder.Create("Haste").AddMultiplierModifier(Speed, 0.5f).Build().ApplyToEntity(e);
 
             Assert.AreEqual(15f, Value(e, Speed));
         }
 
         [Test]
-        public void EveryBuiltInLogicType_ResolvesFromItsKey()
+        public void EveryBuiltInLogic_CanBeCreatedByTheEditor()
         {
-            var factory = new ModifierFactory();
-            var logicTypes = new[]
-            {
-                sk.Modifiers.Linear, sk.Modifiers.Polynomial, sk.Modifiers.Clamp, sk.Modifiers.Min, sk.Modifiers.Max,
-                sk.Modifiers.Floor, sk.Modifiers.Step, sk.Modifiers.Ratio, sk.Modifiers.Exponential,
-                sk.Modifiers.DiminishingReturns, sk.Modifiers.ScaledTriangular
-            };
+            // The Logic dropdown lists [Serializable] ModifierLogic classes with a parameterless constructor.
+            var logicTypes = typeof(ModifierLogic).Assembly.GetTypes()
+                .Where(t => typeof(ModifierLogic).IsAssignableFrom(t) && !t.IsAbstract)
+                .ToList();
+            Assert.GreaterOrEqual(logicTypes.Count, 13);
 
-            foreach (var logicType in logicTypes)
+            foreach (var type in logicTypes)
             {
-                var spec = new AttributeModifierSpec { LogicType = logicType, Arguments = { Const(1f) } };
-                Assert.IsNotInstanceOf<StaticAttributeModifier>(factory.Create(spec, null), $"{logicType} fell back to Static");
-                CollectionAssert.AreNotEqual(new[] { "Value" }, ModifierFactory.GetParameterNames(logicType), $"{logicType} has no parameter names");
+                Assert.IsTrue(type.IsDefined(typeof(SerializableAttribute), false), $"{type.Name} is not [Serializable]");
+                Assert.IsNotNull(type.GetConstructor(Type.EmptyTypes), $"{type.Name} has no parameterless constructor");
+
+                var logic = (ModifierLogic)Activator.CreateInstance(type);
+                float result = float.NaN;
+                logic.Observe(new Entity()).Subscribe(v => result = v);
+                Assert.IsFalse(float.IsNaN(result), $"{type.Name} emitted no value with its default settings");
             }
         }
 
         [Test]
         public void DiminishingReturns_WithZeroInputAndSoftCap_IsZeroNotNaN()
         {
-            // Unset arguments are 0, and a missing input attribute also reads as 0.
-            var spec = new AttributeModifierSpec { LogicType = sk.Modifiers.DiminishingReturns, Arguments = { Const(0f), Const(10f), Const(0f) } };
+            // A missing input attribute reads as 0 too.
+            var logic = new DiminishingReturnsLogic { Input = 0f, MaxBonus = 10f, SoftCap = 0f };
             float result = float.NaN;
-            new ModifierFactory().Create(spec, null).GetMagnitude(new Entity()).Subscribe(v => result = v);
+            logic.Observe(new Entity()).Subscribe(v => result = v);
 
             Assert.AreEqual(0f, result);
         }
 
         [Test]
-        public void UnknownLogicType_WarnsAndFallsBackToStatic()
-        {
-            var spec = new AttributeModifierSpec { LogicType = SemanticKey.FromRawString("Typo"), Arguments = { Const(3f) } };
-
-            LogAssert.Expect(LogType.Warning, "[ModifierFactory] Unknown modifier logic type 'Typo'. Falling back to Static.");
-            var modifier = new ModifierFactory().Create(spec, null);
-
-            Assert.IsInstanceOf<StaticAttributeModifier>(modifier);
-        }
-
-        [Test]
         public void CreatingFromSpec_DoesNotModifyTheSpec()
         {
-            var source = Attr(Strength);
-            var spec = LinearSpec(Damage, source, 1f);
+            var spec = LinearSpec(Damage, Attr(Strength), 1f);
             var owner = new Entity(); owner.SetOrUpdateBaseValue(Strength, 7f);
             var other = new Entity(); other.SetOrUpdateBaseValue(Strength, 3f);
 
-            new ModifierFactory().Create(spec, owner);
+            var modifier = spec.CreateModifier(owner);
 
             float read = float.NaN;
-            source.GetObservable(other).Subscribe(v => read = v);
-            Assert.AreEqual(3f, read, "The shared spec's ValueSource must not have been baked to the first entity.");
+            spec.Logic.Observe(other).Subscribe(v => read = v);
+            Assert.AreEqual(3f, read, "The shared spec's logic must not be tied to the first entity.");
+
+            float fromModifier = float.NaN;
+            modifier.GetMagnitude(other).Subscribe(v => fromModifier = v);
+            Assert.AreEqual(7f, fromModifier, "A modifier created for 'owner' reads the owner's Strength wherever it is applied.");
+        }
+
+        [Test]
+        public void DuplicatedLogic_IsUnsharedAfterDeserialization()
+        {
+            // A list entry duplicated in the Inspector can point to the same logic object as the original.
+            var shared = new LinearLogic { Input = 1f };
+            var block = new StatBlock
+            {
+                Modifiers =
+                {
+                    new AttributeModifierSpec { TargetAttribute = Damage, Logic = shared },
+                    new AttributeModifierSpec { TargetAttribute = Damage, Logic = shared },
+                }
+            };
+            var profile = new EntityProfile { InnateStatBlocks = { block, new StatBlock { Modifiers = { new AttributeModifierSpec { Logic = shared } } } } };
+
+            profile.OnAfterDeserialize();
+
+            var logics = profile.InnateStatBlocks.SelectMany(b => b.Modifiers).Select(m => m.Logic).ToList();
+            Assert.AreEqual(3, logics.Distinct().Count(), "Each modifier must get its own logic object.");
+            Assert.IsTrue(logics.All(l => l is LinearLogic linear && linear.Input.ConstantValue == 1f), "The copies keep the settings.");
         }
 
         // --- Retargeting observers ---------------------------------------------------------------
@@ -372,36 +386,82 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             Assert.AreEqual(50f, shown);
         }
 
-        // --- Known design limitations (not fixed yet) ------------------------------------------
+        // --- Pipeline rules ------------------------------------------------------------------------
 
-        [Test, Ignore("Design: modifiers read an attribute's FINAL value, so '+10% of self' converges to a fixed point (111.1). Needs a BaseValue source mode.")]
-        public void TenPercentOfOwnValue_IsTenPercent()
+        [Test]
+        public void TenPercentMultiplier_AppliesOnce()
         {
             var e = new Entity();
             e.SetOrUpdateBaseValue(MaxHealth, 100f);
-            e.AddModifier("Toughness", Linear(Attr(MaxHealth), 0.1f), MaxHealth);
+            e.AddModifier("Toughness", Constant(1.1f, ModifierType.Multiplicative), MaxHealth);
 
             Assert.AreEqual(110f, Value(e, MaxHealth), 0.001f);
         }
 
-        [Test, Ignore("Design: a modifier can't act on the running pipeline value, so clamping an attribute to another one latches. Needs clamp operations in the pipeline.")]
-        public void ClampOverride_LetsHealthGoDownAgain()
+        [Test]
+        public void Multipliers_Compound()
+        {
+            // Each modifier applies on its own: +10% and +10% make x1.21, not x1.2.
+            var e = new Entity();
+            e.SetOrUpdateBaseValue(Damage, 100f);
+            e.AddModifier("Sword", Constant(1.1f, ModifierType.Multiplicative), Damage);
+            e.AddModifier("Ring", Constant(1.1f, ModifierType.Multiplicative), Damage);
+
+            Assert.AreEqual(121f, Value(e, Damage), 0.001f);
+        }
+
+        [Test]
+        public void ModifierReadingItsOwnAttribute_SettlesAtTheFixedPoint()
+        {
+            // "+10% of MaxHealth" reads MaxHealth's final value, which includes this bonus: x = 100 + 0.1x settles at 111.1.
+            var e = new Entity();
+            e.SetOrUpdateBaseValue(MaxHealth, 100f);
+            e.AddModifier("Toughness", Linear(Attr(MaxHealth), 0.1f), MaxHealth);
+
+            Assert.AreEqual(111.111f, Value(e, MaxHealth), 0.01f);
+        }
+
+        [Test]
+        public void ClampMax_KeepsHealthAtMostMaxHealth()
         {
             var e = new Entity();
             e.SetOrUpdateBaseValue(MaxHealth, 100f);
             e.SetOrUpdateBaseValue(Health, 150f);
-            var clamp = new ModifierFactory().Create(sk.Modifiers.Clamp, new AttributeModifierSpec
-            {
-                Type = ModifierType.Override,
-                Priority = 1000,
-                Arguments = new List<ValueSource> { Attr(Health), Const(0f), Attr(MaxHealth) }
-            });
-            e.AddModifier("ClampToMax", clamp, Health);
+            e.AddModifier("ClampToMax", new LogicModifier(new ValueLogic(Attr(MaxHealth)), ModifierType.ClampMax), Health);
             Assert.AreEqual(100f, Value(e, Health));
 
             e.SetOrUpdateBaseValue(Health, 50f);
-            Assert.AreEqual(50f, Value(e, Health));
+            Assert.AreEqual(50f, Value(e, Health), "The clamp must not latch at the old maximum.");
+
+            e.SetOrUpdateBaseValue(MaxHealth, 40f);
+            Assert.AreEqual(40f, Value(e, Health), "The clamp follows MaxHealth.");
         }
+
+        [Test]
+        public void ClampMin_KeepsTheValueAtLeastTheMinimum()
+        {
+            var e = new Entity();
+            e.SetOrUpdateBaseValue(Speed, 10f);
+            e.AddModifier("Floor", Constant(2f, ModifierType.ClampMin), Speed);
+            e.AddModifier("Slow", Constant(-15f), Speed);
+
+            Assert.AreEqual(2f, Value(e, Speed));
+        }
+
+        [Test]
+        public void Clamps_ApplyAfterAddsAndMultipliersOfTheSamePriority()
+        {
+            var e = new Entity();
+            e.SetOrUpdateBaseValue(Health, 80f);
+            e.AddModifier("Cap", Constant(100f, ModifierType.ClampMax), Health);     // added first...
+            e.AddModifier("Vigor", Constant(1.5f, ModifierType.Multiplicative), Health);
+            Assert.AreEqual(100f, Value(e, Health), "...but applies after the multiplier: min(80 * 1.5, 100).");
+
+            e.AddModifier("Blessing", Constant(30f, ModifierType.Additive, priority: 1), Health);
+            Assert.AreEqual(130f, Value(e, Health), "A later priority applies after the clamp.");
+        }
+
+        // --- Known design limitations (not fixed yet) ------------------------------------------
 
         [Test, Ignore("Design: updates are pushed one dependency at a time, so diamond-shaped dependencies emit intermediate values. Needs batched/topological propagation.")]
         public void DependentValue_NeverObservesHalfUpdatedInputs()

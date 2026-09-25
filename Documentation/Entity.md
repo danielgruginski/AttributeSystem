@@ -176,7 +176,7 @@ Methods for establishing relationships between entities.
 
 ### 7. Profiles & Link Groups
 
--   **`ApplyProfile(EntityProfile profile, IModifierFactory modifierFactory)`**
+-   **`ApplyProfile(EntityProfile profile)`**
     
     -   Initializes the entity from a blueprint, in this order: base attributes, innate tags, link groups, nested entities (registered as providers), pointers, innate StatBlocks. Entries with an unassigned key (`SemanticKey.None`) are skipped, and a `null` profile is ignored. Nested profiles and StatBlocks given by ID are loaded from their JSON files; a profile that nests itself is skipped with an error. See [EntityProfile](EntityProfile.md); profiles can also be built in code with `ProfileBuilder` (see [Fluent Builders](Fluent%20Builders.md)).
         
@@ -198,12 +198,9 @@ Methods for establishing relationships between entities.
 
 ```csharp
 using System;
-using System.Collections.Generic;
 using Game.Constants;                                   // Namespace of your generated key classes
 using ReactiveSolutions.AttributeSystem.Core;
-using ReactiveSolutions.AttributeSystem.Core.Data;      // AttributeReference
-using ReactiveSolutions.AttributeSystem.Core.Modifiers; // LinearModifier
-using SemanticKeys;
+using ReactiveSolutions.AttributeSystem.Core.Modifiers; // LogicModifier, LinearLogic
 
 var player = new Entity();
 var sword = new Entity();
@@ -219,22 +216,12 @@ sword.RegisterExternalProvider(Links.Owner, player);
 // We want to add to "Damage" (Local), based on "Strength" (Remote Source).
 // Note: This example uses a Modifier that reads from a remote source, 
 // but is applied LOCALLY to the sword.
-var scalingMod = new LinearModifier(new AttributeModifierSpec
+var scalingMod = new LogicModifier(new LinearLogic
 {
-    SourceId = "Scaling",
-    Type = ModifierType.Additive,
-    Arguments = new List<ValueSource>
-    {
-        // Input: Owner.Strength, resolved from the sword
-        new ValueSource
-        {
-            Mode = ValueSource.SourceMode.Attribute,
-            AttributeRef = new AttributeReference(Stats.Strength, new List<SemanticKey> { Links.Owner })
-        },
-        ValueSource.Const(0.5f), // Coefficient
-        ValueSource.Const(0f)    // Addend
-    }
-});
+    Input = ValueSource.FromAttribute(Stats.Strength, Links.Owner), // Owner.Strength, resolved from the sword
+    Coefficient = 0.5f,
+    Addend = 0f
+}, ModifierType.Additive, sourceId: "Scaling");
 IDisposable handle = sword.AddModifier("Scaling", scalingMod, Stats.Damage); // Damage: 5 + 10 * 0.5 = 10
 
 // 4. Cleanup

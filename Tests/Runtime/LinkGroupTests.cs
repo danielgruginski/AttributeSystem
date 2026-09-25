@@ -1,8 +1,8 @@
 ﻿using NUnit.Framework;
 using ReactiveSolutions.AttributeSystem.Core;
+using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using ReactiveSolutions.AttributeSystem.Core.Data;
 using SemanticKeys;
-using sk;
 using System.Collections.Generic;
 using UniRx;
 using UnityEngine;
@@ -11,14 +11,12 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 {
     public class LinkGroupTests
     {
-        private ModifierFactory _modifierFactory;
         private SemanticKey _testAttr;
         private SemanticKey _testTag;
 
         [SetUp]
         public void Setup()
         {
-            _modifierFactory = new ModifierFactory();
             _testAttr = new SemanticKey("Strength", "Strength", null);
             _testTag = new SemanticKey("Blessed", "Blessed", null);
         }
@@ -37,10 +35,9 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // If the field name differs, this helper will need adjustment.
             var spec = new AttributeModifierSpec
             {
-                LogicType = Modifiers.Static,
                 TargetAttribute = _testAttr, // Assuming 'AttributeKey' or 'Attribute' property
                 Type = ModifierType.Additive, // Assuming 'ModifierType' or 'Type' enum
-                Arguments = new List<ValueSource> { Const(value) }
+                Logic = new ValueLogic(Const(value))
             };
 
             // ADD THE SPEC TO THE STATBLOCK
@@ -81,7 +78,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var statBlock = CreateStatBlock(10f);
 
             // Act
-            var handle = group.ApplyStatBlock(statBlock, _modifierFactory);
+            var handle = group.ApplyStatBlock(statBlock);
 
             // Assert
             var attr = processor.GetAttribute(_testAttr);
@@ -98,7 +95,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var statBlock = CreateStatBlock(50f);
 
             // Act - Apply first, add member later
-            using (group.ApplyStatBlock(statBlock, _modifierFactory))
+            using (group.ApplyStatBlock(statBlock))
             {
                 var processor = new Entity();
 
@@ -121,7 +118,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             var statBlock = CreateStatBlock(10f);
 
-            using (group.ApplyStatBlock(statBlock, _modifierFactory))
+            using (group.ApplyStatBlock(statBlock))
             {
                 Assert.AreEqual(10f, processor.GetAttribute(_testAttr).ObservableValue.Value);
 
@@ -148,7 +145,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 InvertTag = false
             };
 
-            using (group.ApplyStatBlock(statBlock, _modifierFactory, condition))
+            using (group.ApplyStatBlock(statBlock, condition))
             {
                 // 1. Tag missing -> No Modifier
                 Assert.AreEqual(true, processor.GetAttribute(_testAttr) == null); // the default value when not found should be 0f
@@ -175,7 +172,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             group.AddMember(p2);
 
             var statBlock = CreateStatBlock(20f);
-            var handle = group.ApplyStatBlock(statBlock, _modifierFactory);
+            var handle = group.ApplyStatBlock(statBlock);
 
             Assert.AreEqual(20f, p1.GetAttribute(_testAttr).ObservableValue.Value);
             Assert.AreEqual(20f, p2.GetAttribute(_testAttr).ObservableValue.Value);
@@ -196,8 +193,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var sb1 = CreateStatBlock(10f);
             var sb2 = CreateStatBlock(20f); // Cumulative
 
-            var h1 = group.ApplyStatBlock(sb1, _modifierFactory);
-            var h2 = group.ApplyStatBlock(sb2, _modifierFactory);
+            var h1 = group.ApplyStatBlock(sb1);
+            var h2 = group.ApplyStatBlock(sb2);
 
             Assert.AreEqual(30f, processor.GetAttribute(_testAttr).ObservableValue.Value);
 

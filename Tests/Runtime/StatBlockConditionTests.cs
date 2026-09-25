@@ -1,8 +1,8 @@
 ﻿using NUnit.Framework;
 using ReactiveSolutions.AttributeSystem.Core;
+using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using ReactiveSolutions.AttributeSystem.Core.Data;
 using SemanticKeys;
-using sk;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -11,10 +11,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
     public class StatBlockConditionTests
     {
         private Entity _processor;
-        private IModifierFactory _factory;
 
         private SemanticKey Strength = TestKeys.Mock("Strength");
-        private SemanticKey LogicTypeStatic = Modifiers.Static;
         private SemanticKey IsEnraged = TestKeys.Mock("IsEnraged");
         private SemanticKey IsQuiet = TestKeys.Mock("IsQuiet");
         private SemanticKey Stealth = TestKeys.Mock("Stealth");
@@ -31,7 +29,6 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         public void Setup()
         {
             _processor = new Entity();
-            _factory = new ModifierFactory();
         }
 
         [Test]
@@ -41,14 +38,13 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             statBlock.ActivationCondition = new StatBlockCondition { Type = StatBlockCondition.Mode.Always };
             statBlock.Modifiers.Add(new AttributeModifierSpec
             {
-                LogicType = LogicTypeStatic,
                 TargetAttribute = Strength,
                 Type = ModifierType.Additive,
-                Arguments = new List<ValueSource> { Const(5f) }
+                Logic = new ValueLogic(Const(5f))
             });
 
             // Act
-            statBlock.ApplyToEntity(_processor, _factory);
+            statBlock.ApplyToEntity(_processor);
 
 
             _processor.SetOrUpdateBaseValue(Strength, 0);
@@ -72,13 +68,12 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             };
             statBlock.Modifiers.Add(new AttributeModifierSpec
             {
-                LogicType = LogicTypeStatic,
                 Type = ModifierType.Additive,
                 TargetAttribute = Strength,
-                Arguments = new List<ValueSource> { Const(10) }
+                Logic = new ValueLogic(Const(10))
             });
 
-            statBlock.ApplyToEntity(_processor, _factory);
+            statBlock.ApplyToEntity(_processor);
 
 
             _processor.SetOrUpdateBaseValue(Strength, 0);
@@ -101,16 +96,15 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             };
             statBlock.Modifiers.Add(new AttributeModifierSpec
             {
-                LogicType = LogicTypeStatic,
                 Type = ModifierType.Additive,
                 TargetAttribute = Strength,
                 TargetPath = new List<SemanticKey>(),
-                Arguments = new List<ValueSource> { Const(10) }
+                Logic = new ValueLogic(Const(10))
             });
 
             _processor.SetOrUpdateBaseValue(Strength, 0);
 
-            var activeStatBlock = statBlock.ApplyToEntity(_processor, _factory);
+            var activeStatBlock = statBlock.ApplyToEntity(_processor);
 
             Assert.AreEqual(0, _processor.GetAttribute(Strength).ObservableValue.Value);
         }
@@ -131,13 +125,12 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             };
             statBlock.Modifiers.Add(new AttributeModifierSpec
             {
-                LogicType = LogicTypeStatic,
                 Type = ModifierType.Additive,
                 TargetAttribute = Stealth,
-                Arguments = new List<ValueSource> { Const(5) }
+                Logic = new ValueLogic(Const(5))
             });
 
-            statBlock.ApplyToEntity(_processor, _factory);
+            statBlock.ApplyToEntity(_processor);
 
             _processor.SetOrUpdateBaseValue(Stealth, 0);
 
@@ -163,13 +156,12 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             };
             statBlock.Modifiers.Add(new AttributeModifierSpec
             {
-                LogicType = LogicTypeStatic,
                 Type = ModifierType.Additive,
                 TargetAttribute = DamageBonus,
-                Arguments = new List<ValueSource> { Const(10) }
+                Logic = new ValueLogic(Const(10))
             });
 
-            statBlock.ApplyToEntity(_processor, _factory);
+            statBlock.ApplyToEntity(_processor);
 
 
             _processor.SetOrUpdateBaseValue(DamageBonus, 0);
@@ -203,13 +195,12 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             };
             statBlock.Modifiers.Add(new AttributeModifierSpec
             {
-                LogicType = LogicTypeStatic,
                 Type = ModifierType.Additive,
                 TargetAttribute = Defense,
-                Arguments = new List<ValueSource> { Const(100) }
+                Logic = new ValueLogic(Const(100))
             });
 
-            statBlock.ApplyToEntity(_processor, _factory);
+            statBlock.ApplyToEntity(_processor);
 
 
             _processor.SetOrUpdateBaseValue(Defense, 0);

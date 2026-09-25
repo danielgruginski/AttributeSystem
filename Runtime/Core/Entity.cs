@@ -34,12 +34,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// Applies an EntityProfile to this processor, setting up base stats, tags, nested entities, and innate buffs.
         /// Nested profiles and StatBlocks referenced by ID are loaded from their JSON files.
         /// </summary>
-        public void ApplyProfile(EntityProfile profile, IModifierFactory modifierFactory)
-            => ApplyProfile(profile, modifierFactory, new HashSet<object>());
+        public void ApplyProfile(EntityProfile profile)
+            => ApplyProfile(profile, new HashSet<object>());
 
         /// <param name="applying">The profiles (objects, and the IDs of JSON profiles) being applied further up the
         /// nesting chain, so a profile that nests itself is reported instead of recursing forever.</param>
-        private void ApplyProfile(EntityProfile profile, IModifierFactory modifierFactory, HashSet<object> applying)
+        private void ApplyProfile(EntityProfile profile, HashSet<object> applying)
         {
             if (profile == null) return;
 
@@ -95,7 +95,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 if (nestedProfile == null) continue;
 
                 var childEntity = new Entity();
-                childEntity.ApplyProfile(nestedProfile, modifierFactory, applying);
+                childEntity.ApplyProfile(nestedProfile, applying);
 
                 RegisterExternalProvider(nestedEntry.ProviderKey, childEntity);
                 _nestedEntities.Add(childEntity);
@@ -117,21 +117,21 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
                 // The loader logs an error if the JSON can't be loaded.
                 var statBlock = new StatBlock();
-                if (StatBlockJsonLoader.TryLoadInto(statBlockId, statBlock)) ApplyInnateStatBlock(statBlock, modifierFactory);
+                if (StatBlockJsonLoader.TryLoadInto(statBlockId, statBlock)) ApplyInnateStatBlock(statBlock);
             }
 
             foreach (var statBlock in profile.InnateStatBlocks)
             {
-                if (statBlock != null) ApplyInnateStatBlock(statBlock, modifierFactory);
+                if (statBlock != null) ApplyInnateStatBlock(statBlock);
             }
 
             applying.Remove(profile);
             if (profile.JsonId != null) applying.Remove(profile.JsonId);
         }
 
-        private void ApplyInnateStatBlock(StatBlock statBlock, IModifierFactory modifierFactory)
+        private void ApplyInnateStatBlock(StatBlock statBlock)
         {
-            var handle = statBlock.ApplyToEntity(this, modifierFactory);
+            var handle = statBlock.ApplyToEntity(this);
             if (handle != null)
             {
                 _profileDisposables.Add(handle);

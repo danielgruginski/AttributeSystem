@@ -203,8 +203,8 @@ namespace ReactiveSolutions.AttributeSystem.Core
         }
 
         /// <summary>
-        /// Pipeline order: lower Priority first; within a Priority, additive, then multiplicative, then
-        /// override modifiers (so multipliers scale base + additives); then insertion order.
+        /// Pipeline order: lower Priority first; within a Priority, additive, then multiplicative, then override,
+        /// then clamp modifiers (so multipliers scale base + additives, and clamps limit the result); then insertion order.
         /// </summary>
         private static int Compare(ModifierSlot a, ModifierSlot b)
         {
@@ -263,6 +263,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
                         break;
                     case ModifierType.Override:
                         result = slot.Magnitude;
+                        break;
+                    case ModifierType.ClampMin:
+                        result = Math.Max(result, slot.Magnitude);
+                        break;
+                    case ModifierType.ClampMax:
+                        result = Math.Min(result, slot.Magnitude);
                         break;
                 }
             }

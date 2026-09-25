@@ -2,9 +2,18 @@
 
 ## Overview
 
-Modifiers are the logic units of the Attribute System. While an `Attribute` holds the value, an **Attribute Modifier** describes _how_ that value changes (e.g., "+10 Flat", "+50% Multiplier", "Clamp between 0 and 100").
+An `Attribute` holds a value; **modifiers** change it: "+10", "x1.5", "set to 0", "at most MaxHealth". An attribute applies its modifiers one after another, like a stack of operations: each takes the value the previous ones produced and applies its own operation once. So two "+10%" multipliers compound (100 x 1.1 x 1.1 = 121), and a clamp placed last keeps the result in range.
 
-The system uses a **Unified Argument Architecture**, meaning every modifier—regardless of its math—accepts a standardized list of inputs (`ValueSource`s). This allows any parameter of a formula (like the "10" in "+10 Damage") to be either a hardcoded constant OR a dynamic reference to another attribute (e.g., "Owner.Strength").
+Every modifier has:
+
+-   a **Type**: what its value does to the attribute (add, multiply, override, clamp);
+    
+-   a **Priority**: when it applies;
+    
+-   a **value** that can change over time, e.g. when it reads another attribute.
+    
+
+In StatBlocks, a modifier's value comes from a **logic** class, such as `LinearLogic` (`Input * Coefficient + Addend`); see [Modifier Logic](Modifier%20Logic.md). The examples on this page assume `using ReactiveSolutions.AttributeSystem.Core;` and `using ReactiveSolutions.AttributeSystem.Core.Modifiers;`, and keys such as `Stats.Damage` from classes generated from KeyDomains (see [Semantic Keys](Semantic%20Keys.md)).
 
 ## Core Interface: `IAttributeModifier`
 
@@ -13,12 +22,11 @@ Every modifier implements this lightweight interface (namespace `ReactiveSolutio
 ```csharp
 public interface IAttributeModifier
 {
-    // Defines how this modifier merges with the previous value 
-    // (Additive, Multiplicative, or Override)
+    // What the value does to the attribute (see ModifierType).
     ModifierType Type { get; }
 
     // Determines calculation order (Lower = Earlier).
-    // Ties: Additive, then Multiplicative, then Override, then insertion order.
+    // Ties: Additive, Multiplicative, Override, ClampMin, ClampMax, then insertion order.
     int Priority { get; }
 
     // Where the modifier comes from (e.g. "IronSword"). Shown by the Attribute Debugger.
@@ -32,154 +40,71 @@ public interface IAttributeModifier
 
 ```
 
-`ModifierType` has three values:
+## Modifier Types and Order
 
 ```csharp
 public enum ModifierType
 {
-    Additive,       // Added to the base value or other additives
-    Multiplicative, // Multiplies the sum of base + additives
-    Override        // Replaces the value (Highest priority wins)
+    Additive,       // Adds the value
+    Multiplicative, // Multiplies by the value (each multiplier applies on its own: +10% and +10% make x1.21)
+    Override,       // Replaces the value
+    ClampMin,       // Keeps the value at least this high
+    ClampMax        // Keeps the value at most this high (e.g. Health at most MaxHealth)
 }
 
 ```
 
-An attribute applies its modifiers ordered by **`Priority` (ascending), then `Type` (Additive, then Multiplicative, then Override), then insertion order**. The comments above therefore hold at equal priority: a multiplier scales base + additives, and the last override applied wins (the highest `Priority`, or the most recently added one at equal priority). A lower `Priority` runs first regardless of type, so an Additive modifier with a higher priority than a multiplier is added after the multiplication, and modifiers with a higher priority than an override still apply on top of it.
+An attribute applies its modifiers ordered by **`Priority` (ascending), then `Type` (in the order above), then insertion order**. At equal priority, multipliers therefore scale the base plus the additives, an override replaces that result, and the clamps limit whatever comes out. A lower `Priority` runs first regardless of type: an Additive modifier with a higher priority than a multiplier is added after the multiplication, and a modifier with a higher priority than a clamp can take the value past its limit.
+
+For example, with Health at a base of 80 and MaxHealth at 100:
+
+| Modifiers (all Priority 0) | Health |
+| ----- | ----- |
+| `+20` (Additive), `x1.5` (Multiplicative) | (80 + 20) x 1.5 = 150 |
+| the same, plus MaxHealth as a Clamp Max | min(150, 100) = 100 |
+| the same, with the base dropped to 40 | min((40 + 20) x 1.5, 100) = 90 |
+
+A clamp only limits the value: when the value drops below the limit again, the clamp has no effect.
 
 -   `Type` and `Priority` are read when the modifier is added, to place it in the pipeline; its position doesn't change afterwards.
     
 -   A modifier whose magnitude hasn't emitted yet contributes nothing.
     
--   A modifier that reads the attribute it modifies sees that attribute's _final_ value (see [Circular Dependencies and Known Limitations](Attribute.md#circular-dependencies-and-known-limitations)).
+-   A modifier that reads the attribute it modifies sees that attribute's _final_ value, which includes the modifier's own effect. "+10% of MaxHealth" as a Linear modifier on MaxHealth that reads MaxHealth (Coefficient 0.1) settles at 111.1 for a base of 100 (x = 100 + 0.1x). To add 10% once, use a Multiplicative modifier of 1.1 (100 x 1.1 = 110). See [Circular Dependencies and Known Limitations](Attribute.md#circular-dependencies-and-known-limitations).
     
 
-## Standard Implementations
+## LogicModifier
 
-The system comes with several robust implementations to cover most RPG/Game needs without requiring custom code. They live in the `ReactiveSolutions.AttributeSystem.Core.Modifiers` namespace (except `FunctionalAttributeModifier`).
-
-### 1. `LinearModifier`
-
-The workhorse of the system.
-
--   **Formula:** `(Input * Coefficient) + Addend`
-    
--   **Arguments:**
-    
-    1.  `Input` (The main value, usually a dynamic attribute)
-        
-    2.  `Coefficient` (Multiplier, 1 if the argument is omitted)
-        
-    3.  `Addend` (Flat bonus, 0 if the argument is omitted)
-        
--   **Usage:**
-    
-    -   _Flat Bonus:_ Input=10, Coeff=1, Addend=0 -> Result 10.
-        
-    -   _Scaling:_ Input=Strength, Coeff=2.5 -> Result Strength * 2.5.
-        
-
-### 2. `PolynomialModifier`
-
-Used for non-linear scaling (quadratic curves, etc.).
-
--   **Formula:** `(Input ^ Power) * Scale + Flat`
-    
--   **Arguments:**
-    
-    1.  `Input`
-        
-    2.  `Power` (Exponent)
-        
-    3.  `Scale`
-        
-    4.  `Flat`
-        
-
-### 3. `FunctionalModifier` (The Swiss Army Knife)
-
-A generic wrapper that executes a specific math function (often wrapping `Mathf`): `new FunctionalModifier(AttributeModifierSpec spec, Func<IList<float>, float> operation)`. The operation receives the current argument values, in order.
-
--   **Usage:** Used for specific logic defined in the `ModifierFactory`.
-    
--   **Examples:**
-    
-    -   `Clamp`: Args [Input, Min, Max]
-        
-    -   `Min` / `Max`: Args [Value A, Value B]
-        
-    -   `Step`: Args [Edge Threshold, Input Value]. Returns 1 if Input Value >= Edge Threshold, else 0.
-        
-    -   See [ModifierFactory](ModifierFactory.md) for the full list (`Floor`, `Ratio`, `Exponential`, `DiminishingReturns`, `ScaledTriangular`).
-        
-
-### 4. `StaticAttributeModifier`
-
-Returns its first argument (`Value`) unchanged, e.g. a flat `+10` (Additive) or a fixed `x1.5` (Multiplicative). It backs the `Static` logic type and is the factory's fallback for unknown logic types.
-
-### Other Implementations
-
--   **`FunctionalAttributeModifier`** (namespace `ReactiveSolutions.AttributeSystem.Core`): passes a single `ValueSource` through a lambda. Constructor: `FunctionalAttributeModifier(string sourceId, ValueSource source, Func<float, float> operation, ModifierType type = ModifierType.Additive, int priority = 0)`.
-    
--   **`SegmentedMultiplierAttributeModifier`**: returns the multiplier of the highest threshold its source value reaches (tiered "breakpoints"), or a default multiplier. It is configured through its serialized fields only and is not registered in the factory.
-    
-
-## The Modifier Factory
-
-To support data-driven design (JSON StatBlocks), the system uses a `ModifierFactory` to map logic types to specific modifier classes. A spec names its logic type with a SemanticKey, such as the package's generated `sk.Modifiers.Linear`, and the factory looks it up by the key's string value (`"Linear"`). An unknown logic type logs a warning and falls back to `Static`. See [ModifierFactory](ModifierFactory.md).
-
-### Registration
-
-You can register new logic types in your startup code:
+`LogicModifier` is the modifier that StatBlocks create: it takes its value from a logic object. Use it to apply logic from code:
 
 ```csharp
-using ReactiveSolutions.AttributeSystem.Core;           // ModifierFactory
-using ReactiveSolutions.AttributeSystem.Core.Modifiers; // FunctionalModifier
+var entity = new Entity();
+entity.SetOrUpdateBaseValue(Stats.Damage, 10f);
+entity.SetOrUpdateBaseValue(Stats.Strength, 8f);
 
-var factory = new ModifierFactory();
+// Damage += Strength * 0.5   (10 + 4 = 14)
+IDisposable scaling = entity.AddModifier("Scaling",
+    new LogicModifier(new LinearLogic { Input = ValueSource.FromAttribute(Stats.Strength), Coefficient = 0.5f }),
+    Stats.Damage);
 
-// Register a custom "DistanceBonus" logic
-factory.Register("DistanceBonus", spec => new FunctionalModifier(spec, vals => {
-    // Custom logic: Bonus based on distance to target
-    float dist = vals[0];
-    return dist > 10 ? 0 : (10 - dist) * 2; // +2 damage per meter closer than 10m
-}), "DistanceToTarget");
+// Health can't go above MaxHealth. Priority 1000 applies it after everything at lower priorities.
+entity.AddModifier("HealthCap",
+    new LogicModifier(new ValueLogic(ValueSource.FromAttribute(Stats.MaxHealth)), ModifierType.ClampMax, priority: 1000),
+    Stats.Health);
 
+scaling.Dispose(); // Removes the modifier: Damage is 10 again
 ```
 
-The builder receives the `AttributeModifierSpec`. A spec selects this logic when its `LogicType` is a key named `DistanceBonus`, e.g. one you add to your own KeyDomain (see [Semantic Keys](Semantic%20Keys.md)). Builders belong to the factory instance they are registered on, so pass that factory wherever StatBlocks are applied (see [ModifierFactory](ModifierFactory.md)).
+The constructor is `LogicModifier(ModifierLogic logic, ModifierType type = ModifierType.Additive, int priority = 0, string sourceId = null, Entity context = null)`. `context` is the entity the logic reads its attribute inputs from; leave it `null` to read them from the entity whose attribute is modified. (StatBlocks pass the entity they are applied to.)
 
-### Argument Metadata
+## Other Implementations
 
-The factory also allows defining parameter names for the Unity Editor. This ensures that when a designer selects "Clamp" in the Inspector, the input fields are labeled "Input", "Min", and "Max" instead of generic labels. The built-in names are available statically (`ModifierFactory.TryGetParameterNames`), so the editor knows them without creating a factory.
-
-## Unified Arguments: `AttributeModifierSpec`
-
-All built-in modifiers are constructed from an `AttributeModifierSpec`, the same serializable class that StatBlocks store (it replaces the old `ModifierArgs` struct). Factory builders receive it too. This passes the `ValueSource` list safely.
-
-```csharp
-[Serializable]
-public class AttributeModifierSpec
-{
-    public SemanticKey TargetAttribute;  // The attribute a StatBlock applies it to
-    public List<SemanticKey> TargetPath; // Provider path to a remote target (empty = local)
-    public string SourceId;
-    public ModifierType Type = ModifierType.Additive;
-    public int Priority = 0;
-    public SemanticKey LogicType;        // e.g. sk.Modifiers.Linear
-    public List<ValueSource> Arguments;
+-   **`FunctionalAttributeModifier`** (namespace `ReactiveSolutions.AttributeSystem.Core`): passes a single `ValueSource` through a lambda. It can't be saved in a StatBlock, since a lambda isn't data. Constructor: `FunctionalAttributeModifier(string sourceId, ValueSource source, Func<float, float> operation, ModifierType type = ModifierType.Additive, int priority = 0)`.
     
-    // Helper to safely get arguments or default to a Constant (0 unless specified)
-    public ValueSource GetSafe(int index, float defaultConstant = 0f);
 
-    // Logs a warning and returns false if fewer than requiredCount arguments are defined
-    public bool ValidateArgCount(int requiredCount, string logicType);
-}
+## Writing a Modifier From Scratch
 
-```
-
-## Creating a Custom Modifier
-
-If `FunctionalModifier` isn't enough (e.g., you need complex state or external physics queries), you can implement `IAttributeModifier` directly or inherit from `ParametricAttributeModifier` (its constructor takes `sourceId, type, priority, arguments`; override `protected float Calculate(IList<float> args)` and it resolves the `ValueSource` arguments for you).
+For anything a logic class can't express, implement `IAttributeModifier` directly. A logic class is usually simpler, and it also works in StatBlocks and the Inspector (see [Modifier Logic](Modifier%20Logic.md#writing-your-own-logic)).
 
 ```csharp
 using System;
@@ -202,7 +127,7 @@ public class DayNightModifier : IAttributeModifier
 
 ```
 
-Apply it like any other modifier; disposing the returned handle removes it (`Stats.Damage` is a key from a generated KeyDomain class, see [Semantic Keys](Semantic%20Keys.md)):
+Apply it like any other modifier; disposing the returned handle removes it:
 
 ```csharp
 var entity = new Entity();

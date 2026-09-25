@@ -84,7 +84,7 @@ When the first provider changes (or disappears):
 2.  **Cleanup:** The previous application, held in a `SerialDisposable`, is then disposed. This removes the modifier from the old target (or disposes the nested connection that holds it).
     
 
-The `ValueSource` arguments of the built-in modifiers are read relative to the entity whose attribute is modified (the one `GetMagnitude` receives), unless they were baked to another entity. `ModifierFactory.Create(spec, entity)`, which StatBlocks use, bakes the entity the block was applied to: a sword's StatBlock modifier on its Owner's Damage reads `Strength` from the sword, and needs the path `Owner` in the argument's reference to read the Owner's Strength. A missing attribute reads as 0.
+A `LogicModifier` reads its logic's attribute inputs from its `Context` entity, or, without one, from the entity whose attribute is modified (the one `GetMagnitude` receives). StatBlocks set the context to the entity the block was applied to: a sword's StatBlock modifier on its Owner's Damage reads `Strength` from the sword, and needs the path `Owner` in the input's reference to read the Owner's Strength. A missing attribute reads as 0.
 
 ### 4. Lifecycle (`Dispose`)
 
@@ -99,19 +99,13 @@ When `Dispose()` is called:
 
 ## Usage Example
 
-`Links.Owner` and `Stats.Health` are keys from classes generated from your KeyDomains (see [Semantic Keys](Semantic%20Keys.md)). `StaticAttributeModifier` is in the `ReactiveSolutions.AttributeSystem.Core.Modifiers` namespace.
+`Links.Owner` and `Stats.Health` are keys from classes generated from your KeyDomains (see [Semantic Keys](Semantic%20Keys.md)). `LogicModifier` and `ValueLogic` are in the `ReactiveSolutions.AttributeSystem.Core.Modifiers` namespace.
 
 ```csharp
 // Scenario: A "Curse" component wants to apply -10 Health to the "Owner" of this object.
 
 // 1. Define the modifier
-var modifier = new StaticAttributeModifier(new AttributeModifierSpec
-{
-    SourceId = "Curse",
-    Type = ModifierType.Additive,
-    Priority = 0,
-    Arguments = new List<ValueSource> { ValueSource.Const(-10f) }
-});
+var modifier = new LogicModifier(new ValueLogic(-10f), ModifierType.Additive, sourceId: "Curse");
 
 // 2. Define the path (Look for "Owner")
 var path = new List<SemanticKey> { Links.Owner };

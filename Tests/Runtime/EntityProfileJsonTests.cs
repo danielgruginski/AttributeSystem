@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
 using ReactiveSolutions.AttributeSystem.Core;
+using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using ReactiveSolutions.AttributeSystem.Core.Builders;
 using ReactiveSolutions.AttributeSystem.Core.Data;
 using SemanticKeys;
@@ -52,8 +53,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 new AttributeModifierSpec
                 {
                     TargetAttribute = target,
-                    LogicType = sk.Modifiers.Static,
-                    Arguments = new List<ValueSource> { ValueSource.Const(value) }
+                    Logic = new ValueLogic(ValueSource.Const(value))
                 }
             }
         };
@@ -88,6 +88,47 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             Assert.AreEqual("Weapons/RustySword", copy.NestedEntities[0].ProfileId);
             Assert.AreEqual("Passives/Brittle", (string)copy.InnateStatBlockIds[0]);
             Assert.AreEqual(Damage, copy.InnateStatBlocks[0].Modifiers[0].TargetAttribute);
+            Assert.IsInstanceOf<ValueLogic>(copy.InnateStatBlocks[0].Modifiers[0].Logic);
+            Assert.AreEqual(3f, ((ValueLogic)copy.InnateStatBlocks[0].Modifiers[0].Logic).Value.ConstantValue);
+        }
+
+        [Test]
+        public void StatBlockLogic_RoundTripsThroughJson()
+        {
+            var block = new StatBlock
+            {
+                Modifiers =
+                {
+                    new AttributeModifierSpec
+                    {
+                        TargetAttribute = Damage,
+                        Type = ModifierType.Additive,
+                        Logic = new LinearLogic { Input = ValueSource.FromAttribute(Health, RightHand), Coefficient = 0.5f }
+                    },
+                    new AttributeModifierSpec
+                    {
+                        TargetAttribute = Health,
+                        Type = ModifierType.ClampMax,
+                        Priority = 10,
+                        Logic = new SegmentedLogic { Input = 3f, Default = 1f, Segments = { new SegmentedLogic.Segment { Threshold = 2f, Value = 4f } } }
+                    },
+                }
+            };
+
+            var copy = new StatBlock();
+            JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(block), copy);
+
+            var linear = (LinearLogic)copy.Modifiers[0].Logic;
+            Assert.AreEqual(ValueSource.SourceMode.Attribute, linear.Input.Mode);
+            Assert.AreEqual(Health, linear.Input.AttributeRef.Name);
+            CollectionAssert.AreEqual(new[] { RightHand }, linear.Input.AttributeRef.Path);
+            Assert.AreEqual(0.5f, linear.Coefficient.ConstantValue);
+
+            var segmented = (SegmentedLogic)copy.Modifiers[1].Logic;
+            Assert.AreEqual(ModifierType.ClampMax, copy.Modifiers[1].Type);
+            Assert.AreEqual(10, copy.Modifiers[1].Priority);
+            Assert.AreEqual(4f, segmented.Segments[0].Value);
+            Assert.AreNotSame(copy.Modifiers[0].Logic, copy.Modifiers[1].Logic);
         }
 
         [Test]
@@ -97,7 +138,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var knight = ProfileBuilder.Create("Knight").AddNestedEntity(RightHand, "Weapons/Sword").Build();
 
             var e = new Entity();
-            e.ApplyProfile(knight, new ModifierFactory());
+            e.ApplyProfile(knight);
 
             Assert.AreEqual(12f, Get(e, Damage, RightHand).ObservableValue.Value);
         }
@@ -112,7 +153,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 .Build();
 
             var e = new Entity();
-            e.ApplyProfile(ogre, new ModifierFactory());
+            e.ApplyProfile(ogre);
 
             Assert.AreEqual(150f, Get(e, Health).ObservableValue.Value);
 
@@ -138,7 +179,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 "[EntityProfileJsonLoader] Could not load EntityProfile with ID: Weapons/Missing (Attempted path: Data/EntityProfiles/Weapons/Missing)");
 
             var e = new Entity();
-            e.ApplyProfile(knight, new ModifierFactory());
+            e.ApplyProfile(knight);
 
             Assert.IsNull(Get(e, Damage, RightHand));
         }
@@ -151,7 +192,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             LogAssert.Expect(LogType.Error, new Regex("Skipped nested entity 'RightHand': profile 'Golem' is already being applied"));
 
             var e = new Entity();
-            e.ApplyProfile(golem, new ModifierFactory());
+            e.ApplyProfile(golem);
 
             Assert.AreEqual(10f, Get(e, Health).ObservableValue.Value);
             Assert.IsNull(Get(e, Health, RightHand));
@@ -167,7 +208,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             LogAssert.Expect(LogType.Error, new Regex("Skipped nested entity 'RightHand': profile 'Monsters/Hydra' is already being applied"));
 
             var e = new Entity();
-            e.ApplyProfile(EntityProfileJsonLoader.Load("Monsters/Hydra.json"), new ModifierFactory());
+            e.ApplyProfile(EntityProfileJsonLoader.Load("Monsters/Hydra.json"));
 
             Assert.AreEqual(10f, Get(e, Health).ObservableValue.Value);
             Assert.IsNull(Get(e, Health, RightHand));
@@ -182,7 +223,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             LogAssert.Expect(LogType.Error, new Regex("Skipped nested entity 'RightHand': profile 'Imp' is already being applied"));
 
             var e = new Entity();
-            e.ApplyProfile(imp, new ModifierFactory());
+            e.ApplyProfile(imp);
 
             Assert.IsNull(Get(e, Health, RightHand));
         }
@@ -197,7 +238,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 .Build();
 
             var e = new Entity();
-            e.ApplyProfile(rogue, new ModifierFactory());
+            e.ApplyProfile(rogue);
 
             Assert.AreEqual(4f, Get(e, Damage, RightHand).ObservableValue.Value);
             Assert.AreEqual(4f, Get(e, Damage, LeftHand).ObservableValue.Value);

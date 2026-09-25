@@ -92,7 +92,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             };
 
             // Apply
-            var handle = block.ApplyToEntity(_processor, null);
+            var handle = block.ApplyToEntity(_processor);
 
             // Assert Tags Applied
             Assert.IsTrue(_processor.HasTag(TestKeys.Mock("Cursed")));
@@ -114,7 +114,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             _processor.AddTag(TestKeys.Mock("Buffed")); // Count 1 (Base state)
 
             // Apply Block
-            var handle = block.ApplyToEntity(_processor, null);
+            var handle = block.ApplyToEntity(_processor);
             Assert.AreEqual(2, _processor.Tags[TestKeys.Mock("Buffed")], "Count should be 2 (Base + Block)");
 
             // Dispose Block (Unequip)
