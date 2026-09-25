@@ -96,7 +96,7 @@ The registry is keyed by **string**: the SemanticKey's value. `Register(sk.Modif
 
 -   Any key with a matching value selects the builder, even one from another KeyDomain (with a different GUID). For example, a key named `Linear` in your own KeyDomain picks the built-in Linear logic.
     
--   Lookups use the key's cached value. When a key is renamed in its KeyDomain, existing data keeps the old value until **Update All References** is run (the button on the KeyDomain asset, or Tools > SemanticKeys > Update All References); the updater scans assets and loaded scenes, not StatBlock JSON files. Whenever the value a spec holds differs from the name its builder is registered under, the factory warns and falls back to Static. So keep the names of the built-in logic types, and register custom builders under their key's current name. See [Semantic Keys](Semantic%20Keys.md).
+-   Lookups use the key's cached value. Renaming a key in the KeyDomain inspector runs **Update All References** (also available as Tools > SemanticKeys > Update All References), which updates the cached value in assets and loaded scenes, but not in closed scenes or StatBlock JSON files. Whenever the value a spec holds differs from the name its builder is registered under, the factory warns and falls back to Static. So keep the names of the built-in logic types, and register custom builders under their key's current name. See [Semantic Keys](Semantic%20Keys.md).
     
 
 ## Default Registered Types
