@@ -1,0 +1,19 @@
+{
+  "effect": "Fireball",
+  "condition": {
+    "all": [{ "compare": ["Source/Health", ">", 0] }, { "compare": ["Target/Health", ">", 0] }]
+  },
+  "costs": { "Source/Mana": 15 },
+  "actions": [
+    {
+      "target": "Target/Health",
+      "type": "Reduce",
+      "linear": { "input": "Source/SpellPower", "coefficient": 1.5 }
+    }
+  ],
+  "keys": {
+    "Health": "0fb4fa22-7d58-465f-9c3c-7258a14b9149",
+    "Mana": "3181edf0-d48e-443e-954b-5066d4cb22ef",
+    "SpellPower": "baaa3e21-3883-4291-ade4-85b357f1da51"
+  }
+}

@@ -11,17 +11,15 @@ namespace RPGStarter
     /// <summary>
     /// The game code a project writes on top of the Attribute System: spawning characters from their profiles,
     /// combat, equipment, inventory, the party, leveling up and a poison. The rules and numbers are in the data (the
-    /// JSON files under Resources/Data/.../RPGStarter): templates, characters, items and StatBlocks.
+    /// JSON files under Resources/Data/.../RPGStarter): templates, characters, items, StatBlocks and effects.
     /// Plain C#, so tests can run it too; RPGStarterDemo drives it from a MonoBehaviour.
     /// </summary>
     public sealed class RPGGame : IDisposable
     {
-        /// <summary>The folder of the sample's profiles and StatBlocks, inside Data/EntityProfiles and Data/StatBlocks.</summary>
+        /// <summary>
+        /// The folder of the sample's data, inside Data/EntityProfiles, Data/StatBlocks and Data/Effects.
+        /// </summary>
         public const string Data = "RPGStarter/";
-
-        public const float FireballCost = 15f;
-        public const float PotionHealing = 40f;
-        public const float PoisonDamagePerSecond = 3f;
 
         public Entity Knight { get; }
         public Entity Mage { get; }
@@ -38,14 +36,26 @@ namespace RPGStarter
         private readonly Dictionary<Entity, Poisoning> _poisoned = new Dictionary<Entity, Poisoning>();
         private IDisposable _blessing;
 
+        // What happens is data: each effect's condition, costs, formulas and chances are in its JSON file.
+        private readonly Effect _weaponHit = EffectJsonLoader.Load(Data + "Combat/WeaponHit");
+        private readonly Effect _fireball = EffectJsonLoader.Load(Data + "Spells/Fireball");
+        private readonly Effect _healingPotion = EffectJsonLoader.Load(Data + "Consumables/HealingPotion");
+        private readonly Effect _poisonTick = EffectJsonLoader.Load(Data + "Debuffs/PoisonTick");
+        private readonly Effect _levelUp = EffectJsonLoader.Load(Data + "Progression/LevelUp");
+        private readonly System.Random _random;
+
         private sealed class Poisoning
         {
             public ActiveStatBlock Debuff;
             public float SecondsLeft;
+            public float UntilTick;
         }
 
-        public RPGGame()
+        /// <param name="random">Rolls the critical hits. Pass one with a seed to make a game repeatable.</param>
+        public RPGGame(System.Random random = null)
         {
+            _random = random ?? new System.Random();
+
             Knight = Spawn("Heroes/Knight");
             Mage = Spawn("Heroes/Mage");
             Goblin = Spawn("Monsters/Goblin");
@@ -80,39 +90,44 @@ namespace RPGStarter
 
         // ---------------------------------------------------------------- Combat
 
-        /// <summary>A weapon attack: the attacker's AttackPower, reduced by the target's Defense.</summary>
+        /// <summary>
+        /// A weapon attack (the Weapon Hit effect): the attacker's AttackPower reduced by the target's Defense, and on a
+        /// critical hit (the attacker's CritChance), the same damage again. Returns the damage dealt.
+        /// </summary>
         public float Attack(Entity attacker, Entity target)
         {
-            if (!IsAlive(attacker) || !IsAlive(target)) return 0f;
+            var hit = _weaponHit.Apply(attacker, target, _random);
+            if (!hit.Applied) return 0f; // One of them has fallen: the effect's condition.
 
-            float damage = Get(attacker, RPGStats.AttackPower) * 100f / (100f + Get(target, RPGStats.Defense));
-            float dealt = target.GetPool(RPGStats.Health).Reduce(damage);
-            Log($"{attacker.Name} hits {target.Name} for {dealt:0.#}. {HealthText(target)}");
+            float dealt = -hit.ChangeOf(target, RPGStats.Health);
+            string critical = hit.Changes.Count > 1 ? " (critical hit)" : "";
+            Log($"{attacker.Name} hits {target.Name} for {dealt:0.#}{critical}. {HealthText(target)}");
             return dealt;
         }
 
-        /// <summary>A spell: costs Mana, and deals 1.5 x SpellPower.</summary>
+        /// <summary>A spell (the Fireball effect): costs 15 Mana, and deals 1.5 x SpellPower.</summary>
         public bool CastFireball(Entity caster, Entity target)
         {
-            if (!IsAlive(caster) || !IsAlive(target)) return false;
-
-            var mana = caster.GetPool(RPGStats.Mana);
-            if (mana == null || !mana.TrySpend(FireballCost))
+            var fireball = _fireball.Apply(caster, target, _random);
+            if (fireball.Status == EffectStatus.CannotPay)
             {
-                Log($"{caster.Name} doesn't have the Mana for a fireball.");
+                Log($"{caster.Name} doesn't have the {fireball.UnpaidCost.Name} for a fireball.");
                 return false;
             }
+            if (!fireball.Applied) return false;
 
-            float dealt = target.GetPool(RPGStats.Health).Reduce(Get(caster, RPGStats.SpellPower) * 1.5f);
+            float dealt = -fireball.ChangeOf(target, RPGStats.Health);
             Log($"{caster.Name}'s fireball burns {target.Name} for {dealt:0.#}. {HealthText(target)}");
             return true;
         }
 
+        /// <summary>The Healing Potion effect: +40 Health, never above MaxHealth. Returns the Health restored.</summary>
         public float DrinkPotion(Entity drinker)
         {
-            if (!IsAlive(drinker)) return 0f;
+            var potion = _healingPotion.Apply(drinker, drinker);
+            if (!potion.Applied) return 0f;
 
-            float healed = drinker.GetPool(RPGStats.Health).Restore(PotionHealing);
+            float healed = potion.ChangeOf(drinker, RPGStats.Health);
             Log($"{drinker.Name} drinks a potion and heals {healed:0.#}. {HealthText(drinker)}");
             return healed;
         }
@@ -149,16 +164,19 @@ namespace RPGStarter
 
         // ---------------------------------------------------------------- Progression and effects
 
-        /// <summary>Level is a base value; the Character template's formulas turn it into MaxHealth.</summary>
+        /// <summary>
+        /// The Level Up effect: +1 Level, a base value. The Character template's formulas turn it into MaxHealth.
+        /// </summary>
         public void LevelUp(Entity character)
         {
-            character.SetOrUpdateBaseValue(RPGStats.Level, Get(character, RPGStats.Level) + 1f);
+            _levelUp.Apply(character, character);
             Log($"{character.Name} reaches level {Get(character, RPGStats.Level)}. {HealthText(character)}");
         }
 
         /// <summary>
-        /// Poisons the target for a while: the Poison StatBlock (the Poisoned tag, slower movement) while it lasts,
-        /// and damage over time in <see cref="Tick"/>. Poisoning a poisoned target restarts the timer.
+        /// Poisons the target for a while: the Poison StatBlock (the Poisoned tag, slower movement) while it lasts, and
+        /// the Poison Tick effect (3 damage) every second, in <see cref="Tick"/>. Poisoning a poisoned target restarts
+        /// the timer.
         /// </summary>
         public void Poison(Entity target, float seconds)
         {
@@ -166,7 +184,11 @@ namespace RPGStarter
 
             if (!_poisoned.TryGetValue(target, out var poisoning))
             {
-                poisoning = new Poisoning { Debuff = StatBlockJsonLoader.Load(Data + "Debuffs/Poison").ApplyToEntity(target) };
+                poisoning = new Poisoning
+                {
+                    Debuff = StatBlockJsonLoader.Load(Data + "Debuffs/Poison").ApplyToEntity(target),
+                    UntilTick = 1f
+                };
                 _poisoned.Add(target, poisoning);
             }
             poisoning.SecondsLeft = seconds;
@@ -191,7 +213,7 @@ namespace RPGStarter
 
         public bool IsBlessed => _blessing != null;
 
-        /// <summary>Advances time: poison damage, and poisons wearing off.</summary>
+        /// <summary>Advances time: poison ticks, and poisons wearing off.</summary>
         public void Tick(float deltaTime)
         {
             foreach (var pair in _poisoned.ToList())
@@ -199,8 +221,13 @@ namespace RPGStarter
                 var target = pair.Key;
                 var poisoning = pair.Value;
 
-                float seconds = Math.Min(deltaTime, poisoning.SecondsLeft);
-                if (IsAlive(target)) target.GetPool(RPGStats.Health).Reduce(PoisonDamagePerSecond * seconds);
+                // A tick every whole second the poison lasts.
+                poisoning.UntilTick -= Math.Min(deltaTime, poisoning.SecondsLeft);
+                while (poisoning.UntilTick <= 0f && IsAlive(target))
+                {
+                    _poisonTick.Apply(null, target);
+                    poisoning.UntilTick += 1f;
+                }
 
                 poisoning.SecondsLeft -= deltaTime;
                 if (poisoning.SecondsLeft <= 0f || !IsAlive(target))

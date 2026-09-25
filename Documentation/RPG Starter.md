@@ -2,12 +2,13 @@
 
 The package comes with a sample RPG: import it with **Window > Package Manager > Attribute System > Samples > RPG Starter > Import**, add the **RPG Starter Demo** component to an empty GameObject, and press Play. A Knight and a Mage fight a Goblin; buttons let you attack, cast, drink potions, swap weapons, carry an anvil, poison the Knight, level up and bless the party.
 
-This page shows how it is built. The rules and numbers are data (JSON files in the sample's `Resources/Data/EntityProfiles/RPGStarter` and `Resources/Data/StatBlocks/RPGStarter` folders); the code (`Scripts/RPGGame.cs`) only spawns characters, runs the fights and moves items around. Key tables are left out of the excerpts below.
+This page shows how it is built. The rules and numbers are data: JSON files in the sample's `Resources/Data/EntityProfiles/RPGStarter`, `Resources/Data/StatBlocks/RPGStarter` and `Resources/Data/Effects/RPGStarter` folders. The code (`Scripts/RPGGame.cs`) only spawns characters, applies effects, moves items around and counts time. Key tables are left out of the excerpts below.
 
 | Piece | Data | Package feature |
 | ----- | ----- | ----- |
 | Stats and formulas every character shares | `Templates/Character` | [Templates](EntityProfile.md#templates), [Modifier Logic](Modifier%20Logic.md) |
 | Health and Mana | `Templates/Character`, `Templates/Caster` | [Resource Pools](Resource%20Pools.md) |
+| Hits, spells, potions, poison ticks and leveling up | `Combat/WeaponHit`, `Spells/Fireball`, `Consumables/HealingPotion`, `Debuffs/PoisonTick`, `Progression/LevelUp` | [Effects](Effects.md) |
 | Weapons and armor that add to their owner | `Templates/Weapon`, `Templates/Armor` | Parent keys, [conditions](JSON%20Format.md#conditions) |
 | Inventory and encumbrance | `Templates/InventoryHolder` | [Link groups and group totals](LinkGroup.md#4-totals-over-a-group) |
 | The party's aura | `Auras/Leadership` | [LinkGroup](LinkGroup.md) |
@@ -44,22 +45,73 @@ The Character template gives every character its stats (10 in each), its Health 
 }
 ```
 
-The Knight's MaxHealth is 12 x 10 + 1 x 5 = 125, and it follows Vitality and Level as they change: leveling up is `SetOrUpdateBaseValue(Level, level + 1)`. `HealthPercent` is a helper attribute that conditions can compare against.
+The Knight's MaxHealth is 12 x 10 + 1 x 5 = 125, and it follows Vitality and Level as they change: leveling up is the Level Up effect, which adds 1 to Level. `HealthPercent` is a helper attribute that conditions can compare against.
 
 ## Health and Mana Are Pools
 
-The Character template has `"pools": { "Health": "MaxHealth" }`, and Caster adds Mana. A pool starts full and stays between 0 and its maximum, so the game code is short:
+The Character template has `"pools": { "Health": "MaxHealth" }`, and Caster adds Mana. A pool starts full and stays between 0 and its maximum, so the effects that damage and heal need no checks of their own.
+
+`Depleted` logs "... falls." when a character's Health reaches 0:
 
 ```csharp
-float damage = Get(attacker, RPGStats.AttackPower) * 100f / (100f + Get(target, RPGStats.Defense));
-target.GetPool(RPGStats.Health).Reduce(damage);
-
-if (caster.GetPool(RPGStats.Mana).TrySpend(15f)) { /* cast the fireball */ }
-
-drinker.GetPool(RPGStats.Health).Restore(40f); // Never above MaxHealth
+entity.GetPool(RPGStats.Health).Depleted.Subscribe(_ => Log($"{entity.Name} falls."));
 ```
 
-`Depleted` logs "... falls." when a character's Health reaches 0. When the Knight levels up or the party is blessed (+20 MaxHealth), Health keeps its percentage, and ending the blessing costs no Health.
+When the Knight levels up or the party is blessed (+20 MaxHealth), Health keeps its percentage, and ending the blessing costs no Health.
+
+## Hits, Spells and Potions Are Effects
+
+A weapon hit is an effect from the attacker (its source) to its target:
+
+```json
+{
+  "effect": "Weapon Hit",
+  "condition": {
+    "all": [{ "compare": ["Source/Health", ">", 0] }, { "compare": ["Target/Health", ">", 0] }]
+  },
+  "actions": [
+    {
+      "target": "Target/Health",
+      "type": "Reduce",
+      "ratio": {
+        "dividend": { "linear": { "input": "Source/AttackPower", "coefficient": 100 } },
+        "divisor": { "linear": { "input": "Target/Defense", "addend": 100 } }
+      }
+    },
+    {
+      "target": "Target/Health",
+      "type": "Reduce",
+      "chance": "Source/CritChance",
+      "ratio": {
+        "dividend": { "linear": { "input": "Source/AttackPower", "coefficient": 100 } },
+        "divisor": { "linear": { "input": "Target/Defense", "addend": 100 } }
+      }
+    }
+  ]
+}
+```
+
+-   **The condition:** neither of them has fallen.
+-   **The first action** deals the attacker's AttackPower, reduced by the target's Defense (AttackPower x 100 / (Defense + 100)).
+-   **The second action** is a critical hit: the same damage again, as often as the attacker's CritChance (8% for the Knight).
+
+The game code applies it and reports what it did:
+
+```csharp
+var hit = _weaponHit.Apply(attacker, target, _random);
+if (!hit.Applied) return 0f; // One of them has fallen
+
+float dealt = -hit.ChangeOf(target, RPGStats.Health);
+```
+
+The other effects work the same way:
+
+-   **Fireball** costs 15 of the caster's Mana (`"costs": { "Source/Mana": 15 }`) and deals 1.5 x SpellPower. Without the Mana, it does nothing and `Status` is `CannotPay`, so the game logs "Mage doesn't have the Mana for a fireball."
+-   **Healing Potion** adds 40 Health, never above MaxHealth.
+-   **Poison Tick** deals 3 damage.
+-   **Level Up** adds 1 to Level.
+
+`RPGGame` takes a `System.Random` for the critical hits, so a seeded game (or a test) is repeatable.
 
 ## Gear Adds to Its Owner
 
@@ -140,7 +192,7 @@ The Goblin has an innate StatBlock that reacts to its own state:
 
 ## What the Sample Does by Hand
 
-The poison applies its StatBlock (the Poisoned tag and slower movement), but its duration and its damage over time are counted in `RPGGame.Tick`. The package doesn't have timed effects yet.
+The poison applies its StatBlock (the Poisoned tag and slower movement) and, every second, its Poison Tick effect. Its duration and the seconds between ticks are counted in `RPGGame.Tick`: the package doesn't have timed effects yet.
 
 ## Make It Yours
 
@@ -148,3 +200,4 @@ The poison applies its StatBlock (the Poisoned tag and slower movement), but its
 -   **A new item:** a profile built on Weapon or Armor, with its numbers.
 -   **A new monster:** its templates, its numbers, and a StatBlock for how it fights (like the Goblin's frenzy).
 -   **A new rule for everyone:** add a modifier to the Character Rules, e.g. Defense from Vitality.
+-   **A new spell:** an effect file, with its costs and its formula (e.g. a Heal that restores 2 x SpellPower for 10 Mana), and a line in `RPGGame` that applies it.
