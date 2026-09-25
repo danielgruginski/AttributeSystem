@@ -153,11 +153,11 @@ A nested entity is a child `Entity` created from its own profile and registered 
 -   **Reaching the parent:** a nested entity reaches the entity it is nested in if its profile names a **Parent Key** (`"parentKey"` in JSON, `SetParentKey` in code): the parent is registered as its provider under that key, e.g. a sword's `Owner`. A template can set it for all its profiles (every weapon's parent is its Owner), and a profile's own Parent Key replaces its templates'.
     
 
-For entities you link at runtime, such as a sword equipped from an inventory, register both links yourself. The entity's `ParentKey` property holds the key from its profile:
+For entities you link at runtime, such as a sword equipped from an inventory, `Attach` links both ways, using the sword's `ParentKey`, and `Detach` unlinks them:
 
 ```csharp
-hero.RegisterExternalProvider(Links.MainHand, sword);
-sword.RegisterExternalProvider(sword.ParentKey, hero); // e.g. Links.Owner
+hero.Attach(Links.MainHand, sword); // The sword reaches the hero as its Owner
+Entity unequipped = hero.Detach(Links.MainHand);
 ```
 
 A profile that nests itself, directly or through other profiles, is caught: that nested entry is skipped with the error `[Entity] Skipped nested entity '...': profile '...' is already being applied further up.` The same profile can still appear several times side by side (e.g. a dagger in each hand).

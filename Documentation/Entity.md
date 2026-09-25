@@ -173,6 +173,14 @@ Methods for establishing relationships between entities.
     
     -   Returns an `IObservable<Entity>` that emits the current provider (or null) on subscribe, then fires whenever the specific provider is registered, changed, or unregistered (resolving to null).
         
+-   **`GetProvider(SemanticKey key)`**
+    
+    -   The entity registered under the key (e.g. what's in `Links.MainHand`), or `null`.
+        
+-   **`Attach(SemanticKey key, Entity child)`** / **`Detach(SemanticKey key)`**
+    
+    -   Link two entities both ways, as a nested entity is linked: `hero.Attach(Links.MainHand, sword)` registers the sword under `MainHand`, and the hero under the sword's `ParentKey` (e.g. `Owner`) if its profile names one. An entity already under the key is detached first. `Detach` removes both links and returns the detached entity. The attached entity isn't owned: disposing the parent doesn't dispose it.
+        
 
 ### 7. Profiles & Link Groups
 
@@ -192,7 +200,11 @@ Methods for establishing relationships between entities.
         
 -   **`ParentKey`**
     
-    -   The key under which this entity reaches the entity it is nested in (e.g. `Links.Owner`), from its profile's `ParentKey`. When a profile's nested entity names one, `ApplyProfile` registers the parent as the child's provider under that key.
+    -   The key under which this entity reaches the entity it is nested in (e.g. `Links.Owner`), from its profile's `ParentKey`. When a profile's nested entity names one, `ApplyProfile` registers the parent as the child's provider under that key, and `Attach` does the same at runtime.
+        
+-   **`Name`**
+    
+    -   A name for logs and tools: the name of the first profile applied to the entity (not its templates'), unless you set it. Nested entities are named after their profiles.
         
 -   **`GetOrCreateLinkGroup(SemanticKey key)`** / **`GetLinkGroup(SemanticKey key)`**
     

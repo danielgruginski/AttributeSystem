@@ -15,6 +15,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
     {
         public bool IsDisposed { get; private set; }
 
+        /// <summary>
+        /// A name for logs and tools: the name of the first profile applied to the entity (not its templates'), unless
+        /// set otherwise.
+        /// </summary>
+        public string Name { get; set; }
+
         private readonly ReactiveDictionary<SemanticKey, Attribute> _attributes = new();
         public IReadOnlyReactiveDictionary<SemanticKey, Attribute> Attributes => _attributes;
 
@@ -55,6 +61,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 Debug.LogWarning($"[Entity] Skipped profile '{profile.ProfileName}': it is already applied to this entity.");
                 return;
             }
+            if (string.IsNullOrEmpty(Name)) Name = profile.ProfileName;
             ApplyProfile(profile, new HashSet<object>());
         }
 
@@ -142,7 +149,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 var nestedProfile = nestedEntry.Profile ?? EntityProfileJsonLoader.Load(nestedId);
                 if (nestedProfile == null) continue;
 
-                var childEntity = new Entity();
+                var childEntity = new Entity { Name = nestedProfile.ProfileName };
                 childEntity.ApplyProfile(nestedProfile, applying);
 
                 RegisterExternalProvider(nestedEntry.ProviderKey, childEntity);
@@ -323,6 +330,40 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 _externalProviders.Remove(key);
                 _onProviderRegistered.OnNext(key);
             }
+        }
+
+        /// <summary>The entity registered under <paramref name="key"/> (e.g. MainHand), or null.</summary>
+        public Entity GetProvider(SemanticKey key) => _externalProviders.TryGetValue(key, out var provider) ? provider : null;
+
+        /// <summary>
+        /// Links <paramref name="child"/> under <paramref name="key"/> (e.g. a sword in MainHand), and this entity under the
+        /// child's ParentKey (e.g. its Owner), so each reaches the other as with a nested entity. An entity already under
+        /// <paramref name="key"/> is detached first. The child isn't owned: disposing this entity doesn't dispose it.
+        /// </summary>
+        public void Attach(SemanticKey key, Entity child)
+        {
+            if (IsDisposed || key == SemanticKey.None || child == null) return;
+
+            Detach(key);
+            RegisterExternalProvider(key, child);
+            if (child.ParentKey != SemanticKey.None) child.RegisterExternalProvider(child.ParentKey, this);
+        }
+
+        /// <summary>
+        /// Unlinks the entity under <paramref name="key"/> and its link back to this entity, and returns it (null if
+        /// there was none).
+        /// </summary>
+        public Entity Detach(SemanticKey key)
+        {
+            var child = GetProvider(key);
+            if (child == null) return null;
+
+            UnregisterExternalProvider(key);
+            if (child.ParentKey != SemanticKey.None && child.GetProvider(child.ParentKey) == this)
+            {
+                child.UnregisterExternalProvider(child.ParentKey);
+            }
+            return child;
         }
 
         public IObservable<Entity> ObserveProvider(SemanticKey key)
