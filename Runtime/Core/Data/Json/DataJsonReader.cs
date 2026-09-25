@@ -30,6 +30,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
 
         private const string AttributeExample = "an attribute such as \"Strength\" or \"Owner/Strength\"";
         private const string TagExample = "a tag such as \"Stunned\" or \"Owner/Stunned\"";
+        private const string FormulaExample = "{ \"linear\": { \"input\": \"Defense\", \"addend\": 100 } }";
 
         private readonly KeyTableReader _keys;
 
@@ -282,7 +283,10 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
                         onMaxChange = (PoolMaxChange)Enum(typeof(PoolMaxChange), property.Value, at);
                         break;
                     default:
-                        throw UnknownProperty(property, at, names, "");
+                        string hint = LogicTypes.Find(property.Key, out _) != null
+                            ? $" (a formula as the maximum goes in \"max\": {{ \"max\": {{ \"{property.Key}\": ... }} }})"
+                            : "";
+                        throw UnknownProperty(property, at, names, hint);
                 }
             }
 
@@ -651,7 +655,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
 
         // ---------------------------------------------------------------- Keys, paths and values
 
-        /// <summary>A number (a constant) or an attribute ("Owner/Strength").</summary>
+        /// <summary>A number (a constant), an attribute ("Owner/Strength") or a formula ({ "linear": { ... } }).</summary>
         private ValueSource ValueSource(JsonNode node, string path)
         {
             switch (node.Kind)
@@ -663,8 +667,14 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
                 case JsonKind.String:
                     var reference = Reference(node, path, AttributeExample);
                     return new ValueSource { Mode = Core.ValueSource.SourceMode.Attribute, AttributeRef = reference };
+                case JsonKind.Object:
+                    if (node.Properties.Count != 1)
+                    {
+                        throw Error(node, path, $"a formula is one logic, e.g. {FormulaExample}, found {node.Describe()}");
+                    }
+                    return Core.ValueSource.From(LogicReference(typeof(ModifierLogic), node, path));
                 default:
-                    throw Error(node, path, $"expected a number or {AttributeExample}, found {node.Describe()}");
+                    throw Error(node, path, $"expected a number, {AttributeExample}, or a formula such as {FormulaExample}, found {node.Describe()}");
             }
         }
 

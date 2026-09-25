@@ -47,12 +47,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
             {
                 foreach (var info in t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
                 {
-                    if (info.IsInitOnly || info.IsLiteral) continue;
-                    if (info.IsDefined(typeof(NonSerializedAttribute), false)) continue;
-
-                    bool isReference = info.IsDefined(typeof(SerializeReference), false);
-                    if (!info.IsPublic && !isReference && !info.IsDefined(typeof(SerializeField), false)) continue;
-                    if (!JsonTypes.IsSavedByUnity(info.FieldType, isReference)) continue;
+                    if (!JsonTypes.IsSavedField(info, out bool isReference)) continue;
 
                     string name = ToJsonName(info.Name);
                     var clash = fields.FirstOrDefault(f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase));
@@ -289,6 +284,22 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
         /// <summary>A field type that can hold a logic object ([SerializeReference] ModifierLogic, or a base of it).</summary>
         public static bool CanHoldLogic(Type type) =>
             typeof(ModifierLogic).IsAssignableFrom(type) || type.IsAssignableFrom(typeof(ModifierLogic));
+
+        /// <summary>
+        /// Whether Unity saves the field: a public, [SerializeField] or [SerializeReference] instance field that isn't
+        /// readonly or [NonSerialized], of a type Unity saves. <paramref name="isReference"/> is whether it is
+        /// [SerializeReference].
+        /// </summary>
+        public static bool IsSavedField(FieldInfo info, out bool isReference)
+        {
+            isReference = false;
+            if (info.IsStatic || info.IsInitOnly || info.IsLiteral) return false;
+            if (info.IsDefined(typeof(NonSerializedAttribute), false)) return false;
+
+            isReference = info.IsDefined(typeof(SerializeReference), false);
+            if (!info.IsPublic && !isReference && !info.IsDefined(typeof(SerializeField), false)) return false;
+            return IsSavedByUnity(info.FieldType, isReference);
+        }
 
         /// <summary>
         /// Whether Unity saves a field of this type. The fields Unity doesn't save (dictionaries, interfaces,

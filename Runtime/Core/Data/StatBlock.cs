@@ -52,8 +52,8 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
 
         public void OnBeforeSerialize() { }
 
-        // A modifier duplicated in the Inspector can share its logic object with the original; give it its own.
-        public void OnAfterDeserialize() => ModifierLogic.Unshare(Modifiers);
+        // A modifier duplicated in the Inspector can share its logic (and the formulas in it) with the original; give it its own.
+        public void OnAfterDeserialize() => SerializedGraph.Unshare(this);
 
         /// <summary>
         /// Populates a processor and returns an ActiveStatBlock handle to manage the lifecycle of applied modifiers.

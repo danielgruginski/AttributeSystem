@@ -95,9 +95,11 @@ Its value is an object with the logic's fields, named in camelCase: `Coefficient
 
 -   A field that isn't in the file keeps the class's default value, and files leave out the fields that have it: `"linear": { "input": "Strength" }` has a Coefficient of 1 and an Addend of 0.
     
--   A logic with one field can be written as the field's value: `"value": 5` is `"value": { "value": 5 }`, and `"floor": "Strength"` rounds Strength down.
+-   A logic with one field can be written as the field's value: `"value": 5` is `"value": { "value": 5 }`, and `"floor": "Strength"` rounds Strength down. (Not when that value is a formula: it would read as the logic's fields.)
     
 -   An input (a `ValueSource`) is a number, for a constant, or an attribute: `"Strength"`, or `"Owner/Strength"` through a provider path. Attributes are read from the entity the StatBlock is applied to.
+    
+-   An input can also be a formula: another logic, written as an object with that logic, e.g. `"divisor": { "linear": { "input": "Defense", "addend": 100 } }` (see [ValueSource](ValueSource.md#formulas)).
     
 
 ### Field Values
@@ -110,7 +112,7 @@ How each type of field is written, for your own logic classes:
 | `bool` | `true` or `false` |
 | `string`, `char` | `"text"` |
 | An enum | The value's name: `"High"`. For a `[Flags]` enum: `"Fire, Ice"`. |
-| `ValueSource` | A number, or an attribute: `"Owner/Strength"` |
+| `ValueSource` | A number, an attribute (`"Owner/Strength"`), or a formula (`{ "linear": { "input": "Defense", "addend": 100 } }`) |
 | `SemanticKey` | The key's name, or `null` for none. |
 | `AttributeReference` | An attribute: `"Owner/Strength"` |
 | `List<T>`, `T[]` | An array: `[1, 2, 3]` |
@@ -128,7 +130,7 @@ Fields that Unity doesn't save (a `Dictionary`, an interface without `[Serialize
 | `{ "hasTag": "Equipped" }` | `StatBlockCondition.HasTag(Tags.Equipped)` | The entity has the tag. |
 | `{ "hasTag": "Owner/Equipped" }` | `StatBlockCondition.HasTag(Tags.Equipped, Links.Owner)` | The entity at the end of the path has it. |
 | `{ "lacksTag": "Stunned" }` | `StatBlockCondition.LacksTag(Tags.Stunned)` | The entity doesn't have the tag. |
-| `{ "compare": ["Health", "<", 50] }` | `StatBlockCondition.Compare(ValueSource.FromAttribute(Stats.Health), StatBlockCondition.Comparison.Less, 50f)` | The comparison holds: `==`, `!=`, `>`, `<`, `>=` or `<=` between two numbers or attributes. |
+| `{ "compare": ["Health", "<", 50] }` | `StatBlockCondition.Compare(ValueSource.FromAttribute(Stats.Health), StatBlockCondition.Comparison.Less, 50f)` | The comparison holds: `==`, `!=`, `>`, `<`, `>=` or `<=` between two numbers, attributes or formulas. |
 | `{ "all": [ ... ] }` | `StatBlockCondition.All(...)` | All the conditions in the list are true. |
 | `{ "any": [ ... ] }` | `StatBlockCondition.Any(...)` | Any of them is. |
 | `{}` | `StatBlockCondition.Always()` | Always. |
@@ -144,7 +146,7 @@ Fields that Unity doesn't save (a `Dictionary`, an interface without `[Serialize
 }
 ```
 
-(`HalfMaxHealth` being an attribute, or a pointer, that holds half of MaxHealth.)
+(`HalfMaxHealth` being an attribute, or a pointer, that holds half of MaxHealth. A formula works too: `{ "compare": [{ "ratio": { "dividend": "Health", "divisor": "MaxHealth" } }, "<", 0.5] }`.)
 
 ## Entity Profile Files
 
@@ -154,7 +156,7 @@ Fields that Unity doesn't save (a `Dictionary`, an interface without `[Serialize
 | `templates` | `AddTemplate(...)` | The profiles this one builds on, applied first and once per entity: `["Templates/Character"]` (see [Templates](EntityProfile.md#templates)). |
 | `parentKey` | `SetParentKey(key)` | When nested in another entity, the key under which it reaches that entity: `"Owner"`. |
 | `baseAttributes` | `AddBaseAttribute(attribute, value)` | `{ "Health": 40, "Strength": 8 }` |
-| `pools` | `AddPool(resource, max, ...)` | Resources that are spent and restored, and their maximum: `{ "Health": "MaxHealth" }`, or `{ "Mana": { "max": "MaxMana", "onMaxChange": "AddDifference" } }` (see [Resource Pools](Resource%20Pools.md)). |
+| `pools` | `AddPool(resource, max, ...)` | Resources that are spent and restored, and their maximum: `{ "Health": "MaxHealth" }`, or `{ "Mana": { "max": "MaxMana", "onMaxChange": "AddDifference" } }` (see [Resource Pools](Resource%20Pools.md)). A maximum that is a formula goes in `"max"`. |
 | `innateTags` | `AddInnateTag(tag)` | `["Undead"]` |
 | `linkGroups` | `AddLinkGroup(group)` | `["Inventory"]` |
 | `nestedEntities` | `AddNestedEntity(key, ...)` | `{ "RightHand": "Weapons/RustySword" }`: a profile ID, or a profile written in full (see below). |

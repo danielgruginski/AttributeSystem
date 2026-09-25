@@ -4,6 +4,10 @@ using ReactiveSolutions.AttributeSystem.Core;
 
 namespace ReactiveSolutions.AttributeSystem.Editor
 {
+    /// <summary>
+    /// Draws a ValueSource: its Mode, then a number (Constant), an attribute and its path (Attribute), or a logic
+    /// dropdown with the logic's fields below it (Formula).
+    /// </summary>
     [CustomPropertyDrawer(typeof(ValueSource))]
     public class ValueSourceSpecDrawer : PropertyDrawer
     {
@@ -14,23 +18,23 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
             var modeProp = property.FindPropertyRelative("Mode");
+            if (modeProp == null) return EditorGUIUtility.singleLineHeight;
 
-            // If in Attribute mode, the height depends on the AttributeReference drawer
-            if (modeProp != null && modeProp.enumValueIndex == (int)ValueSource.SourceMode.Attribute)
+            switch ((ValueSource.SourceMode)modeProp.enumValueIndex)
             {
-                var attrRefProp = property.FindPropertyRelative("AttributeRef");
-                if (attrRefProp != null)
-                {
-                    // Add a tiny bit of padding for the mode dropdown line
-                    // Actually, AttributeReferenceDrawer handles its own height, 
-                    // but we draw the Mode dropdown on the same line as the "Name" part of the ref.
-                    // Let's defer to the AttributeReference height.
-                    return EditorGUI.GetPropertyHeight(attrRefProp, true);
-                }
-            }
+                case ValueSource.SourceMode.Attribute:
+                    // The Mode dropdown shares the first line with the AttributeReference drawer, which sets the height.
+                    var attrRefProp = property.FindPropertyRelative("AttributeRef");
+                    return attrRefProp != null ? EditorGUI.GetPropertyHeight(attrRefProp, true) : EditorGUIUtility.singleLineHeight;
 
-            // Default single line for Constant mode
-            return EditorGUIUtility.singleLineHeight;
+                case ValueSource.SourceMode.Formula:
+                    // The logic dropdown shares the first line; the logic's fields go below.
+                    var formulaProp = property.FindPropertyRelative("Formula");
+                    return EditorGUIUtility.singleLineHeight + (formulaProp != null ? ModifierLogicGUI.GetFieldsHeight(formulaProp) : 0f);
+
+                default:
+                    return EditorGUIUtility.singleLineHeight;
+            }
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
@@ -40,6 +44,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             var modeProp = property.FindPropertyRelative("Mode");
             var constantProp = property.FindPropertyRelative("ConstantValue");
             var attrRefProp = property.FindPropertyRelative("AttributeRef");
+            var formulaProp = property.FindPropertyRelative("Formula");
 
             // 1. Draw Label
             Rect contentPosition = EditorGUI.PrefixLabel(position, GUIUtility.GetControlID(FocusType.Passive), label);
@@ -50,30 +55,36 @@ namespace ReactiveSolutions.AttributeSystem.Editor
 
             // 3. Draw Content
             Rect valueRect = new Rect(contentPosition.x + ModeWidth + Padding, contentPosition.y, contentPosition.width - ModeWidth - Padding, position.height);
+            Rect valueLine = new Rect(valueRect.x, valueRect.y, valueRect.width, EditorGUIUtility.singleLineHeight);
 
-            int modeIndex = modeProp.enumValueIndex; // 0 = Constant, 1 = Attribute
+            // The indent is already in the prefix label's rects; don't apply it twice.
+            int indent = EditorGUI.indentLevel;
+            EditorGUI.indentLevel = 0;
 
-            if (modeIndex == (int)ValueSource.SourceMode.Constant)
+            switch ((ValueSource.SourceMode)modeProp.enumValueIndex)
             {
-                // Just draw the float field
-                // Ensure height is single line for the float field even if 'position' is tall
-                Rect floatRect = new Rect(valueRect.x, valueRect.y, valueRect.width, EditorGUIUtility.singleLineHeight);
-                EditorGUI.PropertyField(floatRect, constantProp, GUIContent.none);
-            }
-            else
-            {
-                if (attrRefProp != null)
-                {
-                    // Pass drawing to AttributeReferenceDrawer.
-                    // IMPORTANT: AttributeReferenceDrawer expects to draw the label. 
-                    // We pass GUIContent.none because we already drew our main label (e.g. "Input").
-                    // However, AttributeReferenceDrawer starts with the "Name" field.
-                    // We need to ensure it draws within 'valueRect'.
+                case ValueSource.SourceMode.Constant:
+                    EditorGUI.PropertyField(valueLine, constantProp, GUIContent.none);
+                    break;
 
-                    EditorGUI.PropertyField(valueRect, attrRefProp, GUIContent.none, true);
-                }
+                case ValueSource.SourceMode.Attribute:
+                    // AttributeReferenceDrawer draws the attribute on the first line, and its path below.
+                    if (attrRefProp != null) EditorGUI.PropertyField(valueRect, attrRefProp, GUIContent.none, true);
+                    break;
+
+                case ValueSource.SourceMode.Formula:
+                    if (formulaProp == null) break;
+                    ModifierLogicGUI.DrawTypePopup(valueLine, formulaProp, GUIContent.none);
+
+                    // The formula's fields, below, across the full width.
+                    EditorGUI.indentLevel = indent;
+                    Rect fields = new Rect(position.x, position.y + EditorGUIUtility.singleLineHeight,
+                        position.width, position.height - EditorGUIUtility.singleLineHeight);
+                    ModifierLogicGUI.DrawFields(fields, formulaProp);
+                    break;
             }
 
+            EditorGUI.indentLevel = indent;
             EditorGUI.EndProperty();
         }
     }

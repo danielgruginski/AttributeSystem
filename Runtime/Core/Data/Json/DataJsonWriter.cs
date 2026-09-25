@@ -115,13 +115,22 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
 
                 AddMap(node, "baseAttributes", profile.BaseAttributes, path, entry => entry.Attribute, (entry, at) => JsonNode.From(entry.BaseValue));
 
-                // "Health": "MaxHealth", or an object when the pool doesn't keep its percentage.
+                // "Health": "MaxHealth", or an object when the pool doesn't keep its percentage or its maximum is a
+                // formula (a formula on its own would read as the pool's settings).
                 AddMap(node, "pools", profile.Pools, path, pool => pool.Resource, (pool, at) =>
-                    pool.OnMaxChange == PoolMaxChange.KeepPercent
-                        ? ValueSource(pool.Max, at)
-                        : JsonNode.NewObject()
-                            .Add("max", ValueSource(pool.Max, Child(at, "max")))
-                            .Add("onMaxChange", EnumNode(typeof(PoolMaxChange), pool.OnMaxChange, Child(at, "onMaxChange"))));
+                {
+                    if (pool.OnMaxChange == PoolMaxChange.KeepPercent && pool.Max?.Mode != Core.ValueSource.SourceMode.Formula)
+                    {
+                        return ValueSource(pool.Max, at);
+                    }
+
+                    var settings = JsonNode.NewObject().Add("max", ValueSource(pool.Max, Child(at, "max")));
+                    if (pool.OnMaxChange != PoolMaxChange.KeepPercent)
+                    {
+                        settings.Add("onMaxChange", EnumNode(typeof(PoolMaxChange), pool.OnMaxChange, Child(at, "onMaxChange")));
+                    }
+                    return settings;
+                });
                 AddKeys(node, "innateTags", profile.InnateTags);
                 AddKeys(node, "linkGroups", profile.LinkGroups);
 
@@ -196,7 +205,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
             var type = logic.GetType();
             var fields = Fields(type, path);
 
-            if (fields.Length == 1 && CanBeWrittenAlone(fields[0]))
+            if (fields.Length == 1 && CanBeWrittenAlone(fields[0], fields[0].Info.GetValue(logic)))
             {
                 var field = fields[0];
                 return Value(field.Type, field.IsReference, field.Info.GetValue(logic), path);
@@ -229,10 +238,13 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
 
         /// <summary>
         /// Whether a one-field logic can be written as the field's value: when the value is a number, text or an
-        /// array. (An object would read as the logic's fields, and a type JSON can't hold is only left out as a default.)
+        /// array. (An object, such as a formula, would read as the logic's fields, and a type JSON can't hold is only
+        /// left out as a default.)
         /// </summary>
-        private static bool CanBeWrittenAlone(JsonField field)
+        private static bool CanBeWrittenAlone(JsonField field, object value)
         {
+            if (value is ValueSource source && source.Mode == Core.ValueSource.SourceMode.Formula) return false;
+
             var type = field.Type;
             if (JsonTypes.TryGetListElement(type, out _)) return true;
             if (field.IsReference) return false;
@@ -436,6 +448,9 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
                 case Core.ValueSource.SourceMode.Attribute:
                     // An attribute not picked yet reads as 0, like a missing value.
                     return Reference(source.AttributeRef, path);
+                case Core.ValueSource.SourceMode.Formula:
+                    // { "linear": { ... } }, or null for a formula not picked yet (it reads as 0).
+                    return LogicReference(source.Formula, path);
                 default:
                     throw Error(path, $"unknown value source mode {(int)source.Mode}");
             }

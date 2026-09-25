@@ -11,6 +11,7 @@ A reactive attribute management system designed for scalability and maintainabil
   * Exponential & Ratio scaling.  
   * Diminishing Returns & Segmented breakpoints.  
   * Clamping and Triangular bonuses.  
+  * Formulas nest: any input can be another logic, e.g. `AttackPower * 100 / (Defense + 100)`.  
   * Custom logic: write a small serializable class and it appears in the Inspector. No registration.  
 * **Entity Graph**: Entities can read and modify each other's attributes through provider paths (e.g. a sword reading `Owner.Strength`), with pointers (aliases), reference-counted tags and conditional StatBlocks.  
 * **Resource Pools**: Health, Mana and the like stay between 0 and their maximum through damage, healing and max changes.  
