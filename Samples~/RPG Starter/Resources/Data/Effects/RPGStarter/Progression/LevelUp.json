@@ -1,0 +1,9 @@
+{
+  "effect": "Level Up",
+  "actions": [
+    { "target": "Target/Level", "value": 1 }
+  ],
+  "keys": {
+    "Level": "29ef14b1-dffd-4a15-83e4-2cb2178d5fe6"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "effect": "Healing Potion",
+  "condition": { "compare": ["Target/Health", ">", 0] },
+  "actions": [
+    { "target": "Target/Health", "value": 40 }
+  ],
+  "keys": {
+    "Health": "0fb4fa22-7d58-465f-9c3c-7258a14b9149"
+  }
+}

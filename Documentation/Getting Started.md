@@ -158,7 +158,9 @@ Finally, let's see the result.
     
 -   **Health Bars:** Make Health a pool up to MaxHealth (see [Resource Pools](Resource%20Pools.md)): damage and healing then stay between 0 and MaxHealth. Use `AttributeProgressBar` to display "Health" / "MaxHealth".
     
--   **A Whole Game:** Import the RPG Starter sample (**Window > Package Manager > Attribute System > Samples**) to see templates, pools, gear, inventory weight and a party working together (see [RPG Starter](RPG%20Starter.md)).
+-   **Hits, Spells and Potions:** Write what an attack or a spell does as an effect, with **Window > Attribute System > Effect Editor**: its cost, its formula over the attacker's and the target's stats, and a chance to crit. Then apply it with `effect.Apply(attacker, target)` (see [Effects](Effects.md)).
+    
+-   **A Whole Game:** Import the RPG Starter sample (**Window > Package Manager > Attribute System > Samples**) to see templates, pools, effects, gear, inventory weight and a party working together (see [RPG Starter](RPG%20Starter.md)).
     
 -   **Your Own Logic:** Write a small `[Serializable]` class to compute a modifier's value; it shows up in the **Logic** dropdown (see [Modifier Logic](Modifier%20Logic.md)).
     

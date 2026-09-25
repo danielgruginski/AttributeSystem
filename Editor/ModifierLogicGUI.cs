@@ -8,8 +8,8 @@ using UnityEngine;
 namespace ReactiveSolutions.AttributeSystem.Editor
 {
     /// <summary>
-    /// Draws a [SerializeReference] ModifierLogic field: a dropdown of every logic class in the project
-    /// (built-in or your own), followed by the chosen logic's fields.
+    /// Draws a [SerializeReference] ModifierLogic field (a modifier's logic, or a formula): a dropdown of every logic
+    /// class in the project (built-in or your own), followed by the chosen logic's fields.
     /// </summary>
     public static class ModifierLogicGUI
     {
@@ -99,10 +99,15 @@ namespace ReactiveSolutions.AttributeSystem.Editor
 
         // --- Rect-based (property drawers) ----------------------------------------------------------
 
-        public static float GetHeight(SerializedProperty logicProperty)
+        /// <summary>The height of the dropdown and, below it, the logic's fields.</summary>
+        public static float GetHeight(SerializedProperty logicProperty) =>
+            EditorGUIUtility.singleLineHeight + GetFieldsHeight(logicProperty);
+
+        /// <summary>The height of the logic's fields (and of a warning if its class is missing), drawn by <see cref="DrawFields"/>.</summary>
+        public static float GetFieldsHeight(SerializedProperty logicProperty)
         {
             float spacing = EditorGUIUtility.standardVerticalSpacing;
-            float height = EditorGUIUtility.singleLineHeight;
+            float height = 0f;
             if (MissingTypeMessage(logicProperty) != null) height += spacing + EditorGUIUtility.singleLineHeight * 2;
             foreach (var child in Children(logicProperty))
             {
@@ -111,33 +116,50 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             return height;
         }
 
+        /// <summary>The "Logic" dropdown, then the logic's fields.</summary>
         public static void Draw(Rect position, SerializedProperty logicProperty)
         {
-            float spacing = EditorGUIUtility.standardVerticalSpacing;
             var row = new Rect(position.x, position.y, position.width, EditorGUIUtility.singleLineHeight);
+            DrawTypePopup(row, logicProperty, LogicLabel);
+            DrawFields(new Rect(position.x, row.yMax, position.width, position.height - row.height), logicProperty);
+        }
 
+        /// <summary>The dropdown of logic classes, on one line. Pass GUIContent.none for no label.</summary>
+        public static void DrawTypePopup(Rect position, SerializedProperty logicProperty, GUIContent label)
+        {
             int selected = SelectedIndex(logicProperty);
-            int chosen = EditorGUI.Popup(row, LogicLabel, selected, Options);
+            int chosen = label == null || label == GUIContent.none
+                ? EditorGUI.Popup(position, selected, Options)
+                : EditorGUI.Popup(position, label, selected, Options);
             if (chosen != selected)
             {
                 SetType(logicProperty, chosen);
                 GUIUtility.ExitGUI(); // The fields below changed; redraw from scratch.
             }
+        }
+
+        /// <summary>The logic's fields, indented (and a warning if its class is missing).</summary>
+        public static void DrawFields(Rect position, SerializedProperty logicProperty)
+        {
+            float spacing = EditorGUIUtility.standardVerticalSpacing;
+            var row = new Rect(position.x, position.y, position.width, 0f);
 
             string missing = MissingTypeMessage(logicProperty);
             if (missing != null)
             {
-                row.y += row.height + spacing;
+                row.y += spacing;
                 row.height = EditorGUIUtility.singleLineHeight * 2;
                 EditorGUI.HelpBox(row, missing, MessageType.Warning);
+                row.y += row.height;
             }
 
             EditorGUI.indentLevel++;
             foreach (var child in Children(logicProperty))
             {
-                row.y += row.height + spacing;
+                row.y += spacing;
                 row.height = EditorGUI.GetPropertyHeight(child, true);
                 EditorGUI.PropertyField(row, child, true);
+                row.y += row.height;
             }
             EditorGUI.indentLevel--;
         }

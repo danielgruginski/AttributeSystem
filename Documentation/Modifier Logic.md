@@ -8,7 +8,7 @@ Every modifier in a StatBlock (an `AttributeModifierSpec`) has a **Logic**: a sm
     
 -   **Named inputs.** Each input is its own field (`Input`, `Coefficient`, ...), so there is no argument order to remember.
     
--   **Any settings.** Inputs are `ValueSource`s (a constant, or an attribute's value), and a logic class can also have numbers, text, enums, lists, curves, other logic and `[Serializable]` classes of your own (see [JSON Format](JSON%20Format.md#field-values) for how each is saved).
+-   **Any settings.** Inputs are `ValueSource`s (a constant, an attribute's value, or a formula: another logic), and a logic class can also have numbers, text, enums, lists, curves, other logic and `[Serializable]` classes of your own (see [JSON Format](JSON%20Format.md#field-values) for how each is saved).
     
 
 Namespace: `ReactiveSolutions.AttributeSystem.Core.Modifiers`. Keys such as `Stats.Damage` come from classes generated from KeyDomains (see [Semantic Keys](Semantic%20Keys.md)).
@@ -32,6 +32,8 @@ Namespace: `ReactiveSolutions.AttributeSystem.Core.Modifiers`. Keys such as `Sta
 | `GroupTotalLogic` | `Group`, `Attribute`, `Operation` (Sum) | An attribute totaled over a link group's members: `Sum`, `Average`, `Min`, `Max`, or `Count` of the members. See [LinkGroup](LinkGroup.md#totals-over-a-group). |
 
 All fields are `ValueSource`s except `SegmentedLogic`'s `Default` and `Segments`, and `GroupTotalLogic`'s. Defaults are in parentheses; the others default to 0. The dropdown shows the names without the "Logic" suffix (e.g. "Diminishing Returns").
+
+An input can be a logic of its own, so the built-ins combine into bigger formulas. AttackPower x 100 / (Defense + 100) is a `RatioLogic` whose `Dividend` and `Divisor` are `LinearLogic`s. In the Inspector, set the input's mode to **Formula**; in code, assign the logic (`Divisor = new LinearLogic { ... }`). See [ValueSource](ValueSource.md#formulas).
 
 ## Writing Your Own Logic
 
@@ -64,7 +66,7 @@ public class DistanceBonusLogic : FormulaLogic
     
 -   A logic object is shared data: a StatBlock applies the same object to every entity, so `Observe` must not change its fields.
     
--   The copy made by `Clone()` is shallow. Override it if each copy needs its own lists or other objects (as `SegmentedLogic` does for `Segments`).
+-   `Clone()` copies the logic with its inputs, lists and nested formulas (the fields Unity saves). Override it, calling `base.Clone()`, if your logic holds other objects that each copy needs its own of.
     
 
 Use your logic like the built-ins, in the Inspector or in code:

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
+using ReactiveSolutions.AttributeSystem.Core.Data;
 using UniRx;
 
 namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
@@ -12,7 +12,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     /// <para>
     /// To add your own logic, write a [Serializable] class that derives from <see cref="FormulaLogic"/> (a formula
     /// over inputs) or from ModifierLogic itself. Its public fields are its settings; ValueSource fields are inputs
-    /// that hold a constant or read an attribute. There is nothing to register: the class shows up in the Logic
+    /// that hold a constant, read an attribute or compute a formula. There is nothing to register: the class shows up in the Logic
     /// dropdown of the Inspector and the Stat Block Editor, and is saved with the StatBlock.
     /// </para>
     /// </summary>
@@ -26,9 +26,15 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
         public abstract IObservable<float> Observe(Entity context);
 
         /// <summary>
-        /// A copy of this logic. Shallow by default; override it if your logic holds objects that must not be shared.
+        /// A copy of this logic that can be changed without changing this one: its inputs, lists and nested formulas
+        /// are copied too. Override it (calling base.Clone()) if your logic holds other objects that must not be shared.
         /// </summary>
-        public virtual ModifierLogic Clone() => (ModifierLogic)MemberwiseClone();
+        public virtual ModifierLogic Clone()
+        {
+            var copy = (ModifierLogic)MemberwiseClone();
+            SerializedGraph.CopyFields(copy);
+            return copy;
+        }
 
         /// <summary>The name shown in the Inspector and in logs: the class name without a "Logic" suffix.</summary>
         public static string GetDisplayName(Type logicType)
@@ -38,27 +44,6 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
             return name.EndsWith("Logic") && name.Length > "Logic".Length
                 ? name.Substring(0, name.Length - "Logic".Length)
                 : name;
-        }
-
-        /// <summary>
-        /// Gives each spec its own logic object. A list entry duplicated in the Inspector can point to the same
-        /// object as the entry it was copied from, so editing one would change both.
-        /// </summary>
-        internal static void Unshare(IEnumerable<AttributeModifierSpec> specs)
-        {
-            var seen = new HashSet<ModifierLogic>(ReferenceComparer.Instance);
-            foreach (var spec in specs)
-            {
-                if (spec?.Logic == null) continue;
-                if (!seen.Add(spec.Logic)) spec.Logic = spec.Logic.Clone();
-            }
-        }
-
-        private sealed class ReferenceComparer : IEqualityComparer<ModifierLogic>
-        {
-            public static readonly ReferenceComparer Instance = new ReferenceComparer();
-            public bool Equals(ModifierLogic x, ModifierLogic y) => ReferenceEquals(x, y);
-            public int GetHashCode(ModifierLogic obj) => RuntimeHelpers.GetHashCode(obj);
         }
     }
 

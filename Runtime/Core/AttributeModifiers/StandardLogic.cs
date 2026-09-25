@@ -208,12 +208,5 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
             }
             return value;
         }
-
-        public override ModifierLogic Clone()
-        {
-            var copy = (SegmentedLogic)base.Clone();
-            copy.Segments = new List<Segment>(Segments);
-            return copy;
-        }
     }
 }

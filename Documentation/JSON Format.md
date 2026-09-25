@@ -2,7 +2,7 @@
 
 ## Overview
 
-StatBlocks and entity profiles are saved as JSON files in a format of their own, which describes them the way the [Fluent Builders](Fluent%20Builders.md) build them: each property of a file is a builder call. Loading a file makes those calls; saving writes what they need.
+StatBlocks, entity profiles and [effects](Effects.md) are saved as JSON files in a format of their own, which describes them the way the [Fluent Builders](Fluent%20Builders.md) build them: each property of a file is a builder call. Loading a file makes those calls; saving writes what they need.
 
 ```json
 {
@@ -39,7 +39,7 @@ StatBlockBuilder.Create("Iron Sword")
     .Build();
 ```
 
-The **Stat Block Editor** and the **Entity Profile Editor** write these files (see [StatBlock](StatBlock.md) and [EntityProfile](EntityProfile.md)), and the loaders read them. They are plain text, so you can also write and edit them by hand, and review them in version control.
+The **Stat Block Editor**, the **Entity Profile Editor** and the **Effect Editor** write these files (see [StatBlock](StatBlock.md), [EntityProfile](EntityProfile.md) and [Effects](Effects.md)), and the loaders read them. They are plain text, so you can also write and edit them by hand, and review them in version control.
 
 ## Keys
 
@@ -51,7 +51,7 @@ The body names keys by name: `"Damage"`, `"Owner/Strength"` (the steps of a path
     
 -   **Writing by hand:** a name that isn't in the table is an error when the file is loaded in the game. Load and save the file in its editor window: the window looks the name up in your KeyDomains and adds it to the table. If keys in several domains have that name, write it with the domain's name, e.g. `"Tags.Poison"`.
     
--   **In code**, `StatBlockJson.FromJson(json, findKey)` and `EntityProfileJson.FromJson(json, findKey)` take a function that finds the keys missing from the table (return `SemanticKey.None` for a name you don't know). For example, a game that loads files written by modders can resolve names with its own table of keys.
+-   **In code**, `StatBlockJson.FromJson(json, findKey)`, `EntityProfileJson.FromJson(json, findKey)` and `EffectJson.FromJson(json, findKey)` take a function that finds the keys missing from the table (return `SemanticKey.None` for a name you don't know). For example, a game that loads files written by modders can resolve names with its own table of keys.
     
 
 ## StatBlock Files
@@ -95,9 +95,11 @@ Its value is an object with the logic's fields, named in camelCase: `Coefficient
 
 -   A field that isn't in the file keeps the class's default value, and files leave out the fields that have it: `"linear": { "input": "Strength" }` has a Coefficient of 1 and an Addend of 0.
     
--   A logic with one field can be written as the field's value: `"value": 5` is `"value": { "value": 5 }`, and `"floor": "Strength"` rounds Strength down.
+-   A logic with one field can be written as the field's value: `"value": 5` is `"value": { "value": 5 }`, and `"floor": "Strength"` rounds Strength down. (Not when that value is a formula: it would read as the logic's fields.)
     
 -   An input (a `ValueSource`) is a number, for a constant, or an attribute: `"Strength"`, or `"Owner/Strength"` through a provider path. Attributes are read from the entity the StatBlock is applied to.
+    
+-   An input can also be a formula: another logic, written as an object with that logic, e.g. `"divisor": { "linear": { "input": "Defense", "addend": 100 } }` (see [ValueSource](ValueSource.md#formulas)).
     
 
 ### Field Values
@@ -110,7 +112,7 @@ How each type of field is written, for your own logic classes:
 | `bool` | `true` or `false` |
 | `string`, `char` | `"text"` |
 | An enum | The value's name: `"High"`. For a `[Flags]` enum: `"Fire, Ice"`. |
-| `ValueSource` | A number, or an attribute: `"Owner/Strength"` |
+| `ValueSource` | A number, an attribute (`"Owner/Strength"`), or a formula (`{ "linear": { "input": "Defense", "addend": 100 } }`) |
 | `SemanticKey` | The key's name, or `null` for none. |
 | `AttributeReference` | An attribute: `"Owner/Strength"` |
 | `List<T>`, `T[]` | An array: `[1, 2, 3]` |
@@ -128,7 +130,7 @@ Fields that Unity doesn't save (a `Dictionary`, an interface without `[Serialize
 | `{ "hasTag": "Equipped" }` | `StatBlockCondition.HasTag(Tags.Equipped)` | The entity has the tag. |
 | `{ "hasTag": "Owner/Equipped" }` | `StatBlockCondition.HasTag(Tags.Equipped, Links.Owner)` | The entity at the end of the path has it. |
 | `{ "lacksTag": "Stunned" }` | `StatBlockCondition.LacksTag(Tags.Stunned)` | The entity doesn't have the tag. |
-| `{ "compare": ["Health", "<", 50] }` | `StatBlockCondition.Compare(ValueSource.FromAttribute(Stats.Health), StatBlockCondition.Comparison.Less, 50f)` | The comparison holds: `==`, `!=`, `>`, `<`, `>=` or `<=` between two numbers or attributes. |
+| `{ "compare": ["Health", "<", 50] }` | `StatBlockCondition.Compare(ValueSource.FromAttribute(Stats.Health), StatBlockCondition.Comparison.Less, 50f)` | The comparison holds: `==`, `!=`, `>`, `<`, `>=` or `<=` between two numbers, attributes or formulas. |
 | `{ "all": [ ... ] }` | `StatBlockCondition.All(...)` | All the conditions in the list are true. |
 | `{ "any": [ ... ] }` | `StatBlockCondition.Any(...)` | Any of them is. |
 | `{}` | `StatBlockCondition.Always()` | Always. |
@@ -144,7 +146,7 @@ Fields that Unity doesn't save (a `Dictionary`, an interface without `[Serialize
 }
 ```
 
-(`HalfMaxHealth` being an attribute, or a pointer, that holds half of MaxHealth.)
+(`HalfMaxHealth` being an attribute, or a pointer, that holds half of MaxHealth. A formula works too: `{ "compare": [{ "ratio": { "dividend": "Health", "divisor": "MaxHealth" } }, "<", 0.5] }`.)
 
 ## Entity Profile Files
 
@@ -154,7 +156,7 @@ Fields that Unity doesn't save (a `Dictionary`, an interface without `[Serialize
 | `templates` | `AddTemplate(...)` | The profiles this one builds on, applied first and once per entity: `["Templates/Character"]` (see [Templates](EntityProfile.md#templates)). |
 | `parentKey` | `SetParentKey(key)` | When nested in another entity, the key under which it reaches that entity: `"Owner"`. |
 | `baseAttributes` | `AddBaseAttribute(attribute, value)` | `{ "Health": 40, "Strength": 8 }` |
-| `pools` | `AddPool(resource, max, ...)` | Resources that are spent and restored, and their maximum: `{ "Health": "MaxHealth" }`, or `{ "Mana": { "max": "MaxMana", "onMaxChange": "AddDifference" } }` (see [Resource Pools](Resource%20Pools.md)). |
+| `pools` | `AddPool(resource, max, ...)` | Resources that are spent and restored, and their maximum: `{ "Health": "MaxHealth" }`, or `{ "Mana": { "max": "MaxMana", "onMaxChange": "AddDifference" } }` (see [Resource Pools](Resource%20Pools.md)). A maximum that is a formula goes in `"max"`. |
 | `innateTags` | `AddInnateTag(tag)` | `["Undead"]` |
 | `linkGroups` | `AddLinkGroup(group)` | `["Inventory"]` |
 | `nestedEntities` | `AddNestedEntity(key, ...)` | `{ "RightHand": "Weapons/RustySword" }`: a profile ID, or a profile written in full (see below). |
@@ -195,6 +197,22 @@ Fields that Unity doesn't save (a `Dictionary`, an interface without `[Serialize
 
 A nested entity or a template is usually a profile ID, so one weapon profile serves many characters. A profile built in code (`AddNestedEntity(key, weapon => ...)`, `AddTemplate(profile)`) is written in full instead: `{ "RightHand": { "profile": "Bone Cleaver", "baseAttributes": { "Damage": 75 } } }`. The Entity Profile Editor only shows nested entities and templates by ID, so it doesn't open files like that; edit them as text.
 
+## Effect Files
+
+An effect file lists what an effect does to its source and its target: `effect`, `condition`, `costs`, `actions` and `keys`. Every path in it starts with `Source` or `Target`, which are written by name and aren't in the key table. See [Effects](Effects.md#files-and-the-effect-editor).
+
+```json
+{
+  "effect": "Healing Potion",
+  "actions": [
+    { "target": "Target/Health", "value": 40 }
+  ],
+  "keys": {
+    "Health": "9a1b3c5d-7e8f-4a0b-b2c4-6d8e0f1a3b5c"
+  }
+}
+```
+
 ## Reading and Writing in Code
 
 ```csharp
@@ -205,9 +223,12 @@ StatBlock copy = StatBlockJson.FromJson(json);
 
 string profileJson = EntityProfileJson.ToJson(goblinProfile);
 EntityProfile goblin = EntityProfileJson.FromJson(profileJson);
+
+string effectJson = EffectJson.ToJson(fireball);
+Effect fireballCopy = EffectJson.FromJson(effectJson);
 ```
 
-`StatBlockJsonLoader.Load(id)` and `EntityProfileJsonLoader.Load(id)` read files by ID from `Resources/Data/StatBlocks` and `Resources/Data/EntityProfiles`; see [StatBlock](StatBlock.md) and [EntityProfile](EntityProfile.md).
+`StatBlockJsonLoader.Load(id)`, `EntityProfileJsonLoader.Load(id)` and `EffectJsonLoader.Load(id)` read files by ID from `Resources/Data/StatBlocks`, `Resources/Data/EntityProfiles` and `Resources/Data/Effects`; see [StatBlock](StatBlock.md), [EntityProfile](EntityProfile.md) and [Effects](Effects.md).
 
 ## Errors
 
@@ -221,7 +242,7 @@ modifiers[1].linear.cofficient: the Linear logic has no field 'cofficient' (its 
     
 -   `FromJson` throws a `JsonFormatException`, with the position in its `Line` and `Column`.
     
--   `ToJson` throws an `InvalidOperationException` for data a file can't hold: a logic field of a type files can't hold, a provider path with an empty entry, or a profile nested in itself.
+-   `ToJson` throws an `InvalidOperationException` for data a file can't hold: a logic field of a type files can't hold, a provider path with an empty entry, a profile nested in itself, or a path in an effect that doesn't start with Source or Target.
     
 -   JSON has no comments, and no comma after the last item of a list or object.
     

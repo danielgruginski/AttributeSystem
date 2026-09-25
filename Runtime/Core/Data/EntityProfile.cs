@@ -1,8 +1,6 @@
-﻿using ReactiveSolutions.AttributeSystem.Core.Modifiers;
-using SemanticKeys;
+﻿using SemanticKeys;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 namespace ReactiveSolutions.AttributeSystem.Core.Data
@@ -151,10 +149,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
 
         public void OnBeforeSerialize() { }
 
-        // An inline StatBlock duplicated in the Inspector can share modifier logic objects with the original.
-        public void OnAfterDeserialize() =>
-            ModifierLogic.Unshare((InnateStatBlocks ?? new List<StatBlock>())
-                .Where(block => block?.Modifiers != null)
-                .SelectMany(block => block.Modifiers));
+        // An entry duplicated in the Inspector (an inline StatBlock, a pool) can share logic objects with the original.
+        public void OnAfterDeserialize() => SerializedGraph.Unshare(this);
     }
 }

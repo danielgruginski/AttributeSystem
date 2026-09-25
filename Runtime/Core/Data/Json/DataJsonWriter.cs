@@ -10,7 +10,7 @@ using UnityEngine;
 namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
 {
     /// <summary>
-    /// Writes StatBlocks and EntityProfiles in the format DataJsonReader reads: one property per builder call,
+    /// Writes StatBlocks, EntityProfiles and Effects in the format DataJsonReader reads: one property per builder call,
     /// keys by name, and a "keys" table at the end with each name's GUID. Entries that do nothing (a tag or base
     /// value with no key) are left out, and so are logic fields that have their class's default value.
     /// </summary>
@@ -22,9 +22,13 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
         private readonly HashSet<object> _writing = new HashSet<object>(ReferenceComparer.Instance);
         private int _depth;
 
-        private DataJsonWriter(KeyTableWriter keys)
+        // In an effect, every path starts with a role, written by name: "Source/Mana", "Target/Health".
+        private readonly bool _roles;
+
+        private DataJsonWriter(KeyTableWriter keys, bool roles = false)
         {
             _keys = keys;
+            _roles = roles;
         }
 
         public static string WriteStatBlock(StatBlock block)
@@ -41,6 +45,15 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
             if (profile == null) throw new ArgumentNullException(nameof(profile));
             var writer = new DataJsonWriter(new KeyTableWriter());
             var root = writer.Profile(profile, "");
+            writer.AddKeyTable(root);
+            return JsonWriter.Write(root);
+        }
+
+        public static string WriteEffect(Effect effect)
+        {
+            if (effect == null) throw new ArgumentNullException(nameof(effect));
+            var writer = new DataJsonWriter(new KeyTableWriter(), roles: true);
+            var root = writer.Effect(effect, "");
             writer.AddKeyTable(root);
             return JsonWriter.Write(root);
         }
@@ -115,13 +128,22 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
 
                 AddMap(node, "baseAttributes", profile.BaseAttributes, path, entry => entry.Attribute, (entry, at) => JsonNode.From(entry.BaseValue));
 
-                // "Health": "MaxHealth", or an object when the pool doesn't keep its percentage.
+                // "Health": "MaxHealth", or an object when the pool doesn't keep its percentage or its maximum is a
+                // formula (a formula on its own would read as the pool's settings).
                 AddMap(node, "pools", profile.Pools, path, pool => pool.Resource, (pool, at) =>
-                    pool.OnMaxChange == PoolMaxChange.KeepPercent
-                        ? ValueSource(pool.Max, at)
-                        : JsonNode.NewObject()
-                            .Add("max", ValueSource(pool.Max, Child(at, "max")))
-                            .Add("onMaxChange", EnumNode(typeof(PoolMaxChange), pool.OnMaxChange, Child(at, "onMaxChange"))));
+                {
+                    if (pool.OnMaxChange == PoolMaxChange.KeepPercent && pool.Max?.Mode != Core.ValueSource.SourceMode.Formula)
+                    {
+                        return ValueSource(pool.Max, at);
+                    }
+
+                    var settings = JsonNode.NewObject().Add("max", ValueSource(pool.Max, Child(at, "max")));
+                    if (pool.OnMaxChange != PoolMaxChange.KeepPercent)
+                    {
+                        settings.Add("onMaxChange", EnumNode(typeof(PoolMaxChange), pool.OnMaxChange, Child(at, "onMaxChange")));
+                    }
+                    return settings;
+                });
                 AddKeys(node, "innateTags", profile.InnateTags);
                 AddKeys(node, "linkGroups", profile.LinkGroups);
 
@@ -154,6 +176,70 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
             {
                 _writing.Remove(profile);
             }
+        }
+
+        // ---------------------------------------------------------------- Effects
+
+        private JsonNode Effect(Effect effect, string path)
+        {
+            var node = JsonNode.NewObject();
+            node.Expanded = true;
+
+            if (!string.IsNullOrEmpty(effect.EffectName)) node.Add("effect", JsonNode.From(effect.EffectName));
+
+            var condition = Condition(effect.Condition, Child(path, "condition"), topLevel: true);
+            if (condition != null) node.Add("condition", condition);
+
+            // "Source/Mana": 15. A cost with no resource does nothing, so it is left out.
+            var costs = JsonNode.NewObject();
+            for (int i = 0; i < Count(effect.Costs); i++)
+            {
+                var cost = effect.Costs[i];
+                if (cost == null || cost.Resource.Name == SemanticKey.None) continue;
+
+                string at = Index(Child(path, "costs"), i);
+                string resource = PathText(cost.Resource.Path, cost.Resource.Name, at);
+                if (costs.Find(resource) != null) throw Error(at, $"the effect has two costs of {resource}: add them up in one");
+                costs.Add(resource, ValueSource(cost.Amount, Child(at, "amount")));
+            }
+            if (costs.Properties.Count > 0) node.Add("costs", costs);
+
+            var actions = JsonNode.NewArray();
+            actions.Expanded = true;
+            for (int i = 0; i < Count(effect.Actions); i++)
+            {
+                if (effect.Actions[i] != null) actions.Add(Action(effect.Actions[i], Index(Child(path, "actions"), i)));
+            }
+            if (actions.Items.Count > 0) node.Add("actions", actions);
+
+            return node;
+        }
+
+        private JsonNode Action(EffectAction action, string path)
+        {
+            var node = JsonNode.NewObject();
+
+            if (action.Target.Name != SemanticKey.None)
+            {
+                node.Add("target", JsonNode.From(PathText(action.Target.Path, action.Target.Name, Child(path, "target"))));
+            }
+            if (action.Type != EffectActionType.Add) node.Add("type", EnumNode(typeof(EffectActionType), action.Type, Child(path, "type")));
+
+            var condition = Condition(action.Condition, Child(path, "condition"), topLevel: true);
+            if (condition != null) node.Add("condition", condition);
+
+            // Always (1) is the default.
+            if (action.Chance != null && !(action.Chance.Mode == Core.ValueSource.SourceMode.Constant && action.Chance.ConstantValue == 1f))
+            {
+                node.Add("chance", ValueSource(action.Chance, Child(path, "chance")));
+            }
+
+            if (action.Logic != null)
+            {
+                string name = LogicName(action.Logic, path);
+                node.Add(name, Logic(action.Logic, Child(path, name)));
+            }
+            return node;
         }
 
         // ---------------------------------------------------------------- Modifiers and logic
@@ -196,7 +282,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
             var type = logic.GetType();
             var fields = Fields(type, path);
 
-            if (fields.Length == 1 && CanBeWrittenAlone(fields[0]))
+            if (fields.Length == 1 && CanBeWrittenAlone(fields[0], fields[0].Info.GetValue(logic)))
             {
                 var field = fields[0];
                 return Value(field.Type, field.IsReference, field.Info.GetValue(logic), path);
@@ -229,10 +315,13 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
 
         /// <summary>
         /// Whether a one-field logic can be written as the field's value: when the value is a number, text or an
-        /// array. (An object would read as the logic's fields, and a type JSON can't hold is only left out as a default.)
+        /// array. (An object, such as a formula, would read as the logic's fields, and a type JSON can't hold is only
+        /// left out as a default.)
         /// </summary>
-        private static bool CanBeWrittenAlone(JsonField field)
+        private static bool CanBeWrittenAlone(JsonField field, object value)
         {
+            if (value is ValueSource source && source.Mode == Core.ValueSource.SourceMode.Formula) return false;
+
             var type = field.Type;
             if (JsonTypes.TryGetListElement(type, out _)) return true;
             if (field.IsReference) return false;
@@ -436,6 +525,9 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
                 case Core.ValueSource.SourceMode.Attribute:
                     // An attribute not picked yet reads as 0, like a missing value.
                     return Reference(source.AttributeRef, path);
+                case Core.ValueSource.SourceMode.Formula:
+                    // { "linear": { ... } }, or null for a formula not picked yet (it reads as 0).
+                    return LogicReference(source.Formula, path);
                 default:
                     throw Error(path, $"unknown value source mode {(int)source.Mode}");
             }
@@ -447,16 +539,28 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
                 ? JsonNode.NewNull()
                 : JsonNode.From(PathText(reference.Path, reference.Name, path));
 
-        /// <summary>The key names of the path and then <paramref name="name"/>, separated by '/'.</summary>
+        /// <summary>
+        /// The key names of the path and then <paramref name="name"/>, separated by '/'. In an effect, the path starts
+        /// with a role, written by its name (it isn't in the key table).
+        /// </summary>
         private string PathText(IList<SemanticKey> providerPath, SemanticKey name, string path)
         {
             var sb = new StringBuilder();
+            if (_roles)
+            {
+                if (providerPath == null || providerPath.Count == 0 || !EffectRoles.IsRole(providerPath[0]))
+                {
+                    throw Error(path, $"'{name}' must be reached through Source or Target in an effect: start its path with one of them");
+                }
+            }
+
             if (providerPath != null)
             {
-                foreach (var step in providerPath)
+                for (int i = 0; i < providerPath.Count; i++)
                 {
+                    var step = providerPath[i];
                     if (step == SemanticKey.None) throw Error(path, "the provider path has an entry with no key: pick one, or remove the entry");
-                    sb.Append(_keys.NameOf(step)).Append('/');
+                    sb.Append(_roles && i == 0 ? step.Value : _keys.NameOf(step)).Append('/');
                 }
             }
             sb.Append(_keys.NameOf(name));
