@@ -32,14 +32,17 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         protected override string ToJson(object data) => EntityProfileJson.ToJson((EntityProfile)data);
         protected override object FromJson(string json, Func<string, SemanticKey> findKey) => EntityProfileJson.FromJson(json, findKey);
 
-        // A nested entity is shown by its Profile Id; a nested profile written in full in the file would be lost on save.
+        // Templates and nested entities are shown by Profile Id; a profile written in full in the file would be lost on save.
         protected override string CheckLoadedData(object data)
         {
-            var inline = ((EntityProfile)data).NestedEntities.Where(entry => entry.Profile != null).Select(entry => $"'{entry.ProviderKey}'").ToList();
+            var profile = (EntityProfile)data;
+            var inline = profile.Templates.Where(entry => entry.Profile != null).Select(entry => $"the template '{entry.Profile.ProfileName}'")
+                .Concat(profile.NestedEntities.Where(entry => entry.Profile != null).Select(entry => $"the nested entity '{entry.ProviderKey}'"))
+                .ToList();
             return inline.Count == 0
                 ? null
-                : $"The file writes the profiles of the nested entities {string.Join(", ", inline)} in full, and this window only " +
-                  "shows nested entities by Profile Id. Edit the file in a text editor, or save each nested profile as its own file " +
+                : $"The file writes the profiles of {string.Join(", ", inline)} in full, and this window only shows templates and " +
+                  "nested entities by Profile Id. Edit the file in a text editor, or save each of those profiles as its own file " +
                   "and refer to it by ID.";
         }
 

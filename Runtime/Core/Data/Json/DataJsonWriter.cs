@@ -91,7 +91,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
         {
             if (!_writing.Add(profile))
             {
-                throw Error(path, $"profile '{profile.ProfileName}' is nested in itself");
+                throw Error(path, $"profile '{profile.ProfileName}' contains itself, as a template or a nested entity");
             }
 
             try
@@ -101,11 +101,23 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
 
                 if (!string.IsNullOrEmpty(profile.ProfileName)) node.Add("profile", JsonNode.From(profile.ProfileName));
 
+                // A template built in code is written in full; one from a file, by its ID.
+                var templates = JsonNode.NewArray();
+                for (int i = 0; i < Count(profile.Templates); i++)
+                {
+                    var entry = profile.Templates[i];
+                    if (entry.Profile != null) templates.Add(Profile(entry.Profile, Index(Child(path, "templates"), i)));
+                    else if (!string.IsNullOrEmpty(entry.ProfileId)) templates.Add(JsonNode.From(entry.ProfileId));
+                }
+                if (templates.Items.Count > 0) node.Add("templates", templates);
+
+                if (profile.ParentKey != SemanticKey.None) node.Add("parentKey", KeyNode(profile.ParentKey));
+
                 AddMap(node, "baseAttributes", profile.BaseAttributes, path, entry => entry.Attribute, (entry, at) => JsonNode.From(entry.BaseValue));
                 AddKeys(node, "innateTags", profile.InnateTags);
                 AddKeys(node, "linkGroups", profile.LinkGroups);
 
-                // A nested profile built in code is written in full; one from a file, by its ID.
+                // Likewise for nested profiles.
                 AddMap(node, "nestedEntities", profile.NestedEntities, path, entry => entry.ProviderKey,
                     (entry, at) => entry.Profile != null ? Profile(entry.Profile, at) : JsonNode.From(entry.ProfileId),
                     entry => entry.Profile != null || !string.IsNullOrEmpty(entry.ProfileId));

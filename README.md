@@ -13,6 +13,7 @@ A reactive attribute management system designed for scalability and maintainabil
   * Clamping and Triangular bonuses.  
   * Custom logic: write a small serializable class and it appears in the Inspector. No registration.  
 * **Entity Graph**: Entities can read and modify each other's attributes through provider paths (e.g. a sword reading `Owner.Strength`), with pointers (aliases), reference-counted tags and conditional StatBlocks.  
+* **Templates**: Profiles build on shared templates (a `Character` template for every character, `Caster` on top of it), applied once per entity; each profile overrides the template values it needs to.  
 * **Data-Driven**: Author StatBlocks and entity profiles in their editor windows or right in the Inspector. They are saved as readable JSON files that mirror the builder calls (`{ "target": "Damage", "value": 5 }`), easy to review, diff and edit by hand.  
 * **Custom Editor Tools**: Includes StatBlock and Entity Profile editor windows, an Attribute Debugger and custom property drawers for an improved designer workflow.  
 * **No Magic Strings**: Attribute names, tags and aliases are GUID-backed [Semantic Keys](Documentation/Semantic%20Keys.md).  

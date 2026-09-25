@@ -30,23 +30,63 @@ namespace ReactiveSolutions.AttributeSystem.Core
         private readonly CompositeDisposable _profileDisposables = new CompositeDisposable();
         private readonly List<Entity> _nestedEntities = new List<Entity>();
 
+        // The profiles applied to this entity, directly or as templates: profile objects, and the IDs of JSON profiles.
+        private readonly HashSet<object> _appliedProfiles = new HashSet<object>();
+
         /// <summary>
-        /// Applies an EntityProfile to this processor, setting up base stats, tags, nested entities, and innate buffs.
-        /// Nested profiles and StatBlocks referenced by ID are loaded from their JSON files.
+        /// The key under which this entity reaches the entity it is nested in (e.g. Owner), from its profile's
+        /// ParentKey; SemanticKey.None if its profile names none.
+        /// </summary>
+        public SemanticKey ParentKey { get; private set; }
+
+        /// <summary>
+        /// Applies an EntityProfile to this entity: first its templates, then its base stats, tags, link groups, nested
+        /// entities, pointers and innate StatBlocks. Templates, nested profiles and StatBlocks referenced by ID are loaded
+        /// from their JSON files. Each profile is applied once per entity, whether directly or as a template: a template
+        /// that several profiles build on is applied the first time only, and applying a profile again logs a warning.
         /// </summary>
         public void ApplyProfile(EntityProfile profile)
-            => ApplyProfile(profile, new HashSet<object>());
+        {
+            if (profile == null) return;
+            if (Implements(profile))
+            {
+                Debug.LogWarning($"[Entity] Skipped profile '{profile.ProfileName}': it is already applied to this entity.");
+                return;
+            }
+            ApplyProfile(profile, new HashSet<object>());
+        }
 
-        /// <param name="applying">The profiles (objects, and the IDs of JSON profiles) being applied further up the
-        /// nesting chain, so a profile that nests itself is reported instead of recursing forever.</param>
+        /// <summary>
+        /// Whether the profile JSON <paramref name="profileId"/> (e.g. "Templates/Character") has been applied to this
+        /// entity, directly or as a template.
+        /// </summary>
+        public bool Implements(string profileId) =>
+            !string.IsNullOrEmpty(profileId) && _appliedProfiles.Contains(EntityProfileJsonLoader.NormalizeId(profileId));
+
+        /// <summary>Whether <paramref name="profile"/> has been applied to this entity, directly or as a template.</summary>
+        public bool Implements(EntityProfile profile) =>
+            profile != null && (_appliedProfiles.Contains(profile) || (profile.JsonId != null && _appliedProfiles.Contains(profile.JsonId)));
+
+        /// <param name="applying">The profiles (objects, and the IDs of JSON profiles) being applied further up, as
+        /// templates or through nesting, so a profile that builds on or nests itself is reported instead of recursing forever.</param>
         private void ApplyProfile(EntityProfile profile, HashSet<object> applying)
         {
             if (profile == null) return;
 
+            _appliedProfiles.Add(profile);
+            if (profile.JsonId != null) _appliedProfiles.Add(profile.JsonId);
             applying.Add(profile);
             if (profile.JsonId != null) applying.Add(profile.JsonId);
 
             // SemanticKey is a struct: unassigned entries are SemanticKey.None, never null.
+
+            // 0. Templates, first: their values are defaults that this profile's own values override.
+            foreach (var template in profile.Templates ?? new List<TemplateEntry>())
+            {
+                ApplyTemplate(template, profile, applying);
+            }
+
+            if (profile.ParentKey != SemanticKey.None) ParentKey = profile.ParentKey;
 
             // 1. Base Attributes
             foreach (var entry in profile.BaseAttributes)
@@ -98,6 +138,8 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 childEntity.ApplyProfile(nestedProfile, applying);
 
                 RegisterExternalProvider(nestedEntry.ProviderKey, childEntity);
+                // The child reaches this entity under the key its profile names (e.g. a sword's Owner).
+                if (childEntity.ParentKey != SemanticKey.None) childEntity.RegisterExternalProvider(childEntity.ParentKey, this);
                 _nestedEntities.Add(childEntity);
             }
 
@@ -126,6 +168,32 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
             applying.Remove(profile);
             if (profile.JsonId != null) applying.Remove(profile.JsonId);
+        }
+
+        private void ApplyTemplate(TemplateEntry entry, EntityProfile profile, HashSet<object> applying)
+        {
+            string id = entry.Profile == null && !string.IsNullOrEmpty(entry.ProfileId)
+                ? EntityProfileJsonLoader.NormalizeId(entry.ProfileId)
+                : null;
+            if (entry.Profile == null && id == null) return;
+
+            bool isApplying = entry.Profile != null
+                ? applying.Contains(entry.Profile) || (entry.Profile.JsonId != null && applying.Contains(entry.Profile.JsonId))
+                : applying.Contains(id);
+            if (isApplying)
+            {
+                string templateName = entry.Profile != null ? entry.Profile.ProfileName : id;
+                Debug.LogError($"[Entity] Skipped template '{templateName}' of profile '{profile.ProfileName}': it is already " +
+                               "being applied further up. A template can't build on itself.");
+                return;
+            }
+
+            // Once per entity: a template that several profiles build on is applied the first time only.
+            if (entry.Profile != null ? Implements(entry.Profile) : _appliedProfiles.Contains(id)) return;
+
+            // The loader logs an error if the JSON can't be loaded.
+            var template = entry.Profile ?? EntityProfileJsonLoader.Load(id);
+            if (template != null) ApplyProfile(template, applying);
         }
 
         private void ApplyInnateStatBlock(StatBlock statBlock)

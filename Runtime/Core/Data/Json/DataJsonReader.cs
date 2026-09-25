@@ -21,7 +21,10 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
         private static readonly string[] StatBlockProperties =
             { "statBlock", "condition", "baseValues", "tags", "remoteTags", "pointers", "modifiers", "keys" };
         private static readonly string[] ProfileProperties =
-            { "profile", "baseAttributes", "innateTags", "linkGroups", "nestedEntities", "pointers", "innateStatBlocks", "keys" };
+        {
+            "profile", "templates", "parentKey", "baseAttributes", "innateTags", "linkGroups", "nestedEntities", "pointers",
+            "innateStatBlocks", "keys"
+        };
         private static readonly string[] ModifierProperties = { "target", "type", "priority", "source" };
         private static readonly string[] ConditionKinds = { "hasTag", "lacksTag", "compare", "all", "any" };
 
@@ -146,6 +149,24 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
                 switch (Match(property.Key, ProfileProperties))
                 {
                     case "profile":
+                        break;
+
+                    case "templates":
+                        foreach (var (item, itemPath) in Array(value, at, "an array of template profile IDs, e.g. [\"Templates/Character\"]"))
+                        {
+                            if (item.Kind == JsonKind.Object)
+                            {
+                                builder.AddTemplate(Profile(item, itemPath, isRoot: false));
+                            }
+                            else
+                            {
+                                builder.AddTemplate(String(item, itemPath, "a template's profile ID such as \"Templates/Character\", or a profile object"));
+                            }
+                        }
+                        break;
+
+                    case "parentKey":
+                        builder.SetParentKey(Key(value, at));
                         break;
 
                     case "baseAttributes":

@@ -151,6 +151,8 @@ Fields that Unity doesn't save (a `Dictionary`, an interface without `[Serialize
 | Property | Builder call | Value |
 | ----- | ----- | ----- |
 | `profile` | `ProfileBuilder.Create(name)` | The profile's name. |
+| `templates` | `AddTemplate(...)` | The profiles this one builds on, applied first and once per entity: `["Templates/Character"]` (see [Templates](EntityProfile.md#templates)). |
+| `parentKey` | `SetParentKey(key)` | When nested in another entity, the key under which it reaches that entity: `"Owner"`. |
 | `baseAttributes` | `AddBaseAttribute(attribute, value)` | `{ "Health": 40, "Strength": 8 }` |
 | `innateTags` | `AddInnateTag(tag)` | `["Undead"]` |
 | `linkGroups` | `AddLinkGroup(group)` | `["Inventory"]` |
@@ -162,6 +164,7 @@ Fields that Unity doesn't save (a `Dictionary`, an interface without `[Serialize
 ```json
 {
   "profile": "Goblin",
+  "templates": ["Templates/Character"],
   "baseAttributes": { "Health": 40, "Strength": 8 },
   "innateTags": ["Undead"],
   "linkGroups": ["Inventory"],
@@ -189,7 +192,7 @@ Fields that Unity doesn't save (a `Dictionary`, an interface without `[Serialize
 }
 ```
 
-A nested entity is usually a profile ID, so one weapon profile serves many characters. A nested profile built in code (`AddNestedEntity(key, weapon => ...)`) is written in full instead: `{ "RightHand": { "profile": "Bone Cleaver", "baseAttributes": { "Damage": 75 } } }`. The Entity Profile Editor only shows nested entities by ID, so it doesn't open files like that; edit them as text.
+A nested entity or a template is usually a profile ID, so one weapon profile serves many characters. A profile built in code (`AddNestedEntity(key, weapon => ...)`, `AddTemplate(profile)`) is written in full instead: `{ "RightHand": { "profile": "Bone Cleaver", "baseAttributes": { "Damage": 75 } } }`. The Entity Profile Editor only shows nested entities and templates by ID, so it doesn't open files like that; edit them as text.
 
 ## Reading and Writing in Code
 

@@ -59,6 +59,25 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
 
 
     /// <summary>
+    /// A profile that another profile builds on (e.g. "Templates/Character"): it is applied first, and only once per
+    /// entity, however many of the entity's profiles and templates build on it.
+    /// </summary>
+    [Serializable]
+    public struct TemplateEntry
+    {
+        [Tooltip("The template's profile JSON (under Resources/Data/EntityProfiles).")]
+        [EntityProfileID]
+        public string ProfileId;
+
+        /// <summary>
+        /// A template built in code (e.g. by ProfileBuilder), used instead of ProfileId. Not serialized: the Inspector
+        /// shows templates by ID, and EntityProfileJson writes this profile in full.
+        /// </summary>
+        [NonSerialized]
+        public EntityProfile Profile;
+    }
+
+    /// <summary>
     /// A pure C# POCO blueprint for initializing an Entity.
     /// Fully serializable to JSON/YAML for saving, loading, or modding: save it as JSON with the
     /// Entity Profile Editor and load it with EntityProfileJsonLoader, or author it inline on an EntityController.
@@ -71,6 +90,16 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         /// <summary>The ID of the JSON file this profile was loaded from (set by EntityProfileJsonLoader), or null.</summary>
         [NonSerialized]
         internal string JsonId;
+
+        [Header("Templates")]
+        [Tooltip("Profiles this one builds on (e.g. 'Templates/Character'). They are applied first, and only once per entity, " +
+                 "even when several profiles build on the same template; this profile's own values override theirs.")]
+        public List<TemplateEntry> Templates = new List<TemplateEntry>();
+
+        [Header("As a Nested Entity")]
+        [Tooltip("When an entity created from this profile is nested in another (e.g. a sword in a 'RightHand'), the key under " +
+                 "which it reaches that entity (e.g. 'Owner'). Leave empty for no link back.")]
+        public SemanticKey ParentKey;
 
         [Header("Base Stats")]
         [Tooltip("Initial attributes and their base values.")]

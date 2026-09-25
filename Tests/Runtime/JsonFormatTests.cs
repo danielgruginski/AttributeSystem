@@ -439,7 +439,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             var e = Assert.Throws<InvalidOperationException>(() => EntityProfileJson.ToJson(golem));
             StringAssert.Contains("nestedEntities.RightHand", e.Message);
-            StringAssert.Contains("nested in itself", e.Message);
+            StringAssert.Contains("contains itself", e.Message);
         }
 
         [Test]

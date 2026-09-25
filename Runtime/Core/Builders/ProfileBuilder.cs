@@ -26,8 +26,32 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
             return builder;
         }
 
-        // Helper to instantly convert strings to SemanticKeys
-        //private SemanticKey Key(string name) => new SemanticKey(name, name, null);
+        /// <summary>
+        /// Builds on a template profile JSON (e.g. "Templates/Character" under Resources/Data/EntityProfiles): it is applied
+        /// before this profile, once per entity, so this profile's values override the template's.
+        /// </summary>
+        public ProfileBuilder AddTemplate(string profileId)
+        {
+            _profile.Templates.Add(new TemplateEntry { ProfileId = profileId });
+            return this;
+        }
+
+        /// <summary>Builds on a template profile built in code: applied before this profile, once per entity.</summary>
+        public ProfileBuilder AddTemplate(EntityProfile template)
+        {
+            _profile.Templates.Add(new TemplateEntry { Profile = template });
+            return this;
+        }
+
+        /// <summary>
+        /// When an entity created from this profile is nested in another (e.g. a sword in a RightHand), it reaches that
+        /// entity under <paramref name="key"/> (e.g. Links.Owner).
+        /// </summary>
+        public ProfileBuilder SetParentKey(SemanticKey key)
+        {
+            _profile.ParentKey = key;
+            return this;
+        }
 
         public ProfileBuilder AddBaseAttribute(SemanticKey name, float value)
         {

@@ -73,7 +73,7 @@ StatBlock vitality = StatBlockBuilder.Create("Vitality")
 
 ## 2. ProfileBuilder
 
-The `ProfileBuilder` generates `EntityProfile`s. It is capable of setting up base stats, innate tags, link groups, pointers, and recursively building nested entities and innate stat blocks via inline actions.
+The `ProfileBuilder` generates `EntityProfile`s. It is capable of setting up templates, base stats, innate tags, link groups, pointers, and recursively building nested entities and innate stat blocks via inline actions.
 
 ### Basic Entity Creation
 
@@ -83,6 +83,25 @@ EntityProfile zombieProfile = ProfileBuilder.Create("Zombie")
     .AddBaseAttribute(Stats.Speed, 2f)
     .AddInnateTag(Tags.Undead)
     .AddLinkGroup(Groups.Inventory)
+    .Build();
+
+```
+
+### Templates
+
+A profile can build on templates: profiles that are applied before it, once per entity, so their values are defaults the profile overrides (see [EntityProfile](EntityProfile.md#templates)).
+
+```csharp
+EntityProfile character = ProfileBuilder.Create("Character")
+    .AddBaseAttributes(10f, Stats.Strength, Stats.Vitality)
+    .AddInnateTag(Tags.Character)
+    .AddInnateStatBlock(rules => rules
+        .AddModifier(Stats.MaxHealth, new LinearLogic { Input = ValueSource.FromAttribute(Stats.Vitality), Coefficient = 10f }))
+    .Build();
+
+EntityProfile goblin = ProfileBuilder.Create("Goblin")
+    .AddTemplate(character)               // Or a template file: .AddTemplate("Templates/Character")
+    .AddBaseAttribute(Stats.Strength, 6f) // Replaces the template's 10
     .Build();
 
 ```
@@ -117,6 +136,7 @@ EntityProfile bossProfile = ProfileBuilder.Create("GiantSkeletonBoss")
     
     // 2. Inline Nested Entity (e.g., An equipped weapon entity created automatically)
     .AddNestedEntity(Links.RightHand, weapon => weapon
+        .SetParentKey(Links.Owner)       // The weapon reaches the boss as its Owner
         .AddBaseAttribute(Stats.Damage, 75f)
         .AddInnateTag(Tags.HeavyWeapon)
     )

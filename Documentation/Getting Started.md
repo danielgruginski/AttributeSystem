@@ -154,7 +154,7 @@ Finally, let's see the result.
 
 ## Next Steps
 
--   **Profiles:** Instead of setting stats in a script, save them as a JSON profile with **Window > Attribute System > Entity Profile Editor** and pick it in the `EntityController`'s **Profile Id** (see [EntityProfile](EntityProfile.md)).
+-   **Profiles:** Instead of setting stats in a script, save them as a JSON profile with **Window > Attribute System > Entity Profile Editor** and pick it in the `EntityController`'s **Profile Id**. Stats and formulas that many entities share go in a template (e.g. `Templates/Character`) that their profiles build on (see [EntityProfile](EntityProfile.md#templates)).
     
 -   **Health Bars:** Use `AttributeProgressBar` to display "Health" / "MaxHealth". To keep Health from going above MaxHealth, give it a modifier of Type **Clamp Max** whose Value reads MaxHealth (see [Attribute Modifiers](Attribute%20Modifiers.md)).
     

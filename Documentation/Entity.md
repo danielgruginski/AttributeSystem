@@ -178,7 +178,17 @@ Methods for establishing relationships between entities.
 
 -   **`ApplyProfile(EntityProfile profile)`**
     
-    -   Initializes the entity from a blueprint, in this order: base attributes, innate tags, link groups, nested entities (registered as providers), pointers, innate StatBlocks. Entries with an unassigned key (`SemanticKey.None`) are skipped, and a `null` profile is ignored. Nested profiles and StatBlocks given by ID are loaded from their JSON files; a profile that nests itself is skipped with an error. See [EntityProfile](EntityProfile.md); profiles can also be built in code with `ProfileBuilder` (see [Fluent Builders](Fluent%20Builders.md)).
+    -   Initializes the entity from a blueprint, in this order: templates, base attributes, innate tags, link groups, nested entities (registered as providers), pointers, innate StatBlocks. Entries with an unassigned key (`SemanticKey.None`) are skipped, and a `null` profile is ignored. Templates, nested profiles and StatBlocks given by ID are loaded from their JSON files; a profile that nests or builds on itself is skipped with an error. See [EntityProfile](EntityProfile.md); profiles can also be built in code with `ProfileBuilder` (see [Fluent Builders](Fluent%20Builders.md)).
+        
+    -   Each profile is applied once per entity, directly or as a template: a template that several of the entity's profiles build on is applied the first time only, and applying a profile the entity already has logs a warning and does nothing.
+        
+-   **`Implements(string profileId)`** / **`Implements(EntityProfile profile)`**
+    
+    -   Whether the profile (e.g. `"Templates/Character"`) was applied to this entity, directly or as a template.
+        
+-   **`ParentKey`**
+    
+    -   The key under which this entity reaches the entity it is nested in (e.g. `Links.Owner`), from its profile's `ParentKey`. When a profile's nested entity names one, `ApplyProfile` registers the parent as the child's provider under that key.
         
 -   **`GetOrCreateLinkGroup(SemanticKey key)`** / **`GetLinkGroup(SemanticKey key)`**
     
