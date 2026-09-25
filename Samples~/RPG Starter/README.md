@@ -12,7 +12,7 @@ A small RPG built with the Attribute System. The rules and numbers are JSON data
 
 1.  Import the sample: **Window > Package Manager > Attribute System > Samples > RPG Starter > Import**.
 2.  In a new scene, add the **RPG Starter Demo** component to an empty GameObject.
-3.  Press Play, and use the buttons: attack, cast, drink a potion, swap weapons, pick up the anvil, poison the Knight and cure him, level up, bless the party.
+3.  Press Play, and use the buttons: attack, cast, drink a potion, swap weapons, pick up the anvil, poison the Knight and cure the poison, level up, bless the party.
 
 ## What's Where
 

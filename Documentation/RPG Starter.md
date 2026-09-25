@@ -1,6 +1,6 @@
 # RPG Starter
 
-The package comes with a sample RPG: import it with **Window > Package Manager > Attribute System > Samples > RPG Starter > Import**, add the **RPG Starter Demo** component to an empty GameObject, and press Play. A Knight and a Mage fight a Goblin; buttons let you attack, cast, drink potions, swap weapons, carry an anvil, poison the Knight and cure him, level up and bless the party.
+The package comes with a sample RPG: import it with **Window > Package Manager > Attribute System > Samples > RPG Starter > Import**, add the **RPG Starter Demo** component to an empty GameObject, and press Play. A Knight and a Mage fight a Goblin; buttons let you attack, cast, drink potions, swap weapons, carry an anvil, poison the Knight and cure the poison, level up and bless the party.
 
 This page shows how it is built. The rules and numbers are data: JSON files in the `RPGStarter` folders of the sample's `Resources/Data/EntityProfiles`, `StatBlocks`, `Effects` and `StatusEffects`. The code (`Scripts/RPGGame.cs`) only spawns characters, applies effects, moves items around and counts time. Key tables are left out of the excerpts below.
 
@@ -29,7 +29,7 @@ This page shows how it is built. The rules and numbers are data: JSON files in t
 }
 ```
 
-The Character template gives every character its stats (10 in each), its Health pool and its formulas; the Knight only says what is different about him. The Mage builds on Caster (which builds on Character) instead, and the Goblin on Character alone. The Knight's sword and armor are nested entities, created with him.
+The Character template gives every character its stats (10 in each), its Health pool and its formulas; the Knight only says what is different about the Knight. The Mage builds on Caster (which builds on Character) instead, and the Goblin on Character alone. The Knight's sword and armor are nested entities, created with the Knight.
 
 ## Formulas Live in the Templates
 
@@ -102,7 +102,7 @@ A weapon hit is an effect from the attacker (its source) to its target:
 -   **The condition:** neither of them has fallen.
 -   **The first action** deals the attacker's AttackPower, reduced by the target's Defense (AttackPower x 100 / (Defense + 100)).
 -   **The second action** is a critical hit: the same damage again, as often as the attacker's CritChance (8% for the Knight).
--   **The status:** a Venomous weapon poisons 30% of the time. The Goblin's Rusty Dagger has the Venomous tag, so its hits poison, and so do the Knight's once he wields the dagger.
+-   **The status:** a Venomous weapon poisons 30% of the time. The Goblin's Rusty Dagger has the Venomous tag, so its hits poison, and so do the Knight's once the weapons are swapped.
 
 The game code applies it and reports what it did:
 
@@ -181,7 +181,7 @@ character.Attach(RPGLinks.MainHand, item); // The item reaches the character as 
 }
 ```
 
-Items in the Inventory group add up to CarriedWeight. Pick up the anvil (40) and the Knight (capacity 38) is Encumbered and moves at half speed until he drops it.
+Items in the Inventory group add up to CarriedWeight. Pick up the anvil (40) and the Knight (capacity 38) is Encumbered and moves at half speed until the anvil is dropped.
 
 ## Auras and Reactions
 
