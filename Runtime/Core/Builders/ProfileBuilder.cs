@@ -72,6 +72,16 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
             return this;
         }
 
+        /// <summary>
+        /// Makes <paramref name="resource"/> a pool (e.g. Health): an amount between 0 and <paramref name="max"/>
+        /// (e.g. ValueSource.FromAttribute(Stats.MaxHealth), or a constant), full when the entity is created.
+        /// </summary>
+        public ProfileBuilder AddPool(SemanticKey resource, ValueSource max, PoolMaxChange onMaxChange = PoolMaxChange.KeepPercent)
+        {
+            _profile.Pools.Add(new PoolEntry { Resource = resource, Max = max, OnMaxChange = onMaxChange });
+            return this;
+        }
+
         public ProfileBuilder AddInnateTag(SemanticKey tag)
         {
             _profile.InnateTags.Add(tag);

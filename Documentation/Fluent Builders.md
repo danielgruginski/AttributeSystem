@@ -73,7 +73,7 @@ StatBlock vitality = StatBlockBuilder.Create("Vitality")
 
 ## 2. ProfileBuilder
 
-The `ProfileBuilder` generates `EntityProfile`s. It is capable of setting up templates, base stats, innate tags, link groups, pointers, and recursively building nested entities and innate stat blocks via inline actions.
+The `ProfileBuilder` generates `EntityProfile`s. It is capable of setting up templates, base stats, pools, innate tags, link groups, pointers, and recursively building nested entities and innate stat blocks via inline actions.
 
 ### Basic Entity Creation
 
@@ -94,6 +94,7 @@ A profile can build on templates: profiles that are applied before it, once per 
 ```csharp
 EntityProfile character = ProfileBuilder.Create("Character")
     .AddBaseAttributes(10f, Stats.Strength, Stats.Vitality)
+    .AddPool(Stats.Health, ValueSource.FromAttribute(Stats.MaxHealth)) // Health: spent and restored, up to MaxHealth
     .AddInnateTag(Tags.Character)
     .AddInnateStatBlock(rules => rules
         .AddModifier(Stats.MaxHealth, new LinearLogic { Input = ValueSource.FromAttribute(Stats.Vitality), Coefficient = 10f }))

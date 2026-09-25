@@ -114,6 +114,14 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
                 if (profile.ParentKey != SemanticKey.None) node.Add("parentKey", KeyNode(profile.ParentKey));
 
                 AddMap(node, "baseAttributes", profile.BaseAttributes, path, entry => entry.Attribute, (entry, at) => JsonNode.From(entry.BaseValue));
+
+                // "Health": "MaxHealth", or an object when the pool doesn't keep its percentage.
+                AddMap(node, "pools", profile.Pools, path, pool => pool.Resource, (pool, at) =>
+                    pool.OnMaxChange == PoolMaxChange.KeepPercent
+                        ? ValueSource(pool.Max, at)
+                        : JsonNode.NewObject()
+                            .Add("max", ValueSource(pool.Max, Child(at, "max")))
+                            .Add("onMaxChange", EnumNode(typeof(PoolMaxChange), pool.OnMaxChange, Child(at, "onMaxChange"))));
                 AddKeys(node, "innateTags", profile.InnateTags);
                 AddKeys(node, "linkGroups", profile.LinkGroups);
 

@@ -13,6 +13,7 @@ A reactive attribute management system designed for scalability and maintainabil
   * Clamping and Triangular bonuses.  
   * Custom logic: write a small serializable class and it appears in the Inspector. No registration.  
 * **Entity Graph**: Entities can read and modify each other's attributes through provider paths (e.g. a sword reading `Owner.Strength`), with pointers (aliases), reference-counted tags and conditional StatBlocks.  
+* **Resource Pools**: Health, Mana and the like stay between 0 and their maximum through damage, healing and max changes.  
 * **Templates**: Profiles build on shared templates (a `Character` template for every character, `Caster` on top of it), applied once per entity; each profile overrides the template values it needs to.  
 * **Data-Driven**: Author StatBlocks and entity profiles in their editor windows or right in the Inspector. They are saved as readable JSON files that mirror the builder calls (`{ "target": "Damage", "value": 5 }`), easy to review, diff and edit by hand.  
 * **Custom Editor Tools**: Includes StatBlock and Entity Profile editor windows, an Attribute Debugger and custom property drawers for an improved designer workflow.  
@@ -78,7 +79,7 @@ Add an `EntityController` to a GameObject and use `controller.Instance` to reach
 ## **Documentation**
 
 * [Getting Started](Documentation/Getting%20Started.md) and [Semantic Keys](Documentation/Semantic%20Keys.md)
-* Core: [Entity](Documentation/Entity.md), [Attribute](Documentation/Attribute.md), [Attribute Modifiers](Documentation/Attribute%20Modifiers.md), [Modifier Logic](Documentation/Modifier%20Logic.md), [ValueSource](Documentation/ValueSource.md), [AttributeReference](Documentation/AttributeReference.md), [Attribute Pointers](Documentation/Attribute%20Pointers.md), [AttributeConnection](Documentation/AttributeConnection.md)
+* Core: [Entity](Documentation/Entity.md), [Attribute](Documentation/Attribute.md), [Resource Pools](Documentation/Resource%20Pools.md), [Attribute Modifiers](Documentation/Attribute%20Modifiers.md), [Modifier Logic](Documentation/Modifier%20Logic.md), [ValueSource](Documentation/ValueSource.md), [AttributeReference](Documentation/AttributeReference.md), [Attribute Pointers](Documentation/Attribute%20Pointers.md), [AttributeConnection](Documentation/AttributeConnection.md)
 * Data: [StatBlock](Documentation/StatBlock.md), [ActiveStatBlock](Documentation/ActiveStatBlock.md), [EntityProfile](Documentation/EntityProfile.md), [LinkGroup](Documentation/LinkGroup.md), [Fluent Builders](Documentation/Fluent%20Builders.md), [JSON Format](Documentation/JSON%20Format.md)
 * Unity: [EntityController](Documentation/EntityController.md), [StatBlockLinker](Documentation/StatBlockLinker.md), [AttributeContextLinker](Documentation/AttributeContextLinker.md), [AttributeUIBehaviour](Documentation/AttributeUIBehaviour.md)
 

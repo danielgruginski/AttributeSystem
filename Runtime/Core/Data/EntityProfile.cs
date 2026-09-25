@@ -21,6 +21,22 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
     }
 
     /// <summary>
+    /// A resource that is spent and restored, such as Health: an amount between 0 and Max (see ResourcePool).
+    /// </summary>
+    [Serializable]
+    public struct PoolEntry
+    {
+        [Tooltip("The attribute that holds the amount (e.g. Health).")]
+        public SemanticKey Resource;
+
+        [Tooltip("The most it can hold: an attribute (e.g. MaxHealth) or a constant.")]
+        public ValueSource Max;
+
+        [Tooltip("What the amount does when Max changes: keep the same percentage, move by as much as Max, or keep the amount.")]
+        public PoolMaxChange OnMaxChange;
+    }
+
+    /// <summary>
     /// Represents a mapping to redirect local attribute queries to a different attribute.
     /// </summary>
     [Serializable]
@@ -104,6 +120,11 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         [Header("Base Stats")]
         [Tooltip("Initial attributes and their base values.")]
         public List<BaseAttributeEntry> BaseAttributes = new List<BaseAttributeEntry>();
+
+        [Header("Pools")]
+        [Tooltip("Resources that are spent and restored, such as Health or Mana: an amount between 0 and Max, full when the " +
+                 "entity is created. A pool defined again (e.g. by a profile and its template) replaces the earlier one.")]
+        public List<PoolEntry> Pools = new List<PoolEntry>();
 
         [Header("Innate Traits")]
         [Tooltip("Tags that are inherently applied to this entity upon creation (e.g., 'Undead', 'Weapon').")]

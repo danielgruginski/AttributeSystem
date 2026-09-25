@@ -156,7 +156,7 @@ Finally, let's see the result.
 
 -   **Profiles:** Instead of setting stats in a script, save them as a JSON profile with **Window > Attribute System > Entity Profile Editor** and pick it in the `EntityController`'s **Profile Id**. Stats and formulas that many entities share go in a template (e.g. `Templates/Character`) that their profiles build on (see [EntityProfile](EntityProfile.md#templates)).
     
--   **Health Bars:** Use `AttributeProgressBar` to display "Health" / "MaxHealth". To keep Health from going above MaxHealth, give it a modifier of Type **Clamp Max** whose Value reads MaxHealth (see [Attribute Modifiers](Attribute%20Modifiers.md)).
+-   **Health Bars:** Make Health a pool up to MaxHealth (see [Resource Pools](Resource%20Pools.md)): damage and healing then stay between 0 and MaxHealth. Use `AttributeProgressBar` to display "Health" / "MaxHealth".
     
 -   **Your Own Logic:** Write a small `[Serializable]` class to compute a modifier's value; it shows up in the **Logic** dropdown (see [Modifier Logic](Modifier%20Logic.md)).
     

@@ -33,6 +33,8 @@ namespace ReactiveSolutions.AttributeSystem.Core
         // The profiles applied to this entity, directly or as templates: profile objects, and the IDs of JSON profiles.
         private readonly HashSet<object> _appliedProfiles = new HashSet<object>();
 
+        private readonly Dictionary<SemanticKey, ResourcePool> _pools = new Dictionary<SemanticKey, ResourcePool>();
+
         /// <summary>
         /// The key under which this entity reaches the entity it is nested in (e.g. Owner), from its profile's
         /// ParentKey; SemanticKey.None if its profile names none.
@@ -95,6 +97,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 {
                     SetOrUpdateBaseValue(entry.Attribute, entry.BaseValue);
                 }
+            }
+
+            // 1b. Pools (e.g. Health up to MaxHealth). A pool this profile defines again replaces its template's.
+            foreach (var pool in profile.Pools ?? new List<PoolEntry>())
+            {
+                if (pool.Resource != SemanticKey.None) AddPool(pool.Resource, pool.Max, pool.OnMaxChange);
             }
 
             // 2. Innate Tags
@@ -272,6 +280,31 @@ namespace ReactiveSolutions.AttributeSystem.Core
             return false;
         }
 
+        // --- Resource Pools ---
+
+        /// <summary>
+        /// Makes <paramref name="resource"/> (e.g. Health) a pool: an amount that is spent and restored, between 0 and
+        /// <paramref name="max"/> (e.g. ValueSource.FromAttribute(Stats.MaxHealth), or a constant). A new pool is full;
+        /// one that replaces the resource's previous pool keeps its amount. See ResourcePool.
+        /// </summary>
+        public ResourcePool AddPool(SemanticKey resource, ValueSource max, PoolMaxChange onMaxChange = PoolMaxChange.KeepPercent)
+        {
+            if (IsDisposed || resource == SemanticKey.None) return null;
+
+            _pools.TryGetValue(resource, out var previous);
+            previous?.Dispose();
+
+            var pool = new ResourcePool(this, resource, max, onMaxChange, previous);
+            _pools[resource] = pool;
+            return pool;
+        }
+
+        /// <summary>The pool of <paramref name="resource"/> (e.g. Health), or null if it isn't one.</summary>
+        public ResourcePool GetPool(SemanticKey resource) => _pools.TryGetValue(resource, out var pool) ? pool : null;
+
+        /// <summary>This entity's pools.</summary>
+        public IEnumerable<ResourcePool> Pools => _pools.Values;
+
         // --- External Providers ---
 
         public void RegisterExternalProvider(SemanticKey key, Entity processor)
@@ -423,6 +456,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
             // Clean up profile stat blocks
             _profileDisposables.Dispose();
+
+            foreach (var pool in _pools.Values)
+            {
+                pool.Dispose();
+            }
+            _pools.Clear();
 
             // Cascade disposal to nested entities
             foreach (var nested in _nestedEntities)
