@@ -119,11 +119,11 @@ EntityProfile bossProfile = ProfileBuilder.Create("GiantSkeletonBoss")
 
 ```
 
-When the profile is applied, the nested weapon becomes its own `Entity`, registered as a provider under `Links.RightHand` (so the pointer can reach it) and disposed together with the boss. `AddInnateStatBlock` and `AddNestedEntity` also accept an already-built `StatBlock` or `EntityProfile`.
+When the profile is applied, the nested weapon becomes its own `Entity`, registered as a provider under `Links.RightHand` (so the pointer can reach it) and disposed together with the boss. `AddInnateStatBlock` and `AddNestedEntity` also accept an already-built `StatBlock` or `EntityProfile`, or the ID of a JSON file: `AddInnateStatBlock("Auras/Boss")` and `AddNestedEntity(Links.RightHand, "Weapons/BoneCleaver")` (see [EntityProfile](EntityProfile.md)).
 
 ## 4. Integration Workflow (The Data/Asset Split)
 
-The builders create their objects in memory: `StatBlockBuilder` outputs a plain, serializable `StatBlock` POCO, and `ProfileBuilder` outputs an `EntityProfile` (which currently derives from `ScriptableObject`, so it exists only in memory until you save it as an asset). You can use these built objects in two primary ways:
+The builders create their objects in memory: `StatBlockBuilder` outputs a plain, serializable `StatBlock`, and `ProfileBuilder` a plain, serializable `EntityProfile`. You can use these built objects in two primary ways:
 
 1.  **Runtime Generation:** Generate profiles on the fly when your game boots up or when procedurally generating a dungeon. You can immediately pass the built profile directly to an `Entity`, and apply built StatBlocks the same way. Applying never modifies the profile or the StatBlock, so one instance can be used for any number of entities:
     
@@ -133,23 +133,20 @@ The builders create their objects in memory: `StatBlockBuilder` outputs a plain,
     
     ```
     
-2.  **Editor Generation Scripts:** Write a custom Unity Editor script that loops through your code, builds the data, and saves it as physical assets in your project folder. A `StatBlock` is stored inside a `StatBlockSO` wrapper. An `EntityProfile` is itself a `ScriptableObject` that the `EntityProfileSO` wrapper only references, so save the profile (and the nested profiles it references) as assets too.
+2.  **Editor Generation Scripts:** Write a custom Unity Editor script that builds the data in code and saves it as JSON files. The Stat Block Editor, the Entity Profile Editor and the ID dropdowns (such as an `EntityController`'s **Profile Id**) then pick them up. An ID is the file's path in its folder without the extension.
     
     ```csharp
-    // Example inside an Editor script (StatBlockSO and EntityProfileSO are in ReactiveSolutions.AttributeSystem.Unity.Data):
-    var statBlockSO = ScriptableObject.CreateInstance<StatBlockSO>();
-    statBlockSO.StatBlock = poisonDebuff; // Stored inside the asset
-    UnityEditor.AssetDatabase.CreateAsset(statBlockSO, "Assets/Resources/Poison_Debuff.asset");
+    // Example inside an Editor script:
+    System.IO.Directory.CreateDirectory("Assets/Resources/Data/StatBlocks/Debuffs");
+    System.IO.File.WriteAllText("Assets/Resources/Data/StatBlocks/Debuffs/Poison.json", JsonUtility.ToJson(poisonDebuff, true));
     
-    UnityEditor.AssetDatabase.CreateAsset(bossProfile, "Assets/Resources/GiantSkeletonBoss_Profile.asset");
-    foreach (var nested in bossProfile.NestedEntities)
-        UnityEditor.AssetDatabase.AddObjectToAsset(nested.Profile, bossProfile); // e.g. the inline RightHand weapon
+    System.IO.Directory.CreateDirectory("Assets/Resources/Data/EntityProfiles/Bosses");
+    System.IO.File.WriteAllText("Assets/Resources/Data/EntityProfiles/Bosses/GiantSkeleton.json", JsonUtility.ToJson(bossProfile, true));
     
-    var wrapperSO = ScriptableObject.CreateInstance<EntityProfileSO>();
-    wrapperSO.Profile = bossProfile; // References the saved profile
-    UnityEditor.AssetDatabase.CreateAsset(wrapperSO, "Assets/Resources/GiantSkeletonBoss.asset");
-    UnityEditor.AssetDatabase.SaveAssets();
+    UnityEditor.AssetDatabase.Refresh();
     
     ```
     
-    This gives you code-driven design that outputs physical assets you can drag and drop onto your `EntityController`s!
+    Innate StatBlocks are saved inside the profile. Nested profiles built inline (`AddNestedEntity(key, weapon => ...)`) are not: they only exist in memory, so save the weapon as its own profile file and add it by ID, e.g. `AddNestedEntity(Links.RightHand, "Weapons/BoneCleaver")`.
+    
+    This gives you code-driven design that outputs data files you can pick on your `EntityController`s!

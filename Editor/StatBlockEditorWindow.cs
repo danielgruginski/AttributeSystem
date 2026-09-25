@@ -1,16 +1,11 @@
 using UnityEngine;
 using UnityEditor;
-using System.IO;
-using System;
-using System.Collections.Generic;
-using System.Reflection;
 using ReactiveSolutions.AttributeSystem.Core; // For ModifierFactory
 using ReactiveSolutions.AttributeSystem.Core.Data;
-using SemanticKeys;
 
 namespace ReactiveSolutions.AttributeSystem.Editor
 {
-    public class StatBlockEditorWindow : EditorWindow
+    public class StatBlockEditorWindow : JsonDataEditorWindow
     {
         // -----------------------------------------------------------
         // Helper Container: Bridges POCO StatBlock -> Unity Inspector
@@ -20,55 +15,18 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             public StatBlock Data = new StatBlock();
         }
 
-        private StatBlockContainer _container;
-        private SerializedObject _serializedObject;
-        private const string JSON_PATH = "Resources/Data/StatBlocks";
-
-        private string _currentFileName = "NewStatBlock";
-        private string _fullFilePath;
-        private Vector2 _scroll;
-
-        // Visual styles
-        private GUIStyle _headerStyle;
-        private GUIStyle _boxStyle;
-
         [MenuItem("Window/Attribute System/Stat Block Editor (Unified)")]
         public static void ShowWindow() => GetWindow<StatBlockEditorWindow>("StatBlock Editor");
 
-        private void OnEnable()
+        protected override string JsonFolder => "Resources/" + StatBlockJsonLoader.ResourcesPath;
+        protected override string DataLabel => "StatBlock";
+        protected override string Title => "Unified StatBlock Editor";
+
+        protected override ScriptableObject CreateContainer() => CreateInstance<StatBlockContainer>();
+        protected override object GetData(ScriptableObject container) => ((StatBlockContainer)container).Data;
+
+        protected override void DrawData(SerializedProperty dataProp)
         {
-            EnsureDirectory();
-            if (_container == null) CreateNewContainer();
-        }
-
-        private void OnDisable()
-        {
-            if (_container != null) DestroyImmediate(_container);
-        }
-
-        private void OnGUI()
-        {
-            // Safety Init
-            if (_container == null || _serializedObject == null || _serializedObject.targetObject == null)
-            {
-                CreateNewContainer();
-            }
-
-            // Setup Styles
-            if (_headerStyle == null)
-            {
-                _headerStyle = new GUIStyle(EditorStyles.boldLabel) { fontSize = 13 };
-                _boxStyle = new GUIStyle(EditorStyles.helpBox) { padding = new RectOffset(10, 10, 10, 10) };
-            }
-
-            DrawHeader();
-
-            EditorGUILayout.Space();
-
-            _scroll = EditorGUILayout.BeginScrollView(_scroll);
-            _serializedObject.Update();
-
-            SerializedProperty dataProp = _serializedObject.FindProperty("Data");
             SerializedProperty activationProp = dataProp.FindPropertyRelative("ActivationCondition");
             SerializedProperty tagsProp = dataProp.FindPropertyRelative("Tags");
             SerializedProperty remoteTagsProp = dataProp.FindPropertyRelative("RemoteTags");
@@ -81,30 +39,27 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             EditorGUILayout.PropertyField(dataProp.FindPropertyRelative("BlockName"), new GUIContent("Block Name"));
             EditorGUILayout.Space();
 
-            EditorGUILayout.LabelField("Activation Conditions", _headerStyle);
+            EditorGUILayout.LabelField("Activation Conditions", HeaderStyle);
             EditorGUILayout.PropertyField(activationProp, true);
 
-            EditorGUILayout.LabelField("Tags", _headerStyle);
+            EditorGUILayout.LabelField("Tags", HeaderStyle);
             EditorGUILayout.PropertyField(tagsProp, true);
 
-            EditorGUILayout.LabelField("Remote Tags", _headerStyle);
+            EditorGUILayout.LabelField("Remote Tags", HeaderStyle);
             EditorGUILayout.PropertyField(remoteTagsProp, true);
 
-            EditorGUILayout.LabelField("Attribute Pointers (Aliases)", _headerStyle);
+            EditorGUILayout.LabelField("Attribute Pointers (Aliases)", HeaderStyle);
             EditorGUILayout.PropertyField(pointersProp, true);
 
-            EditorGUILayout.LabelField("Base Attributes", _headerStyle);
+            EditorGUILayout.LabelField("Base Attributes", HeaderStyle);
             EditorGUILayout.PropertyField(baseValuesProp, true);
 
 
             EditorGUILayout.Space(15);
-            EditorGUILayout.LabelField("Modifier Pipeline", _headerStyle);
+            EditorGUILayout.LabelField("Modifier Pipeline", HeaderStyle);
 
             // --- 2. Custom Modifier Drawing ---
             DrawModifiersList(modifiersProp);
-
-            _serializedObject.ApplyModifiedProperties();
-            EditorGUILayout.EndScrollView();
         }
 
         /// <summary>
@@ -146,7 +101,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         /// </summary>
         private bool DrawModifierSpec(SerializedProperty spec, int index)
         {
-            EditorGUILayout.BeginVertical(_boxStyle);
+            EditorGUILayout.BeginVertical(BoxStyle);
 
             // -- Toolbar (Title + Delete) --
             EditorGUILayout.BeginHorizontal();
@@ -245,121 +200,6 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             var valProp = semanticKeyProp.FindPropertyRelative("_value");
             string key = valProp != null ? valProp.stringValue : null;
             return string.IsNullOrEmpty(key) ? "Static" : key;
-        }
-
-        private void DrawHeader()
-        {
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            GUILayout.Label("Unified StatBlock Editor", EditorStyles.boldLabel);
-
-            // Filename editing
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("Filename (No ext):", GUILayout.Width(110));
-            _currentFileName = EditorGUILayout.TextField(_currentFileName);
-            EditorGUILayout.LabelField(".json", GUILayout.Width(40));
-            EditorGUILayout.EndHorizontal();
-
-            if (!string.IsNullOrEmpty(_fullFilePath))
-            {
-                EditorGUILayout.HelpBox($"Editing: {_fullFilePath}", MessageType.Info);
-            }
-            else
-            {
-                EditorGUILayout.HelpBox("Unsaved New Block", MessageType.Warning);
-            }
-
-            EditorGUILayout.EndVertical();
-
-            // Toolbar
-            EditorGUILayout.BeginHorizontal();
-            if (GUILayout.Button("New")) CreateNewContainer();
-            if (GUILayout.Button("Load")) LoadJson();
-            if (GUILayout.Button("Save")) SaveJson();
-            EditorGUILayout.EndHorizontal();
-        }
-
-        private void CreateNewContainer()
-        {
-            if (_container != null) DestroyImmediate(_container);
-            _container = ScriptableObject.CreateInstance<StatBlockContainer>();
-            _serializedObject = new SerializedObject(_container);
-
-            _currentFileName = "NewStatBlock";
-            _fullFilePath = null;
-        }
-
-        private void EnsureDirectory()
-        {
-            string path = Path.Combine(Application.dataPath, JSON_PATH);
-            if (!Directory.Exists(path))
-            {
-                Directory.CreateDirectory(path);
-                AssetDatabase.Refresh();
-            }
-        }
-
-        private void SaveJson()
-        {
-            if (string.IsNullOrEmpty(_currentFileName))
-            {
-                EditorUtility.DisplayDialog("Error", "Please enter a filename.", "OK");
-                return;
-            }
-
-            string path = Path.Combine(Application.dataPath, JSON_PATH);
-            // The name may include subfolders (e.g. "Weapons/IronSword"), matching StatBlockJsonLoader IDs.
-            string fileName = _currentFileName.Replace(" ", "_") + ".json";
-            string fullPath = Path.Combine(path, fileName);
-            Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
-
-            string json = JsonUtility.ToJson(_container.Data, true);
-            File.WriteAllText(fullPath, json);
-
-            // ImportAsset expects a project-relative path ("Assets/...").
-            AssetDatabase.ImportAsset($"Assets/{JSON_PATH}/{fileName}");
-            _fullFilePath = fullPath;
-            Debug.Log($"Saved StatBlock to {fileName}");
-            Repaint();
-        }
-
-        private void LoadJson()
-        {
-            string path = Path.Combine(Application.dataPath, JSON_PATH);
-            if (!Directory.Exists(path)) Directory.CreateDirectory(path);
-
-            string filePath = EditorUtility.OpenFilePanel("Load JSON", path, "json");
-            if (string.IsNullOrEmpty(filePath)) return;
-
-            try
-            {
-                string json = File.ReadAllText(filePath);
-
-                CreateNewContainer();
-                JsonUtility.FromJsonOverwrite(json, _container.Data);
-                _serializedObject.Update();
-
-                _fullFilePath = filePath;
-                _currentFileName = ToStatBlockId(filePath, path);
-            }
-            catch (Exception e)
-            {
-                Debug.LogError($"Load failed: {e.Message}");
-            }
-        }
-
-        /// <summary>
-        /// ".../Resources/Data/StatBlocks/Weapons/IronSword.json" -> "Weapons/IronSword" (the ID StatBlockJsonLoader expects).
-        /// </summary>
-        private static string ToStatBlockId(string filePath, string rootPath)
-        {
-            string full = Path.GetFullPath(filePath).Replace('\\', '/');
-            string root = Path.GetFullPath(rootPath).Replace('\\', '/').TrimEnd('/') + "/";
-            string relative = full.StartsWith(root, StringComparison.OrdinalIgnoreCase)
-                ? full.Substring(root.Length)
-                : Path.GetFileName(full);
-            return relative.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
-                ? relative.Substring(0, relative.Length - ".json".Length)
-                : relative;
         }
     }
 }

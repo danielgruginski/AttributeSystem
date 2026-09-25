@@ -1,16 +1,20 @@
-using UnityEngine;
-using System.Collections.Generic;
-using System;
-
 namespace ReactiveSolutions.AttributeSystem.Core.Data
 {
+    /// <summary>
+    /// Loads StatBlocks saved as JSON (by the Stat Block Editor) from Resources/Data/StatBlocks.
+    /// </summary>
     public static class StatBlockJsonLoader
     {
-        // Path relative to a Resources folder. 
-        // Example: If file is at Assets/Resources/Data/StatBlocks/Block.json, 
-        // Resources.Load expects "Data/StatBlocks/Block"
-        private const string RESOURCE_SUBPATH = "Data/StatBlocks/";
+        /// <summary>
+        /// The folder, relative to a Resources folder, that holds the StatBlock JSON files.
+        /// Example: Assets/Resources/Data/StatBlocks/Block.json has the ID "Block".
+        /// </summary>
+        public const string ResourcesPath = "Data/StatBlocks";
 
+        /// <summary>
+        /// Loads a StatBlock by ID (e.g. "Weapons/IronSword"; "IronSword.json" and "Data/StatBlocks/IronSword" work too).
+        /// If it can't be loaded, logs an error and returns an empty block.
+        /// </summary>
         public static StatBlock Load(string id)
         {
             if (string.IsNullOrEmpty(id)) return null;
@@ -20,45 +24,12 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
             return block;
         }
 
-        public static void LoadIntoStatBlock(string id, StatBlock block)
-        {
-            // 1. Sanitize the ID to be a valid Resources path
-            // Remove .json extension if present
-            string cleanId = id;
-            if (cleanId.EndsWith(".json"))
-            {
-                cleanId = cleanId.Substring(0, cleanId.Length - 5);
-            }
+        /// <summary>
+        /// Overwrites <paramref name="block"/> with the StatBlock JSON <paramref name="id"/>. Logs an error if it can't be loaded.
+        /// </summary>
+        public static void LoadIntoStatBlock(string id, StatBlock block) => TryLoadInto(id, block);
 
-            // Remove the hardcoded path prefix if the ID already contains it (avoid duplication)
-            // Some users might pass "Data/StatBlocks/MyID", others just "MyID"
-            if (cleanId.StartsWith(RESOURCE_SUBPATH))
-            {
-                cleanId = cleanId.Substring(RESOURCE_SUBPATH.Length);
-            }
-
-            string resourcePath = RESOURCE_SUBPATH + cleanId;
-
-            // 2. Load from Resources
-            var textAsset = Resources.Load<TextAsset>(resourcePath);
-
-            if (textAsset != null)
-            {
-                try
-                {
-                    JsonUtility.FromJsonOverwrite(textAsset.text, block);
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError($"[StatBlockJsonLoader] Failed to parse JSON for {id}: {e.Message}");
-                }
-            }
-            else
-            {
-                // Fallback: Check if the user provided a full raw ID without the path prefix
-                // This helps if the ID itself IS the path (though less standard for this loader)
-                Debug.LogError($"[StatBlockJsonLoader] Could not load StatBlock with ID: {id} (Attempted path: {resourcePath})");
-            }
-        }
+        internal static bool TryLoadInto(string id, StatBlock block) =>
+            JsonDataLoader.TryLoadInto(ResourcesPath, id, block, nameof(StatBlockJsonLoader), "StatBlock");
     }
 }

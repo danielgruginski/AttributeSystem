@@ -11,8 +11,8 @@ A reactive attribute management system designed for scalability and maintainabil
   * Diminishing Returns & Segmented Multipliers.  
   * Clamping and Triangular bonuses.  
 * **Entity Graph**: Entities can read and modify each other's attributes through provider paths (e.g. a sword reading `Owner.Strength`), with pointers (aliases), reference-counted tags and conditional StatBlocks.  
-* **Data-Driven**: Author StatBlocks as ScriptableObjects or JSON (with a dedicated editor window), facilitating easy balancing.  
-* **Custom Editor Tools**: Includes a StatBlock Editor Window, an Attribute Debugger and custom property drawers for an improved designer workflow.  
+* **Data-Driven**: Author StatBlocks and entity profiles as JSON files (each with its own editor window) or right in the Inspector, facilitating easy balancing.  
+* **Custom Editor Tools**: Includes StatBlock and Entity Profile editor windows, an Attribute Debugger and custom property drawers for an improved designer workflow.  
 * **No Magic Strings**: Attribute names, tags and aliases are GUID-backed [Semantic Keys](Documentation/Semantic%20Keys.md).  
 * **Loose Coupling**: Easily integrates with existing projects (like TopDown Engine) without creating rigid dependencies.
 
@@ -81,13 +81,13 @@ scaling.Dispose();                                 // Damage: 5
 
 ### 3. Use it in a scene
 
-Add an `EntityController` to a GameObject and use `controller.Instance` to reach its `Entity`. Load JSON StatBlocks with `StatBlockLinker`, connect entities (e.g. a sword to its owner) with `AttributeContextLinker`, and bind UI with `AttributeDisplayText` / `AttributeProgressBar`. See [Getting Started](Documentation/Getting%20Started.md) for a step-by-step walkthrough.
+Add an `EntityController` to a GameObject and use `controller.Instance` to reach its `Entity`; give it a profile (a JSON file or one authored in its Inspector) to set its starting stats. Load JSON StatBlocks with `StatBlockLinker`, connect entities (e.g. a sword to its owner) with `AttributeContextLinker`, and bind UI with `AttributeDisplayText` / `AttributeProgressBar`. See [Getting Started](Documentation/Getting%20Started.md) for a step-by-step walkthrough.
 
 ## **Documentation**
 
 * [Getting Started](Documentation/Getting%20Started.md) and [Semantic Keys](Documentation/Semantic%20Keys.md)
 * Core: [Entity](Documentation/Entity.md), [Attribute](Documentation/Attribute.md), [Attribute Modifiers](Documentation/Attribute%20Modifiers.md), [ModifierFactory](Documentation/ModifierFactory.md), [ValueSource](Documentation/ValueSource.md), [AttributeReference](Documentation/AttributeReference.md), [Attribute Pointers](Documentation/Attribute%20Pointers.md), [AttributeConnection](Documentation/AttributeConnection.md)
-* Data: [StatBlock](Documentation/StatBlock.md), [ActiveStatBlock](Documentation/ActiveStatBlock.md), [LinkGroup](Documentation/LinkGroup.md), [Fluent Builders](Documentation/Fluent%20Builders.md)
+* Data: [StatBlock](Documentation/StatBlock.md), [ActiveStatBlock](Documentation/ActiveStatBlock.md), [EntityProfile](Documentation/EntityProfile.md), [LinkGroup](Documentation/LinkGroup.md), [Fluent Builders](Documentation/Fluent%20Builders.md)
 * Unity: [EntityController](Documentation/EntityController.md), [StatBlockLinker](Documentation/StatBlockLinker.md), [AttributeContextLinker](Documentation/AttributeContextLinker.md), [AttributeUIBehaviour](Documentation/AttributeUIBehaviour.md)
 
 ## **License**

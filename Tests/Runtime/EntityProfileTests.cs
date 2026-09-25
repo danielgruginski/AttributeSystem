@@ -52,7 +52,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
         private EntityProfile CreateEmptyProfile()
         {
-            return ScriptableObject.CreateInstance<EntityProfile>();
+            return new EntityProfile();
         }
 
         [Test]

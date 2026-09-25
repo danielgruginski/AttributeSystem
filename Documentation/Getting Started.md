@@ -17,7 +17,7 @@ First, let's create a Game Object that can hold stats.
 
 1.  Create a new Empty GameObject in your scene and name it **"Player"**.
     
-2.  Add the `EntityController` component to it. Leave **Profile SO** empty for this guide: the script below sets the stats (the controller logs a warning that the entity starts empty).
+2.  Add the `EntityController` component to it. Leave **Profile Id** and **Profile** empty for this guide: the script below sets the stats.
     
 3.  Create a new C# script named `PlayerSetup.cs` and attach it to the Player.
     
@@ -141,6 +141,8 @@ Finally, let's see the result.
 
 ## Next Steps
 
+-   **Profiles:** Instead of setting stats in a script, save them as a JSON profile with **Window > Attribute System > Entity Profile Editor** and pick it in the `EntityController`'s **Profile Id** (see [EntityProfile](EntityProfile.md)).
+    
 -   **Health Bars:** Use `AttributeProgressBar` to display "Health" / "MaxHealth".
     
 -   **Custom Logic:** Inherit from `AttributeUIBehaviour` to make damage numbers pop up.

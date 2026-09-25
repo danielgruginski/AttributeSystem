@@ -1,5 +1,4 @@
 using ReactiveSolutions.AttributeSystem.Core.Data;
-using ReactiveSolutions.AttributeSystem.Unity.Data;
 using SemanticKeys;
 using System;
 using System.Collections.Generic;
@@ -31,15 +30,21 @@ namespace ReactiveSolutions.AttributeSystem.Core
         private readonly CompositeDisposable _profileDisposables = new CompositeDisposable();
         private readonly List<Entity> _nestedEntities = new List<Entity>();
 
-        public void ApplyProfile(EntityProfileSO profileSO, IModifierFactory modifierFactory)
-        => ApplyProfile(profileSO.Profile, modifierFactory);
-
         /// <summary>
         /// Applies an EntityProfile to this processor, setting up base stats, tags, nested entities, and innate buffs.
+        /// Nested profiles and StatBlocks referenced by ID are loaded from their JSON files.
         /// </summary>
         public void ApplyProfile(EntityProfile profile, IModifierFactory modifierFactory)
+            => ApplyProfile(profile, modifierFactory, new HashSet<object>());
+
+        /// <param name="applying">The profiles (objects, and the IDs of JSON profiles) being applied further up the
+        /// nesting chain, so a profile that nests itself is reported instead of recursing forever.</param>
+        private void ApplyProfile(EntityProfile profile, IModifierFactory modifierFactory, HashSet<object> applying)
         {
             if (profile == null) return;
+
+            applying.Add(profile);
+            if (profile.JsonId != null) applying.Add(profile.JsonId);
 
             // SemanticKey is a struct: unassigned entries are SemanticKey.None, never null.
 
@@ -64,17 +69,36 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 if (groupKey != SemanticKey.None) GetOrCreateLinkGroup(groupKey);
             }
 
-            // 4. Nested Entities (Recursive Composition)
+            // 4. Nested Entities (Recursive Composition): a profile built in code, or one saved as JSON
             foreach (var nestedEntry in profile.NestedEntities)
             {
-                if (nestedEntry.ProviderKey != SemanticKey.None && nestedEntry.Profile != null)
-                {
-                    var childEntity = new Entity();
-                    childEntity.ApplyProfile(nestedEntry.Profile, modifierFactory);
+                if (nestedEntry.ProviderKey == SemanticKey.None) continue;
 
-                    RegisterExternalProvider(nestedEntry.ProviderKey, childEntity);
-                    _nestedEntities.Add(childEntity);
+                string nestedId = nestedEntry.Profile == null && !string.IsNullOrEmpty(nestedEntry.ProfileId)
+                    ? EntityProfileJsonLoader.NormalizeId(nestedEntry.ProfileId)
+                    : null;
+                if (nestedEntry.Profile == null && nestedId == null) continue;
+
+                bool isApplying = nestedEntry.Profile != null
+                    ? applying.Contains(nestedEntry.Profile) || (nestedEntry.Profile.JsonId != null && applying.Contains(nestedEntry.Profile.JsonId))
+                    : applying.Contains(nestedId);
+                if (isApplying)
+                {
+                    string profileName = nestedEntry.Profile != null ? nestedEntry.Profile.ProfileName : nestedId;
+                    Debug.LogError($"[Entity] Skipped nested entity '{nestedEntry.ProviderKey}': profile '{profileName}' " +
+                                   "is already being applied further up. A profile can't nest itself.");
+                    continue;
                 }
+
+                // The loader logs an error if the JSON can't be loaded.
+                var nestedProfile = nestedEntry.Profile ?? EntityProfileJsonLoader.Load(nestedId);
+                if (nestedProfile == null) continue;
+
+                var childEntity = new Entity();
+                childEntity.ApplyProfile(nestedProfile, modifierFactory, applying);
+
+                RegisterExternalProvider(nestedEntry.ProviderKey, childEntity);
+                _nestedEntities.Add(childEntity);
             }
 
             // 5. Attribute Pointers
@@ -86,17 +110,31 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 }
             }
 
-            // 6. Innate Stat Blocks
+            // 6. Innate Stat Blocks: JSON files by ID, then the ones stored in the profile
+            foreach (var statBlockId in profile.InnateStatBlockIds)
+            {
+                if (string.IsNullOrEmpty(statBlockId)) continue;
+
+                // The loader logs an error if the JSON can't be loaded.
+                var statBlock = new StatBlock();
+                if (StatBlockJsonLoader.TryLoadInto(statBlockId, statBlock)) ApplyInnateStatBlock(statBlock, modifierFactory);
+            }
+
             foreach (var statBlock in profile.InnateStatBlocks)
             {
-                if (statBlock != null)
-                {
-                    var handle = statBlock.ApplyToEntity(this, modifierFactory);
-                    if (handle != null)
-                    {
-                        _profileDisposables.Add(handle);
-                    }
-                }
+                if (statBlock != null) ApplyInnateStatBlock(statBlock, modifierFactory);
+            }
+
+            applying.Remove(profile);
+            if (profile.JsonId != null) applying.Remove(profile.JsonId);
+        }
+
+        private void ApplyInnateStatBlock(StatBlock statBlock, IModifierFactory modifierFactory)
+        {
+            var handle = statBlock.ApplyToEntity(this, modifierFactory);
+            if (handle != null)
+            {
+                _profileDisposables.Add(handle);
             }
         }
 

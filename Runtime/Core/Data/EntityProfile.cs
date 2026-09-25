@@ -43,20 +43,32 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         [Tooltip("The key under which this nested entity will be registered (e.g., 'RightHand', 'InnateDemon').")]
         public SemanticKey ProviderKey;
 
-        [Tooltip("The profile used to generate this nested entity.")]
+        [Tooltip("The profile JSON (under Resources/Data/EntityProfiles) used to generate this nested entity.")]
+        [EntityProfileID]
+        public string ProfileId;
+
+        /// <summary>
+        /// A profile built in code (e.g. by ProfileBuilder), used instead of ProfileId. Not serialized:
+        /// saved profiles reference their nested profiles by ID.
+        /// </summary>
+        [NonSerialized]
         public EntityProfile Profile;
     }
 
 
     /// <summary>
     /// A pure C# POCO blueprint for initializing an Entity.
-    /// Fully serializable to JSON/YAML for saving, loading, or modding.
+    /// Fully serializable to JSON/YAML for saving, loading, or modding: save it as JSON with the
+    /// Entity Profile Editor and load it with EntityProfileJsonLoader, or author it inline on an EntityController.
     /// </summary>
     [Serializable]
-    public class EntityProfile : ScriptableObject
+    public class EntityProfile
     {
-
         public string ProfileName;
+
+        /// <summary>The ID of the JSON file this profile was loaded from (set by EntityProfileJsonLoader), or null.</summary>
+        [NonSerialized]
+        internal string JsonId;
 
         [Header("Base Stats")]
         [Tooltip("Initial attributes and their base values.")]
@@ -71,6 +83,9 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         public List<SemanticKey> LinkGroups = new List<SemanticKey>();
 
         [Header("Innate Stat Blocks")]
+        [Tooltip("StatBlock JSON files (by ID) applied immediately upon creation (e.g., 'Passives/Undead').")]
+        public List<StatBlockID> InnateStatBlockIds = new List<StatBlockID>();
+
         [Tooltip("Passives or buffs applied immediately upon creation (e.g., 'Racial Passive', 'Heavy Armor Penalty').")]
         public List<StatBlock> InnateStatBlocks = new List<StatBlock>();
 

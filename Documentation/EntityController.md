@@ -9,7 +9,7 @@ It is designed to be placed on any GameObject that has stats (e.g., Player, Enem
 
 ## Key Features
 
--   **Data-Driven Initialization:** The underlying `Entity` is created automatically, on the first access to `Instance` or in `Awake` (whichever comes first), and populated using the `EntityProfileSO` blueprint assigned to the **Profile SO** field. Without a profile, the entity starts empty and a warning is logged.
+-   **Data-Driven Initialization:** The underlying `Entity` is created automatically, on the first access to `Instance` or in `Awake` (whichever comes first), and populated from its profiles: a JSON profile picked in **Profile Id** and a profile authored in the **Profile** field (see [Inspector Fields](#inspector-fields)). Without either, the entity starts empty.
     
 -   **Component-Based:** Allows GameObjects to participate in the attribute system natively within Unity's scene hierarchy.
     
@@ -30,6 +30,19 @@ public class EntityController : MonoBehaviour
 
 Namespace: `ReactiveSolutions.AttributeSystem.Unity`.
 
+## Inspector Fields
+
+-   **Profile Id** (`string ProfileId`)
+    
+    -   A profile JSON file under `Resources/Data/EntityProfiles`, picked from a dropdown (create them with **Window > Attribute System > Entity Profile Editor**). Applied first. If the file can't be loaded, an error is logged and only the inline profile is applied.
+        
+-   **Profile** (`EntityProfile Profile`)
+    
+    -   A profile authored right in the Inspector: base attributes, tags, link groups, innate StatBlocks (by ID or inline), nested entities and pointers. Applied after the **Profile Id**'s, so its base values win.
+        
+
+Both are read once, when the entity is created; changing them later has no effect on it. See [EntityProfile](EntityProfile.md).
+
 ## Public API
 
 ### Core Access
@@ -44,7 +57,7 @@ Namespace: `ReactiveSolutions.AttributeSystem.Unity`.
         
 -   **`void InitializeEntity()`**
     
-    -   Creates the `Entity` and `ModifierFactory`, and applies the assigned `EntityProfileSO`.
+    -   Creates the `Entity` and `ModifierFactory`, then applies the **Profile Id**'s JSON profile (if set) and the inline **Profile**.
         
     -   _Note:_ This is called automatically in `Awake()` or by the first access to `Instance`, whichever comes first, and does nothing once the entity exists. You rarely need to call it yourself.
         
@@ -108,4 +121,4 @@ public void TakeDamage(float amount)
 
 Previous iterations of the system included "bridge" methods on the `EntityController` (such as `AddAttribute`, `GetAttributeObservable` or `LinkProvider`, and a `Processor` property). These have been **removed**. For example, `controller.AddAttribute(key, value)` is now `controller.Instance.SetOrUpdateBaseValue(key, value)`.
 
-To maintain a strict separation of concerns, the `EntityController` is now solely responsible for Unity lifecycle integration and SO data injection. All gameplay logic and stat manipulation must route through `controller.Instance`.
+To maintain a strict separation of concerns, the `EntityController` is now solely responsible for Unity lifecycle integration and applying its profiles. All gameplay logic and stat manipulation must route through `controller.Instance`.

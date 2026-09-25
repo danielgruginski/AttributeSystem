@@ -262,7 +262,7 @@ handle.Dispose();
 ### Applying One StatBlock to Many Entities
 
 ```csharp
-// goblinPassive is e.g. "Damage += Strength" (from a StatBlockSO asset: goblinPassiveSO.StatBlock).
+// goblinPassive is e.g. "Damage += Strength" (loaded with StatBlockJsonLoader.Load("Passives/Goblin")).
 // Each call returns its own handle, and each goblin's bonus uses that goblin's own Strength.
 ActiveStatBlock handleA = goblinPassive.ApplyToEntity(goblinA, modifierFactory);
 ActiveStatBlock handleB = goblinPassive.ApplyToEntity(goblinB, modifierFactory);

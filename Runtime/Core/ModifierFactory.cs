@@ -141,7 +141,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         /// <summary>
         /// Creates the modifier using the provided Factory service.
-        /// The spec is usually shared asset data (StatBlockSO, EntityProfile, LinkGroup), so the context is
+        /// The spec is usually shared data (a StatBlock from JSON or an EntityProfile, a LinkGroup's block), so the context is
         /// baked into per-application copies of its arguments; the spec itself is never modified.
         /// </summary>
         public IAttributeModifier Create(AttributeModifierSpec spec, Entity context = null)

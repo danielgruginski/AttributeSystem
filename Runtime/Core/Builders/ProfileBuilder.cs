@@ -23,7 +23,6 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
         public static ProfileBuilder Create(string profileName = "NewProfile")
         {
             var builder = new ProfileBuilder();
-            builder._profile.name = profileName;
             builder._profile.ProfileName = profileName;
             return builder;
         }
@@ -96,9 +95,31 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
             return AddNestedEntity(providerKey, nestedBuilder.Build());
         }
 
+        /// <summary>
+        /// Adds a nested entity created from a profile JSON file (e.g. "Weapons/IronSword" under Resources/Data/EntityProfiles).
+        /// </summary>
+        public ProfileBuilder AddNestedEntity(SemanticKey providerKey, string profileId)
+        {
+            _profile.NestedEntities.Add(new NestedEntityEntry
+            {
+                ProviderKey = providerKey,
+                ProfileId = profileId
+            });
+            return this;
+        }
+
         public ProfileBuilder AddInnateStatBlock(StatBlock statBlock)
         {
             _profile.InnateStatBlocks.Add(statBlock);
+            return this;
+        }
+
+        /// <summary>
+        /// Adds an innate StatBlock JSON file by ID (e.g. "Passives/Undead" under Resources/Data/StatBlocks).
+        /// </summary>
+        public ProfileBuilder AddInnateStatBlock(StatBlockID statBlockId)
+        {
+            _profile.InnateStatBlockIds.Add(statBlockId);
             return this;
         }
 

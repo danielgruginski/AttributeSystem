@@ -41,7 +41,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var profile = ProfileBuilder.Create("OrcBlueprint").Build();
 
             Assert.IsNotNull(profile);
-            Assert.AreEqual("OrcBlueprint", profile.name);
+            Assert.AreEqual("OrcBlueprint", profile.ProfileName);
         }
 
         [Test]
