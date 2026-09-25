@@ -76,21 +76,11 @@ public struct AttributeReference
 -   `ValueSource` (Attribute mode) and pointers resolve references the same way, but read a missing attribute or provider as 0.
     
 
-## JSON Representation
+## In JSON Files
 
-When serialized within a `StatBlock` or `ValueSource` (Unity's `JsonUtility`):
+In StatBlock and entity profile files, an `AttributeReference` is one string: the names of the path's steps, then the attribute's, separated by `/`. `"Owner/Intelligence"` is the Intelligence of the entity registered as `Owner`, and `"Intelligence"` is a local attribute. The names are resolved with the file's table of keys (see [JSON Format](JSON%20Format.md)).
 
-```json
-{
-  "Name": { "_guid": "<GUID of Stats.Intelligence>", "_value": "Intelligence", "_domainGuid": "<GUID of the Stats domain>" },
-  "Path": [
-    { "_guid": "<GUID of Links.Owner>", "_value": "Owner", "_domainGuid": "<GUID of the Links domain>" }
-  ]
-}
-
-```
-
-Each key is stored with its GUID, cached value and domain GUID. Keys are matched by GUID at runtime, so hand-written JSON needs the right GUIDs; let the Stat Block Editor write them (see [Semantic Keys](Semantic%20Keys.md)).
+In code, `AttributeReference.Of(Stats.Intelligence, Links.Owner)` creates the same reference.
 
 ## Usage Examples
 

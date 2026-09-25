@@ -59,6 +59,6 @@ For unit tests or quick experiments, `SemanticKey.FromRawString("Health")` creat
 
 The Attribute System compares keys by **GUID**, so it survives renames: attributes, tags, providers and paths, pointers and link groups. A key's string value is only its display name (in the Inspector and in logs).
 
-**JSON files** (StatBlocks and entity profiles) store each key as `{"_guid": ..., "_value": ..., "_domainGuid": ...}`. Keys match by GUID at runtime, so hand-written JSON must contain the right GUIDs: a key with another GUID is a *different* key that merely shares the display name, and a key without a GUID is `SemanticKey.None` (unassigned).
+**JSON files** (StatBlocks and entity profiles) name keys by name, and list each name's GUID in a `keys` table at the end of the file (see [JSON Format](JSON%20Format.md#keys)). The GUID in the table is what counts: a name listed with another GUID is a *different* key that merely shares the name.
 
-After a key is renamed, JSON files still show its old name: the SemanticKeys reference updater doesn't scan them, and the editor windows save the values a file was loaded with. That doesn't affect the game, since keys match by GUID. To refresh a file, load it in its editor window (Stat Block Editor or Entity Profile Editor), run **Tools > SemanticKeys > Update All References** (it also updates the open file), then save.
+After a key is renamed, JSON files still show its old name until they are saved again. That doesn't affect the game, since keys match by GUID. To refresh a file, load it in its editor window (Stat Block Editor or Entity Profile Editor) and save it: loading gives renamed keys their current names.

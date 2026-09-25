@@ -1,7 +1,7 @@
 namespace ReactiveSolutions.AttributeSystem.Core.Data
 {
     /// <summary>
-    /// Loads StatBlocks saved as JSON (by the Stat Block Editor) from Resources/Data/StatBlocks.
+    /// Loads StatBlocks saved as JSON (by the Stat Block Editor, or <see cref="StatBlockJson"/>) from Resources/Data/StatBlocks.
     /// </summary>
     public static class StatBlockJsonLoader
     {
@@ -18,18 +18,23 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         public static StatBlock Load(string id)
         {
             if (string.IsNullOrEmpty(id)) return null;
-
-            var block = new StatBlock();
-            LoadIntoStatBlock(id, block);
-            return block;
+            return TryLoad(id, out var block) ? block : new StatBlock { BlockName = NormalizeId(id) };
         }
 
-        /// <summary>
-        /// Overwrites <paramref name="block"/> with the StatBlock JSON <paramref name="id"/>. Logs an error if it can't be loaded.
-        /// </summary>
-        public static void LoadIntoStatBlock(string id, StatBlock block) => TryLoadInto(id, block);
+        /// <summary>Loads a StatBlock by ID. Logs an error and returns false if it can't be loaded.</summary>
+        internal static bool TryLoad(string id, out StatBlock block)
+        {
+            if (!JsonDataLoader.TryLoad(ResourcesPath, id, json => StatBlockJson.FromJson(json), nameof(StatBlockJsonLoader), "StatBlock", out block))
+            {
+                return false;
+            }
 
-        internal static bool TryLoadInto(string id, StatBlock block) =>
-            JsonDataLoader.TryLoadInto(ResourcesPath, id, block, nameof(StatBlockJsonLoader), "StatBlock");
+            // A block without a name is named after its file in logs and in the Attribute Debugger.
+            if (string.IsNullOrEmpty(block.BlockName)) block.BlockName = NormalizeId(id);
+            return true;
+        }
+
+        /// <summary>The ID in its canonical form ("IronSword.json" and "Data/StatBlocks/IronSword" become "IronSword").</summary>
+        internal static string NormalizeId(string id) => JsonDataLoader.NormalizeId(id, ResourcesPath);
     }
 }

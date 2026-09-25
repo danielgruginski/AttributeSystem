@@ -216,5 +216,33 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             Assert.AreEqual(1, sb.Tags.Count);
             Assert.AreEqual(_undeadTag, sb.Tags[0]);
         }
+
+        [Test]
+        public void StatBlockBuilder_CoversEveryStatBlockField()
+        {
+            var statBlock = StatBlockBuilder.Create("Everything")
+                .SetCondition(StatBlockCondition.HasTag(_undeadTag, _rightHandKey))
+                .AddBaseValue(_healthKey, 50f)
+                .AddRemoteTag(_undeadTag, _rightHandKey)
+                .AddPointer(_maxHealthAlias, _healthKey, _rightHandKey)
+                .AddModifier(AttributeReference.Of(_damageKey, _rightHandKey), new ValueLogic(2f), ModifierType.Override, priority: 5, sourceId: "Curse")
+                .Build();
+
+            Assert.AreEqual(StatBlockCondition.Mode.Tag, statBlock.ActivationCondition.Type);
+            CollectionAssert.AreEqual(new[] { _rightHandKey }, statBlock.ActivationCondition.TagTarget);
+            Assert.AreEqual(_healthKey, statBlock.BaseValues[0].Name);
+            Assert.AreEqual(50f, statBlock.BaseValues[0].Value);
+            CollectionAssert.AreEqual(new[] { _rightHandKey }, statBlock.RemoteTags[0].TargetPath);
+            Assert.AreEqual(_maxHealthAlias, statBlock.Pointers[0].Alias);
+            Assert.AreEqual(_healthKey, statBlock.Pointers[0].Target.Name);
+            CollectionAssert.AreEqual(new[] { _rightHandKey }, statBlock.Pointers[0].Target.Path);
+
+            var spec = statBlock.Modifiers[0];
+            Assert.AreEqual(_damageKey, spec.TargetAttribute);
+            CollectionAssert.AreEqual(new[] { _rightHandKey }, spec.TargetPath);
+            Assert.AreEqual(ModifierType.Override, spec.Type);
+            Assert.AreEqual(5, spec.Priority);
+            Assert.AreEqual("Curse", spec.SourceId);
+        }
     }
 }

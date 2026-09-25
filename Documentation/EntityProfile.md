@@ -49,7 +49,7 @@ var goblin = new Entity();
 goblin.ApplyProfile(EntityProfileJsonLoader.Load("Monsters/Goblin")); // A null profile is ignored
 ```
 
-The JSON stores each key with its GUID, cached name and domain GUID. Read [Identity vs. value](Semantic%20Keys.md#identity-vs-value) before editing files by hand.
+A file describes the profile the way `ProfileBuilder` builds it, e.g. `"baseAttributes": { "Health": 40 }`, and names keys by name, with a table of their GUIDs at the end. See [JSON Format](JSON%20Format.md#entity-profile-files) for the format, and `EntityProfileJson.ToJson` / `FromJson` to convert profiles in code.
 
 ## Nested Entities
 
@@ -57,7 +57,7 @@ A nested entity is a child `Entity` created from its own profile and registered 
 
 -   In data, `ProfileId` references another profile JSON file, so one weapon profile can be reused by many characters.
     
--   In code, `ProfileBuilder.AddNestedEntity(key, profile)` and `AddNestedEntity(key, builder => ...)` set the entry's `Profile` field instead. That field isn't serialized: saved profiles reference their nested profiles by ID.
+-   In code, `ProfileBuilder.AddNestedEntity(key, profile)` and `AddNestedEntity(key, builder => ...)` set the entry's `Profile` field instead. Unity doesn't serialize that field, so the Inspector only shows nested entities by ID. `EntityProfileJson.ToJson` writes such a nested profile in full, inside the file; the Entity Profile Editor doesn't open files like that (edit them as text).
     
 
 A profile that nests itself, directly or through other profiles, is caught: that nested entry is skipped with the error `[Entity] Skipped nested entity '...': profile '...' is already being applied further up.` The same profile can still appear several times side by side (e.g. a dagger in each hand).

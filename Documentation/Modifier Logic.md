@@ -8,7 +8,7 @@ Every modifier in a StatBlock (an `AttributeModifierSpec`) has a **Logic**: a sm
     
 -   **Named inputs.** Each input is its own field (`Input`, `Coefficient`, ...), so there is no argument order to remember.
     
--   **Any settings.** Inputs are `ValueSource`s (a constant, or an attribute's value), and a logic class can also have plain numbers, lists, curves or any other serializable field.
+-   **Any settings.** Inputs are `ValueSource`s (a constant, or an attribute's value), and a logic class can also have numbers, text, enums, lists, curves, other logic and `[Serializable]` classes of your own (see [JSON Format](JSON%20Format.md#field-values) for how each is saved).
     
 
 Namespace: `ReactiveSolutions.AttributeSystem.Core.Modifiers`. Keys such as `Stats.Damage` come from classes generated from KeyDomains (see [Semantic Keys](Semantic%20Keys.md)).
@@ -82,14 +82,21 @@ A StatBlock's modifiers read their attribute inputs from the entity the block is
 
 ## Saving, and Renaming a Logic Class
 
-StatBlocks store the logic with `[SerializeReference]`: assets, scenes and JSON files record each logic's class name, namespace and assembly. If you rename or move a logic class, add Unity's `[MovedFrom]` attribute (namespace `UnityEngine.Scripting.APIUpdating`) so existing data still finds it:
+In JSON files, a logic is named after its class, in camelCase and without "Logic", and so are its fields: `"distanceBonus": { "distance": "TargetDistance", "maxRange": 5 }`. Fields with their default value are left out. See [JSON Format](JSON%20Format.md#logic).
 
-```csharp
-[Serializable, MovedFrom(false, sourceClassName: "ProximityBonusLogic")]
-public class DistanceBonusLogic : FormulaLogic
-{
-    ...
-}
-```
-
-In the Inspector, a modifier whose logic class can't be found shows a warning. When its StatBlock is applied, it is skipped with a warning (`skipped a modifier on '...' with no Logic`).
+-   **Renaming a class or a field** changes its name in JSON files, and a file that names a logic or field that doesn't exist fails to load, with an error naming it. Rename it in the files too (the names are plain text, so search and replace works).
+    
+-   **Scenes and prefabs** (a StatBlock authored in the Inspector) store the logic with `[SerializeReference]`, by class name, namespace and assembly. After renaming or moving a class, add Unity's `[MovedFrom]` attribute (namespace `UnityEngine.Scripting.APIUpdating`) so they still find it:
+    
+    ```csharp
+    [Serializable, MovedFrom(false, sourceClassName: "ProximityBonusLogic")]
+    public class DistanceBonusLogic : FormulaLogic
+    {
+        ...
+    }
+    ```
+    
+    In the Inspector, a modifier whose logic class can't be found shows a warning. When its StatBlock is applied, it is skipped with a warning (`skipped a modifier on '...' with no Logic`).
+    
+-   **Code stripping:** IL2CPP builds can remove a class that only JSON files name. Mark your logic classes `[Preserve]` (namespace `UnityEngine.Scripting`), as the built-in ones are.
+    

@@ -1,7 +1,8 @@
 namespace ReactiveSolutions.AttributeSystem.Core.Data
 {
     /// <summary>
-    /// Loads EntityProfiles saved as JSON (by the Entity Profile Editor) from Resources/Data/EntityProfiles.
+    /// Loads EntityProfiles saved as JSON (by the Entity Profile Editor, or <see cref="EntityProfileJson"/>) from
+    /// Resources/Data/EntityProfiles.
     /// </summary>
     public static class EntityProfileJsonLoader
     {
@@ -16,8 +17,11 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         {
             if (string.IsNullOrEmpty(id)) return null;
 
-            var profile = new EntityProfile();
-            if (!JsonDataLoader.TryLoadInto(ResourcesPath, id, profile, nameof(EntityProfileJsonLoader), "EntityProfile")) return null;
+            if (!JsonDataLoader.TryLoad(ResourcesPath, id, json => EntityProfileJson.FromJson(json), nameof(EntityProfileJsonLoader),
+                    "EntityProfile", out var profile))
+            {
+                return null;
+            }
 
             // Lets Entity.ApplyProfile recognize this profile when a nested entry refers to it by ID.
             profile.JsonId = NormalizeId(id);

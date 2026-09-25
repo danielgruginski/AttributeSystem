@@ -41,11 +41,13 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         }
 
         /// <summary>
-        /// Overwrites <paramref name="target"/> with the JSON file <paramref name="id"/> in <paramref name="folder"/>.
-        /// Logs an error and returns false if the file is missing or can't be parsed.
+        /// Reads the JSON file <paramref name="id"/> in <paramref name="folder"/> with <paramref name="read"/>.
+        /// Logs an error and returns false if the file is missing or can't be read.
         /// </summary>
-        internal static bool TryLoadInto(string folder, string id, object target, string loaderName, string dataName)
+        internal static bool TryLoad<T>(string folder, string id, Func<string, T> read, string loaderName, string dataName, out T result)
+            where T : class
         {
+            result = null;
             string resourcePath = folder + "/" + NormalizeId(id, folder);
             string json = ReadText(resourcePath);
 
@@ -57,7 +59,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
 
             try
             {
-                JsonUtility.FromJsonOverwrite(json, target);
+                result = read(json);
                 return true;
             }
             catch (Exception e)

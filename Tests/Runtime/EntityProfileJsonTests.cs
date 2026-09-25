@@ -13,7 +13,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 {
     /// <summary>
     /// EntityProfiles saved as JSON, and profiles or StatBlocks referenced by ID.
-    /// The JSON files are served from memory instead of a Resources folder.
+    /// The JSON files are served from memory instead of a Resources folder. (The format itself: JsonFormatTests.)
     /// </summary>
     public class EntityProfileJsonTests
     {
@@ -41,10 +41,10 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         }
 
         private void AddProfileFile(string id, EntityProfile profile) =>
-            _files[$"{EntityProfileJsonLoader.ResourcesPath}/{id}"] = JsonUtility.ToJson(profile);
+            _files[$"{EntityProfileJsonLoader.ResourcesPath}/{id}"] = EntityProfileJson.ToJson(profile);
 
         private void AddStatBlockFile(string id, StatBlock block) =>
-            _files[$"{StatBlockJsonLoader.ResourcesPath}/{id}"] = JsonUtility.ToJson(block);
+            _files[$"{StatBlockJsonLoader.ResourcesPath}/{id}"] = StatBlockJson.ToJson(block);
 
         private static StatBlock Bonus(SemanticKey target, float value) => new StatBlock
         {
@@ -74,8 +74,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 .AddInnateStatBlock(Bonus(Damage, 3f))
                 .Build();
 
-            var copy = new EntityProfile();
-            JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(profile), copy);
+            var copy = EntityProfileJson.FromJson(EntityProfileJson.ToJson(profile));
 
             Assert.AreEqual("Skeleton", copy.ProfileName);
             Assert.AreEqual(Health, copy.BaseAttributes[0].Attribute);
@@ -115,8 +114,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 }
             };
 
-            var copy = new StatBlock();
-            JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(block), copy);
+            var copy = StatBlockJson.FromJson(StatBlockJson.ToJson(block));
 
             var linear = (LinearLogic)copy.Modifiers[0].Logic;
             Assert.AreEqual(ValueSource.SourceMode.Attribute, linear.Input.Mode);

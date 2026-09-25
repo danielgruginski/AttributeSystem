@@ -86,9 +86,8 @@ namespace ReactiveSolutions.AttributeSystem.Unity
                 return;
             }
 
-            // StatBlockJsonLoader logs an error if the JSON can't be loaded; the block then stays empty.
-            StatBlock block = new StatBlock();
-            StatBlockJsonLoader.LoadIntoStatBlock(statBlockID, block);
+            // StatBlockJsonLoader logs an error if the JSON can't be loaded, and returns an empty block.
+            StatBlock block = StatBlockJsonLoader.Load(statBlockID);
 
             // Apply the block and store the handle
             var activeHandle = block.ApplyToEntity(_controller.Instance);

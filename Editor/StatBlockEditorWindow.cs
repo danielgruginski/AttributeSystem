@@ -2,6 +2,8 @@ using UnityEngine;
 using UnityEditor;
 using ReactiveSolutions.AttributeSystem.Core.Data;
 using ReactiveSolutions.AttributeSystem.Core.Modifiers;
+using SemanticKeys;
+using System;
 
 namespace ReactiveSolutions.AttributeSystem.Editor
 {
@@ -24,6 +26,10 @@ namespace ReactiveSolutions.AttributeSystem.Editor
 
         protected override ScriptableObject CreateContainer() => CreateInstance<StatBlockContainer>();
         protected override object GetData(ScriptableObject container) => ((StatBlockContainer)container).Data;
+        protected override void SetData(ScriptableObject container, object data) => ((StatBlockContainer)container).Data = (StatBlock)data;
+
+        protected override string ToJson(object data) => StatBlockJson.ToJson((StatBlock)data);
+        protected override object FromJson(string json, Func<string, SemanticKey> findKey) => StatBlockJson.FromJson(json, findKey);
 
         protected override void DrawData(SerializedProperty dataProp)
         {

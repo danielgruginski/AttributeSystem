@@ -5,6 +5,8 @@ The Fluent Builder API provides a powerful, code-driven way to generate `StatBlo
 
 While the Unity Inspector is great for visually tweaking single entities, it quickly becomes tedious when managing hundreds of items, characters, or procedurally generated content. The Fluent Builders allow you to define complex relational data, nested entities, and reactive modifiers entirely in C#, giving you compile-time safety, auto-complete, and the ability to use loops and variables to mass-generate content.
 
+The builders are also how JSON files are read: each property of a StatBlock or profile file is a builder call (`"tags": ["Magical"]` is `AddTag(Tags.Magical)`). See [JSON Format](JSON%20Format.md).
+
 ## 1. StatBlockBuilder
 
 The `StatBlockBuilder` is used to create pure `StatBlock` POCOs programmatically. It handles conditions, modifiers, and tags.
@@ -34,12 +36,27 @@ StatBlock poisonDebuff = StatBlockBuilder.Create("Poison_Debuff")
     
 -   `AddFlatModifier` and `AddMultiplierModifier` leave `Priority` at 0, and modifiers on an attribute are evaluated by `Priority`, then by type (Additive, Multiplicative, Override, Clamp Min, Clamp Max): flat bonuses are added before multipliers apply, whatever order you call the methods in.
     
--   New blocks start with an `Always` condition. `SetCondition(mode, tag, invert)` sets an `Always` or `Tag` condition (the tag is checked on the entity itself); for value comparisons, composite conditions or a `TagTarget` path, set `ActivationCondition` on the built `StatBlock`. Anything else the builder doesn't cover (base values, pointers, remote tags, or a modifier's `SourceId` and `TargetPath`) can also be set on the built `StatBlock`.
+-   New blocks start with an `Always` condition. `SetCondition(condition)` sets another, made with `StatBlockCondition.HasTag(tag, path)`, `LacksTag(tag, path)`, `Compare(a, op, b)`, `All(...)` or `Any(...)` (see [StatBlock](StatBlock.md#5-activation-condition)).
     
+
+### Everything Else a StatBlock Holds
+
+```csharp
+StatBlock holySword = StatBlockBuilder.Create("Holy Sword")
+    .SetCondition(StatBlockCondition.HasTag(Tags.Equipped, Links.Owner)) // While the owner has "Equipped"
+    .AddBaseValue(Stats.Durability, 100f)                                // Set when the block is applied, whatever the condition
+    .AddRemoteTag(Tags.Blessed, Links.Owner)                             // Tags the owner
+    .AddPointer(Stats.MainStat, Stats.Strength, Links.Owner)             // MainStat is the owner's Strength
+    .AddModifier(AttributeReference.Of(Stats.Damage, Links.Owner),      // Modifies the owner's Damage...
+        new ValueLogic(ValueSource.FromAttribute(Stats.MainStat)),      // ...by this block's MainStat
+        sourceId: "Holy Sword")                                         // Shown by the Attribute Debugger
+    .Build();
+
+```
 
 ### Advanced Modifiers
 
-The generic `AddModifier(target, logic, type = Additive, priority = 0)` takes any logic object: a built-in one (`LinearLogic`, `ClampLogic`, ...) or your own class (see [Modifier Logic](Modifier%20Logic.md); namespace `ReactiveSolutions.AttributeSystem.Core.Modifiers`). Its `ValueSource` inputs are constants, or attributes read from the entity the StatBlock is applied to (a missing attribute reads as 0).
+The generic `AddModifier(target, logic, type = Additive, priority = 0, sourceId = null)` takes any logic object: a built-in one (`LinearLogic`, `ClampLogic`, ...) or your own class (see [Modifier Logic](Modifier%20Logic.md); namespace `ReactiveSolutions.AttributeSystem.Core.Modifiers`). Its `ValueSource` inputs are constants, or attributes read from the entity the StatBlock is applied to (a missing attribute reads as 0).
 
 ```csharp
 // Damage += Strength * 2
@@ -129,20 +146,20 @@ The builders create their objects in memory: `StatBlockBuilder` outputs a plain,
     
     ```
     
-2.  **Editor Generation Scripts:** Write a custom Unity Editor script that builds the data in code and saves it as JSON files. The Stat Block Editor, the Entity Profile Editor and the ID dropdowns (such as an `EntityController`'s **Profile Id**) then pick them up. An ID is the file's path in its folder without the extension.
+2.  **Editor Generation Scripts:** Write a custom Unity Editor script that builds the data in code and saves it as JSON files with `StatBlockJson.ToJson` and `EntityProfileJson.ToJson`. The Stat Block Editor, the Entity Profile Editor and the ID dropdowns (such as an `EntityController`'s **Profile Id**) then pick them up. An ID is the file's path in its folder without the extension.
     
     ```csharp
     // Example inside an Editor script:
     System.IO.Directory.CreateDirectory("Assets/Resources/Data/StatBlocks/Debuffs");
-    System.IO.File.WriteAllText("Assets/Resources/Data/StatBlocks/Debuffs/Poison.json", JsonUtility.ToJson(poisonDebuff, true));
+    System.IO.File.WriteAllText("Assets/Resources/Data/StatBlocks/Debuffs/Poison.json", StatBlockJson.ToJson(poisonDebuff));
     
     System.IO.Directory.CreateDirectory("Assets/Resources/Data/EntityProfiles/Bosses");
-    System.IO.File.WriteAllText("Assets/Resources/Data/EntityProfiles/Bosses/GiantSkeleton.json", JsonUtility.ToJson(bossProfile, true));
+    System.IO.File.WriteAllText("Assets/Resources/Data/EntityProfiles/Bosses/GiantSkeleton.json", EntityProfileJson.ToJson(bossProfile));
     
     UnityEditor.AssetDatabase.Refresh();
     
     ```
     
-    Innate StatBlocks are saved inside the profile. Nested profiles built inline (`AddNestedEntity(key, weapon => ...)`) are not: they only exist in memory, so save the weapon as its own profile file and add it by ID, e.g. `AddNestedEntity(Links.RightHand, "Weapons/BoneCleaver")`.
+    Innate StatBlocks, and nested profiles built inline (`AddNestedEntity(key, weapon => ...)`), are written inside the profile's file. The Entity Profile Editor only shows nested entities by ID, so it doesn't open a file with a nested profile written in full: to edit the weapon there, or to reuse it, save it as its own profile file and add it by ID, e.g. `AddNestedEntity(Links.RightHand, "Weapons/BoneCleaver")`.
     
     This gives you code-driven design that outputs data files you can pick on your `EntityController`s!

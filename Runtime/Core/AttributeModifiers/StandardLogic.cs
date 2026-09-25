@@ -1,13 +1,15 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Scripting;
 
 namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
 {
     // The built-in logic types. Each input is a ValueSource: a constant or an attribute's value.
+    // [Preserve] keeps code stripping from removing the classes that only JSON files name.
 
     /// <summary>The value itself: "+5 Damage" (a constant) or "+ Strength" (an attribute).</summary>
-    [Serializable]
+    [Serializable, Preserve]
     public class ValueLogic : FormulaLogic
     {
         [Tooltip("A constant, or an attribute's value.")]
@@ -21,7 +23,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     }
 
     /// <summary>Input * Coefficient + Addend.</summary>
-    [Serializable]
+    [Serializable, Preserve]
     public class LinearLogic : FormulaLogic
     {
         public ValueSource Input = ValueSource.Const(0f);
@@ -33,7 +35,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     }
 
     /// <summary>Input ^ Power * Scale + Flat.</summary>
-    [Serializable]
+    [Serializable, Preserve]
     public class PolynomialLogic : FormulaLogic
     {
         public ValueSource Input = ValueSource.Const(0f);
@@ -49,7 +51,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     /// Input limited to [Min, Max]. To limit the attribute itself (e.g. Health to MaxHealth), use a modifier of
     /// Type Clamp Max instead.
     /// </summary>
-    [Serializable]
+    [Serializable, Preserve]
     public class ClampLogic : FormulaLogic
     {
         public ValueSource Input = ValueSource.Const(0f);
@@ -61,7 +63,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     }
 
     /// <summary>The smaller of A and B.</summary>
-    [Serializable]
+    [Serializable, Preserve]
     public class MinLogic : FormulaLogic
     {
         public ValueSource A = ValueSource.Const(0f);
@@ -72,7 +74,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     }
 
     /// <summary>The larger of A and B.</summary>
-    [Serializable]
+    [Serializable, Preserve]
     public class MaxLogic : FormulaLogic
     {
         public ValueSource A = ValueSource.Const(0f);
@@ -83,7 +85,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     }
 
     /// <summary>Input rounded down to a whole number.</summary>
-    [Serializable]
+    [Serializable, Preserve]
     public class FloorLogic : FormulaLogic
     {
         public ValueSource Input = ValueSource.Const(0f);
@@ -93,7 +95,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     }
 
     /// <summary>1 if Input is at least Threshold, otherwise 0.</summary>
-    [Serializable]
+    [Serializable, Preserve]
     public class StepLogic : FormulaLogic
     {
         public ValueSource Input = ValueSource.Const(0f);
@@ -104,7 +106,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     }
 
     /// <summary>Dividend / Divisor, or Dividend when the divisor is (almost) 0.</summary>
-    [Serializable]
+    [Serializable, Preserve]
     public class RatioLogic : FormulaLogic
     {
         public ValueSource Dividend = ValueSource.Const(0f);
@@ -116,7 +118,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     }
 
     /// <summary>Base ^ Exponent.</summary>
-    [Serializable]
+    [Serializable, Preserve]
     public class ExponentialLogic : FormulaLogic
     {
         public ValueSource Base = ValueSource.Const(1f);
@@ -130,7 +132,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     /// Max Bonus * Input / (Input + Soft Cap): grows quickly at first and approaches Max Bonus.
     /// A negative input counts as 0, and the result is 0 when Input + Soft Cap is 0 or less.
     /// </summary>
-    [Serializable]
+    [Serializable, Preserve]
     public class DiminishingReturnsLogic : FormulaLogic
     {
         public ValueSource Input = ValueSource.Const(0f);
@@ -152,7 +154,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     /// Scale * 0.5 * (sqrt(1 + 8 * Input / Scale) - 1), never more than Input: like "1 + 2 + 3 + ..." points per level,
     /// stretched by Scale. A negative input counts as 0.
     /// </summary>
-    [Serializable]
+    [Serializable, Preserve]
     public class ScaledTriangularLogic : FormulaLogic
     {
         public ValueSource Input = ValueSource.Const(0f);
@@ -173,7 +175,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Modifiers
     /// Breakpoints: the Value of the highest Threshold that Input reaches, or Default below all of them
     /// (e.g. *1.5 damage from 10 Strength, *2 from 20).
     /// </summary>
-    [Serializable]
+    [Serializable, Preserve]
     public class SegmentedLogic : FormulaLogic
     {
         [Serializable]

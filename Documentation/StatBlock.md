@@ -16,7 +16,7 @@ A `StatBlock` does not contain game logic itself. Instead, it is a blueprint tha
     
 -   **Permanent & Conditional Split:** `BaseValues` are applied permanently to the session regardless of conditions, ensuring the stats exist, while `Modifiers`, `Tags`, `RemoteTags` and `Pointers` are applied only while the `ActivationCondition` holds. Disposing the handle does not revert `BaseValues`.
     
--   **Reusable:** One `StatBlock` can be applied to many entities at once. Each application works on its own copies of the modifier arguments, and attribute references in them are read from the entity the block was applied to.
+-   **Reusable:** One `StatBlock` can be applied to many entities at once. Applying it never modifies it, and the attributes its modifiers read are read from the entity it was applied to.
     
 
 ## Class Definition
@@ -79,7 +79,7 @@ public List<AttributeModifierSpec> Modifiers;
         
     -   On each attribute, modifiers are evaluated by `Priority` (lowest first), then by type (Additive, Multiplicative, Override, Clamp Min, Clamp Max), then in the order they were added.
         
-    -   A modifier that reads the attribute it modifies sees that attribute's _final_ value, so self-referencing rules (such as clamping Health between 0 and MaxHealth) are not supported yet.
+    -   A modifier that reads the attribute it modifies sees that attribute's _final_ value, including its own effect (see [Attribute Modifiers](Attribute%20Modifiers.md#modifier-types-and-order)). To keep Health between 0 and MaxHealth, use modifiers of Type **Clamp Min** and **Clamp Max**.
         
 
 ### 3. Tags
@@ -137,19 +137,17 @@ public StatBlockCondition ActivationCondition;
 -   **Self-defeating conditions:** The condition must not depend on the block's own effects. If applying or removing the content flips the condition (e.g. "while Health < 50: +100 Health"), there is no stable state, so the block removes its content, stays disabled for that application and logs `[StatBlock] '<BlockName>' was disabled: its activation condition depends on its own effects ...`.
     
 
+In code, `StatBlockCondition.Always()`, `HasTag(tag, path)`, `LacksTag(tag, path)`, `Compare(a, op, b)`, `All(...)` and `Any(...)` create conditions:
+
 ```csharp
-// Active while Health < 30
-statBlock.ActivationCondition = new StatBlockCondition
-{
-    Type = StatBlockCondition.Mode.ValueComparison,
-    ValueA = new ValueSource { Mode = ValueSource.SourceMode.Attribute, AttributeRef = new AttributeReference(Stats.Health) },
-    CompareOp = StatBlockCondition.Comparison.Less,
-    ValueB = ValueSource.Const(30f)
-};
+// Active while Health < 30 and the entity isn't Stunned
+statBlock.ActivationCondition = StatBlockCondition.All(
+    StatBlockCondition.Compare(ValueSource.FromAttribute(Stats.Health), StatBlockCondition.Comparison.Less, 30f),
+    StatBlockCondition.LacksTag(Tags.Stunned));
 
 ```
 
-`Stats.Health` is a key from a class generated from your `Stats` KeyDomain (see [Semantic Keys](Semantic%20Keys.md)).
+In a JSON file the same condition is `{ "all": [{ "compare": ["Health", "<", 30] }, { "lacksTag": "Stunned" }] }` (see [JSON Format](JSON%20Format.md#conditions)). `Stats.Health` and `Tags.Stunned` are keys from classes generated from your KeyDomains (see [Semantic Keys](Semantic%20Keys.md)).
 
 ## Public API
 
@@ -178,72 +176,38 @@ This is the main entry point for using a StatBlock at runtime. It can be called 
     If activating or deactivating the content flips the condition itself, the block is disabled with an error instead of toggling forever (see _Activation Condition_ above).
     
 
-## JSON Structure Example
+## JSON Files
 
-Because it is a pure POCO, a StatBlock can be stored cleanly as a `.json` file. The **Stat Block Editor** (**Window > Attribute System > Stat Block Editor (Unified)**) saves these files to `Assets/Resources/Data/StatBlocks/`, and `StatBlockJsonLoader` reads them from there with `JsonUtility`.
-
-Every `SemanticKey` is stored with its GUID (`_guid`), name (`_value`) and domain GUID (`_domainGuid`). Keys are matched by GUID at runtime, so create these files with the editor rather than typing names by hand (see [Semantic Keys](Semantic%20Keys.md)). Enums are stored as numbers (`"Type": 0` is `Always` for the condition and `Additive` for a modifier). A modifier's logic is stored by reference: the modifier holds a `rid`, and the `references` block at the end holds each logic's class and fields. In the example below, GUIDs are placeholders and some fields are left out.
+A StatBlock can be saved as a `.json` file. The **Stat Block Editor** (**Window > Attribute System > Stat Block Editor (Unified)**) saves these files to `Assets/Resources/Data/StatBlocks/`, and `StatBlockJsonLoader` reads them from there. A file describes the block the way `StatBlockBuilder` builds it, one property per builder call, and names keys by name, with a table of their GUIDs at the end (see [JSON Format](JSON%20Format.md)):
 
 ```json
 {
-  "BlockName": "Iron Sword Buff",
-  "ActivationCondition": {
-    "Type": 0,
-    "InvertTag": false
-  },
-  "Tags": [
-    { "_guid": "<guid>", "_value": "Magical", "_domainGuid": "<Tags domain guid>" }
+  "statBlock": "Iron Sword",
+  "condition": { "hasTag": "Owner/Armed" },
+  "baseValues": { "Durability": 100 },
+  "tags": ["Magical"],
+  "remoteTags": ["Owner/Blessed"],
+  "pointers": { "MainStat": "Owner/Strength" },
+  "modifiers": [
+    { "target": "Damage", "source": "SwordBaseDmg", "value": 5 },
+    { "target": "Damage", "linear": { "input": "MainStat", "coefficient": 0.5 } }
   ],
-  "RemoteTags": [
-    {
-      "Tag": { "_guid": "<guid>", "_value": "Blessed", "_domainGuid": "<Tags domain guid>" },
-      "TargetPath": [
-        { "_guid": "<guid>", "_value": "Owner", "_domainGuid": "<Links domain guid>" }
-      ]
-    }
-  ],
-  "Pointers": [
-    {
-      "Alias": { "_guid": "<guid>", "_value": "MainStat", "_domainGuid": "<Stats domain guid>" },
-      "Target": {
-        "Name": { "_guid": "<guid>", "_value": "Strength", "_domainGuid": "<Stats domain guid>" },
-        "Path": [
-          { "_guid": "<guid>", "_value": "Owner", "_domainGuid": "<Links domain guid>" }
-        ]
-      }
-    }
-  ],
-  "BaseValues": [
-    {
-      "Name": { "_guid": "<guid>", "_value": "Durability", "_domainGuid": "<Stats domain guid>" },
-      "Value": 100.0
-    }
-  ],
-  "Modifiers": [
-    {
-      "TargetAttribute": { "_guid": "<guid>", "_value": "Damage", "_domainGuid": "<Stats domain guid>" },
-      "TargetPath": [],
-      "SourceId": "SwordBaseDmg",
-      "Type": 0,
-      "Priority": 0,
-      "Logic": { "rid": 1000 }
-    }
-  ],
-  "references": {
-    "version": 2,
-    "RefIds": [
-      {
-        "rid": 1000,
-        "type": { "class": "ValueLogic", "ns": "ReactiveSolutions.AttributeSystem.Core.Modifiers", "asm": "com.reactivesolutions.AttributeSystem" },
-        "data": {
-          "Value": { "Mode": 0, "ConstantValue": 5.0 }
-        }
-      }
-    ]
+  "keys": {
+    "Owner": "e2d4f6a8-0c1b-4e3d-a5f7-9b1d3c5e7f90",
+    "Armed": "c3e5a7b9-1d0f-4c2e-b4a6-8f0b2d4c6e8a",
+    "Durability": "a7c9e1f3-5b6d-4f8a-9c0e-2b4d6f8a1c3e",
+    "Magical": "0b9e4c1d-8f2a-4e6b-b1c3-5d7e9f0a2b4c",
+    "Blessed": "f1a3c5e7-9b0d-4f2a-8c4e-6a8c0e2b4d6f",
+    "MainStat": "6f8b0d2e-4a5c-4e7f-89ab-3d5f7a9c1e2b",
+    "Strength": "5c7e9a1b-3d4f-4b6a-8c0e-1f3a5c7e9b2d",
+    "Damage": "3a5c7e9b-1d2f-4a6c-8e0b-2c4d6f8a0b1e"
   }
 }
-
 ```
+
+This block is active while its owner has the `Armed` tag. It sets the sword's Durability to 100, tags the sword `Magical` and its owner `Blessed`, aliases `MainStat` to the owner's Strength, and adds 5 + MainStat x 0.5 to the sword's Damage.
+
+`StatBlockJson.ToJson(block)` and `StatBlockJson.FromJson(json)` convert StatBlocks to and from this format in code, e.g. to save StatBlocks generated by an editor script.
 
 ## Usage Example
 

@@ -83,7 +83,22 @@ We will use the visual editor to create our Sword's stats.
         
     -   **Addend:** Set to **0**.
         
-5.  Click **Save**. This creates `Assets/Resources/Data/StatBlocks/Weapons/IronSword.json`.
+5.  Click **Save**. This creates `Assets/Resources/Data/StatBlocks/Weapons/IronSword.json`, which describes the block the way you would build it in code, with a table of your keys' GUIDs at the end (see [JSON Format](JSON%20Format.md)):
+    
+    ```json
+    {
+      "statBlock": "Iron Sword",
+      "modifiers": [
+        { "target": "Damage", "value": 5 },
+        { "target": "Damage", "linear": { "input": "Owner/Strength", "coefficient": 0.5 } }
+      ],
+      "keys": {
+        "Damage": "3a5c7e9b-1d2f-4a6c-8e0b-2c4d6f8a0b1e",
+        "Owner": "e2d4f6a8-0c1b-4e3d-a5f7-9b1d3c5e7f90",
+        "Strength": "5c7e9a1b-3d4f-4b6a-8c0e-1f3a5c7e9b2d"
+      }
+    }
+    ```
     
 
 ## 3. Equip the Item

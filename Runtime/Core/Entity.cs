@@ -116,8 +116,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 if (string.IsNullOrEmpty(statBlockId)) continue;
 
                 // The loader logs an error if the JSON can't be loaded.
-                var statBlock = new StatBlock();
-                if (StatBlockJsonLoader.TryLoadInto(statBlockId, statBlock)) ApplyInnateStatBlock(statBlock);
+                if (StatBlockJsonLoader.TryLoad(statBlockId, out var statBlock)) ApplyInnateStatBlock(statBlock);
             }
 
             foreach (var statBlock in profile.InnateStatBlocks)

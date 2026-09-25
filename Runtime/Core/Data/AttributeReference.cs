@@ -23,5 +23,12 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
             Name = name;
             Path = path ?? new List<SemanticKey>();
         }
+
+        /// <summary>
+        /// The attribute <paramref name="name"/>, local or at the end of the provider <paramref name="path"/>:
+        /// <c>Of(Stats.Strength, Links.Owner)</c> is the Owner's Strength.
+        /// </summary>
+        public static AttributeReference Of(SemanticKey name, params SemanticKey[] path) =>
+            new AttributeReference(name, new List<SemanticKey>(path ?? new SemanticKey[0]));
     }
 }

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEditor;
+using SemanticKeys;
 using System;
 using System.IO;
 
@@ -9,6 +10,8 @@ namespace ReactiveSolutions.AttributeSystem.Editor
     /// Base for editor windows that edit one JSON data file at a time (a StatBlock, an EntityProfile): the file
     /// name, New / Load / Save, and a SerializedObject over the data so the usual property drawers apply.
     /// Files are saved under Assets/{JsonFolder}; a file's ID is its path in that folder without ".json".
+    /// Loading looks up in the project's KeyDomains the keys a file names without listing them in its key table,
+    /// and gives renamed keys their current names, so saving writes an up-to-date file.
     /// </summary>
     public abstract class JsonDataEditorWindow : EditorWindow
     {
@@ -29,6 +32,21 @@ namespace ReactiveSolutions.AttributeSystem.Editor
 
         /// <summary>Draws the "Data" property.</summary>
         protected abstract void DrawData(SerializedProperty data);
+
+        /// <summary>The data as JSON (e.g. StatBlockJson.ToJson).</summary>
+        protected abstract string ToJson(object data);
+
+        /// <summary>
+        /// Reads a file (e.g. StatBlockJson.FromJson). <paramref name="findKey"/> finds the keys it names that aren't
+        /// in its key table.
+        /// </summary>
+        protected abstract object FromJson(string json, Func<string, SemanticKey> findKey);
+
+        /// <summary>Replaces the container's "Data".</summary>
+        protected abstract void SetData(ScriptableObject container, object data);
+
+        /// <summary>Why data just read from a file can't be edited in this window, or null if it can.</summary>
+        protected virtual string CheckLoadedData(object data) => null;
 
         private ScriptableObject _container;
         private SerializedObject _serializedObject;
@@ -140,12 +158,21 @@ namespace ReactiveSolutions.AttributeSystem.Editor
                 return;
             }
 
+            string json;
+            try
+            {
+                json = ToJson(GetData(_container));
+            }
+            catch (Exception e)
+            {
+                EditorUtility.DisplayDialog($"Can't save the {DataLabel}", e.Message, "OK");
+                return;
+            }
+
             // The name may include subfolders (e.g. "Weapons/IronSword"), matching the loaders' IDs.
             string fileName = _currentFileName.Replace(" ", "_") + ".json";
             string fullPath = Path.Combine(FolderPath, fileName);
             Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
-
-            string json = JsonUtility.ToJson(GetData(_container), true);
             File.WriteAllText(fullPath, json);
 
             // ImportAsset expects a project-relative path ("Assets/...").
@@ -162,21 +189,32 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             string filePath = EditorUtility.OpenFilePanel("Load JSON", FolderPath, "json");
             if (string.IsNullOrEmpty(filePath)) return;
 
+            string fileName = Path.GetFileName(filePath);
+            object data;
             try
             {
-                string json = File.ReadAllText(filePath);
-
-                CreateNewContainer();
-                JsonUtility.FromJsonOverwrite(json, GetData(_container));
-                _serializedObject.Update();
-
-                _fullFilePath = filePath;
-                _currentFileName = ToDataId(filePath, FolderPath);
+                data = FromJson(File.ReadAllText(filePath), KeyDomainLookup.FindByName);
             }
             catch (Exception e)
             {
-                Debug.LogError($"Load failed: {e.Message}");
+                EditorUtility.DisplayDialog($"Can't load {fileName}", e.Message, "OK");
+                return;
             }
+
+            string problem = CheckLoadedData(data);
+            if (problem != null)
+            {
+                EditorUtility.DisplayDialog($"Can't edit {fileName} here", problem, "OK");
+                return;
+            }
+
+            CreateNewContainer();
+            SetData(_container, data);
+            _serializedObject.Update();
+            KeyDomainLookup.RefreshKeys(_serializedObject);
+
+            _fullFilePath = filePath;
+            _currentFileName = ToDataId(filePath, FolderPath);
         }
 
         /// <summary>

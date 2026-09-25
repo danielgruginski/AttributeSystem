@@ -111,37 +111,15 @@ var remoteSource = ValueSource.FromAttribute(Stats.Intelligence, Links.Owner);
 
 ```
 
-### 4. JSON Representation
+### 4. In JSON Files
 
-When serialized in a `StatBlock` JSON (Unity's `JsonUtility`, as the Stat Block Editor writes it; other fields omitted):
-
-**Constant:**
+In StatBlock and entity profile files, a constant is a number and an attribute is its name, after the names of its provider path's steps: a Linear logic whose Input is the Dexterity of the Owner's Driver, with a Coefficient of 15, is
 
 ```json
-{
-  "Mode": 0,
-  "ConstantValue": 15.0
-}
-
+"linear": { "input": "Owner/Driver/Dexterity", "coefficient": 15 }
 ```
 
-**Attribute (Remote):**
-
-```json
-{
-  "Mode": 1,
-  "AttributeRef": {
-    "Name": { "_guid": "<GUID of Stats.Dexterity>", "_value": "Dexterity", "_domainGuid": "<GUID of the Stats domain>" },
-    "Path": [
-      { "_guid": "<GUID of Links.Owner>", "_value": "Owner", "_domainGuid": "<GUID of the Links domain>" },
-      { "_guid": "<GUID of Links.Driver>", "_value": "Driver", "_domainGuid": "<GUID of the Links domain>" }
-    ]
-  }
-}
-
-```
-
-Each key is stored with its GUID, cached value and domain GUID. Keys are matched by GUID at runtime, so hand-written JSON needs the right GUIDs; let the Stat Block Editor write them (see [Semantic Keys](Semantic%20Keys.md)).
+The names are resolved with the file's table of keys (see [JSON Format](JSON%20Format.md)).
 
 ## Key Concept: Context
 
