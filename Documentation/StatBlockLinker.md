@@ -59,7 +59,7 @@ There is no "apply on awake" option: the listed blocks are always applied in `St
         
 -   **`void AddStatBlock(StatBlockID statBlockID)`**
     
-    -   Loads one StatBlock from JSON, applies it to the target, and stores the returned `ActiveStatBlock` handle internally.
+    -   Loads one StatBlock from JSON, applies it to the target, and stores the returned `ActiveStatBlock` handle internally. Logs a warning and does nothing if there is no target controller.
         
     -   _Note:_ The ID is not added to `Stat Block Ids`, so the next `ApplyStatBlocks()` call removes the block, including the call in `Start`: add blocks this way after `Start` has run. Empty IDs are ignored; if the JSON file can't be found, `StatBlockJsonLoader` logs an error and nothing is applied.
         

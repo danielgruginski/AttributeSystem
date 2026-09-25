@@ -62,7 +62,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
             // If dynamic base stats are needed, they should be Modifiers (Override type).
             foreach (var entry in BaseValues)
             {
-                if (!string.IsNullOrEmpty(entry.Name))
+                if (entry.Name != SemanticKey.None)
                 {
                     entity.SetOrUpdateBaseValue(entry.Name, entry.Value);
                 }
@@ -160,6 +160,12 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
             // 4. Apply Modifiers
             foreach (var spec in Modifiers)
             {
+                if (spec.TargetAttribute == SemanticKey.None)
+                {
+                    Debug.LogWarning($"[StatBlock] '{BlockName}': skipped a '{spec.LogicType}' modifier with no Target Attribute.");
+                    continue;
+                }
+
                 var modifier = factory.Create(spec, processor);
                 if (modifier != null)
                 {
@@ -168,7 +174,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
                 }
                 else
                 {
-                    Debug.LogWarning($"StatBlock.ApplyToProcessor: Could not create modifier of type '{spec.LogicType}'");
+                    Debug.LogWarning($"[StatBlock] '{BlockName}': could not create modifier of type '{spec.LogicType}'.");
                 }
             }
 

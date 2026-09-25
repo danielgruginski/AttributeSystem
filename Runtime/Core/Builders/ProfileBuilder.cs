@@ -24,6 +24,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
         {
             var builder = new ProfileBuilder();
             builder._profile.name = profileName;
+            builder._profile.ProfileName = profileName;
             return builder;
         }
 

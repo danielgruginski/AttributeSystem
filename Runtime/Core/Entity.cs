@@ -134,7 +134,10 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 return Disposable.Empty;
             }
 
-            if (IsLocallyCircular(alias, target))
+            // Only a local pointer can close a loop among this entity's own aliases; a remote target
+            // (non-empty path) is a different attribute even if it shares the name.
+            bool isLocal = path == null || path.Count == 0;
+            if (isLocal && IsLocallyCircular(alias, target))
             {
                 Debug.LogError($"[Entity] Circular pointer detected: {alias} -> {target}");
                 return Disposable.Empty;

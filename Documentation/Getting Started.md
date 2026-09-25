@@ -55,7 +55,7 @@ We will use the visual editor to create our Sword's stats.
 
 1.  Open the editor: Go to **Window > Attribute System > Stat Block Editor (Unified)**.
     
-2.  The window opens with an unsaved new block (click **New** to start over). In the **Filename (No ext)** field, type **"Weapons/IronSword"**.
+2.  The window opens with an unsaved new block (click **New** to start over). In the **Filename (No ext)** field, type **"Weapons/IronSword"**, and set **Block Name** to "Iron Sword" (block names and each modifier's optional **Source Id** show up in logs and in the Attribute Debugger).
     
 3.  **Add Base Damage:**
     

@@ -73,7 +73,7 @@ Debug.Log(mainStat.ObservableValue.Value); // Outputs 50 (from Target)
 
 Pointers can be chained (`A -> B -> C`). Each pointer reads its target's final value, so the chain resolves to the final concrete attribute.
 
--   **Cycle Prevention:** `SetPointer` refuses circular pointers (`A -> B -> A`): it logs the error `[Entity] Circular pointer detected: B -> A` and returns an empty handle. Pointing an alias at itself logs the warning `[Entity] Cannot point alias 'A' to itself.` The check follows the currently active local pointers. A loop through a provider path isn't detected here, but if values keep changing around it, the attribute's circular-dependency guard stops it and logs an error (see [Attribute](Attribute.md#circular-dependencies-and-known-limitations)).
+-   **Cycle Prevention:** `SetPointer` refuses circular pointers (`A -> B -> A`): it logs the error `[Entity] Circular pointer detected: B -> A` and returns an empty handle. Pointing an alias at itself logs the warning `[Entity] Cannot point alias 'A' to itself.` The check follows the currently active local pointers and only applies to local pointers: a pointer with a provider path targets another entity's attribute, so it never counts as a local loop. A loop through a provider path isn't detected here, but if values keep changing around it, the attribute's circular-dependency guard stops it and logs an error (see [Attribute](Attribute.md#circular-dependencies-and-known-limitations)).
     
 -   **Self-Healing:** If a link in the chain is broken (a target attribute or provider is missing), the dependent pointers gracefully fall back to 0. If a pointer in the middle of the chain is removed, that attribute falls back to its own base value (or to the previous pointer on its stack).
     

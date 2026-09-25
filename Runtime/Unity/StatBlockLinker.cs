@@ -56,7 +56,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
 
             if (_controller == null || _controller.Instance == null)
             {
-                Debug.LogWarning("[StatBlockLinker] No AttributeController/Processor found.");
+                Debug.LogWarning("[StatBlockLinker] No EntityController assigned or found.");
                 return;
             }
 
@@ -87,19 +87,19 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         public void AddStatBlock(StatBlockID statBlockID)
         {
             if (string.IsNullOrEmpty(statBlockID)) return;
+            if (_controller == null)
+            {
+                Debug.LogWarning($"[StatBlockLinker] No EntityController to apply '{statBlockID}' to.");
+                return;
+            }
 
+            // StatBlockJsonLoader logs an error if the JSON can't be loaded; the block then stays empty.
             StatBlock block = new StatBlock();
             StatBlockJsonLoader.LoadIntoStatBlock(statBlockID, block);
-            if (block != null)
-            {
-                // Apply the block and store the handle
-                var activeHandle = block.ApplyToEntity(_controller.Instance, _modifierFactory);
-                _activeBlocks.Add(activeHandle);
-            }
-            else
-            {
-                Debug.LogWarning($"[StatBlockLinker] Could not load StatBlock with ID: {statBlockID}");
-            }
+
+            // Apply the block and store the handle
+            var activeHandle = block.ApplyToEntity(_controller.Instance, _modifierFactory);
+            _activeBlocks.Add(activeHandle);
         }
     }
 }

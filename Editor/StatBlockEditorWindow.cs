@@ -77,6 +77,10 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             SerializedProperty modifiersProp = dataProp.FindPropertyRelative("Modifiers");
 
             // --- 1. Draw Base Values (Standard Inspector is fine here) ---
+            // Shown in logs (e.g. when a block is disabled) and by the Attribute Debugger.
+            EditorGUILayout.PropertyField(dataProp.FindPropertyRelative("BlockName"), new GUIContent("Block Name"));
+            EditorGUILayout.Space();
+
             EditorGUILayout.LabelField("Activation Conditions", _headerStyle);
             EditorGUILayout.PropertyField(activationProp, true);
 
@@ -191,6 +195,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             // -- Target & Configuration --
             EditorGUILayout.PropertyField(spec.FindPropertyRelative("TargetAttribute"));
             EditorGUILayout.PropertyField(spec.FindPropertyRelative("TargetPath"));
+            EditorGUILayout.PropertyField(spec.FindPropertyRelative("SourceId"), new GUIContent("Source Id"));
 
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.PropertyField(spec.FindPropertyRelative("Type"));

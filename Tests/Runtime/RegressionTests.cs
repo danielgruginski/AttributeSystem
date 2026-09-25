@@ -228,6 +228,23 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             Assert.AreEqual(50f, Value(e, Health));
         }
 
+        // --- Pointers ------------------------------------------------------------------------
+
+        [Test]
+        public void RemotePointer_IsNotMistakenForALocalCycle()
+        {
+            var mainStat = TestKeys.Mock("MainStat");
+            var owner = new Entity(); owner.SetOrUpdateBaseValue(Strength, 12f);
+            var sword = new Entity();
+            sword.RegisterExternalProvider(Owner, owner);
+
+            sword.SetPointer(Strength, mainStat);                                   // local: Strength -> MainStat
+            sword.SetPointer(mainStat, Strength, new List<SemanticKey> { Owner });  // MainStat -> Owner.Strength: no cycle
+
+            Assert.AreEqual(12f, Value(sword, mainStat));
+            Assert.AreEqual(12f, Value(sword, Strength));
+        }
+
         // --- Profiles ------------------------------------------------------------------------
 
         [Test]
@@ -245,6 +262,28 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             Assert.AreEqual(0, e.Attributes.Count);
             Assert.AreEqual(0, e.Tags.Count);
             Assert.IsNull(e.GetLinkGroup(SemanticKey.None));
+        }
+
+        [Test]
+        public void StatBlock_SkipsUnassignedKeys()
+        {
+            var block = new StatBlock
+            {
+                BaseValues = { new StatBlock.BaseValueEntry { Value = 5f } },   // Name left unassigned
+                Modifiers = { new AttributeModifierSpec { LogicType = sk.Modifiers.Static, Arguments = { Const(1f) } } } // no target
+            };
+            var e = new Entity();
+
+            LogAssert.Expect(LogType.Warning, new Regex("skipped a 'Static' modifier with no Target Attribute"));
+            block.ApplyToEntity(e, new ModifierFactory());
+
+            Assert.AreEqual(0, e.Attributes.Count);
+        }
+
+        [Test]
+        public void ProfileBuilder_SetsProfileName()
+        {
+            Assert.AreEqual("Orc", ProfileBuilder.Create("Orc").Build().ProfileName);
         }
 
         // --- Builders and factory --------------------------------------------------------------
@@ -276,6 +315,17 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 Assert.IsNotInstanceOf<StaticAttributeModifier>(factory.Create(spec, null), $"{logicType} fell back to Static");
                 CollectionAssert.AreNotEqual(new[] { "Value" }, ModifierFactory.GetParameterNames(logicType), $"{logicType} has no parameter names");
             }
+        }
+
+        [Test]
+        public void DiminishingReturns_WithZeroInputAndSoftCap_IsZeroNotNaN()
+        {
+            // Unset arguments are 0, and a missing input attribute also reads as 0.
+            var spec = new AttributeModifierSpec { LogicType = sk.Modifiers.DiminishingReturns, Arguments = { Const(0f), Const(10f), Const(0f) } };
+            float result = float.NaN;
+            new ModifierFactory().Create(spec, null).GetMagnitude(new Entity()).Subscribe(v => result = v);
+
+            Assert.AreEqual(0f, result);
         }
 
         [Test]

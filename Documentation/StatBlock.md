@@ -55,7 +55,7 @@ public struct BaseValueEntry { public SemanticKey Name; public float Value; }
 
 -   **Usage:** Defining "Health = 100", "Speed = 5".
     
--   **Behavior:** When applied, these values update the `BaseValue` of the target attribute (creating the attribute if it doesn't exist). **Note:** These are applied _immediately and permanently_ for the session, bypassing the `ActivationCondition`, and they are **not** reverted when the `ActiveStatBlock` is disposed. If dynamic, reversible base stats are needed, they should be created as `Modifiers`.
+-   **Behavior:** When applied, these values update the `BaseValue` of the target attribute (creating the attribute if it doesn't exist). **Note:** These are applied _immediately and permanently_ for the session, bypassing the `ActivationCondition`, and they are **not** reverted when the `ActiveStatBlock` is disposed. If dynamic, reversible base stats are needed, they should be created as `Modifiers`. Entries whose `Name` is unassigned (`SemanticKey.None`) are skipped.
     
 
 ### 2. Modifiers
@@ -71,6 +71,8 @@ public List<AttributeModifierSpec> Modifiers;
     
 -   **Behavior:** Each spec is converted into a live `IAttributeModifier` instance via the `ModifierFactory` and applied to the target `Entity`. Toggles based on the `ActivationCondition`.
     
+    -   A spec without a `TargetAttribute` is skipped with a warning.
+        
     -   A spec with a `TargetPath` modifies the attribute on the entity at the end of that path (e.g. the `Owner`) and follows the path when it changes (see [AttributeConnection](AttributeConnection.md)).
         
     -   Attribute arguments are resolved from the entity the block was applied to, even when the modifier targets a remote attribute: a sword's modifier on its Owner's Damage reads `Strength` from the sword, and needs the path `Owner` in the argument's `AttributeReference` to read the Owner's Strength. A missing attribute or provider reads as 0.

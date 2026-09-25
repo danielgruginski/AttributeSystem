@@ -80,7 +80,9 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 float inp = Mathf.Max(0, Val(vals, 0));
                 float max = Val(vals, 1);
                 float cap = Val(vals, 2);
-                return max * (inp / (inp + cap));
+                float denominator = inp + cap;
+                // Input and Soft Cap both 0 (e.g. unset arguments or a missing input): no bonus instead of NaN.
+                return denominator > 0f ? max * (inp / denominator) : 0f;
             }), "Input", "Max Bonus", "Soft Cap"),
 
             // ScaledTriangular: Scale * 0.5 * (sqrt(1 + 8 * Input / Scale) - 1)

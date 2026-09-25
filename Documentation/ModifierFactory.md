@@ -115,7 +115,7 @@ The factory comes pre-loaded with these standard modifiers:
 | `Step` | `FunctionalModifier` | `Edge Threshold`, `Input Value` | Returns 1 if Input >= Edge, else 0. |
 | `Ratio` | `FunctionalModifier` | `Dividend`, `Divisor` | `Dividend / Divisor`; returns `Dividend` if the divisor is (almost) 0. |
 | `Exponential` | `FunctionalModifier` | `Exponent`, `Base` | `Base ^ Exponent` (note the argument order). |
-| `DiminishingReturns` | `FunctionalModifier` | `Input`, `Max Bonus`, `Soft Cap` | `Max Bonus * (Input / (Input + Soft Cap))`; a negative input counts as 0. |
+| `DiminishingReturns` | `FunctionalModifier` | `Input`, `Max Bonus`, `Soft Cap` | `Max Bonus * (Input / (Input + Soft Cap))`; a negative input counts as 0, and the result is 0 when `Input + Soft Cap` ≤ 0 (e.g. unset arguments). |
 | `ScaledTriangular` | `FunctionalModifier` | `Input`, `Scale` | `Scale * 0.5 * (sqrt(1 + 8 * Input / Scale) - 1)`, never more than `Input`; a negative input counts as 0. |
 
 Each ID is also available as a generated key in the `sk` namespace (`sk.Modifiers.Static`, `sk.Modifiers.Linear`, ...). Missing arguments count as 0, except that `Linear`'s `Coefficient` and `Polynomial`'s `Power` and `Scale` default to 1.

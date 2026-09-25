@@ -45,11 +45,13 @@ Namespace: `ReactiveSolutions.AttributeSystem.Unity`.
 
 -   **`void LinkContext()`**
     
-    -   Registers the Provider's `Entity` on the Receiver's `Entity` under the Alias, replacing any provider already registered under that alias. If Receiver is empty, it uses the `EntityController` on this GameObject.
+    -   Registers the Provider's `Entity` on the Receiver's `Entity` under the Alias, replacing any provider already registered under that alias. If Receiver is empty, it uses the `EntityController` on this GameObject. Does nothing (after a failed assertion) if the Receiver, Provider or Alias is missing.
+        
+    -   Calling it again replaces this component's previous link. When only the provider changes, the new provider replaces the old one directly, so the alias is never briefly missing.
         
 -   **`void SetProvider(EntityController provider)`**
     
-    -   Sets the Provider and re-links.
+    -   Sets the Provider and re-links (using this GameObject's `EntityController` if Receiver is empty). Passing `null` removes the link, e.g. when the weapon is dropped.
         
     -   _Example:_ When a player picks up a weapon:
         
@@ -58,19 +60,17 @@ Namespace: `ReactiveSolutions.AttributeSystem.Unity`.
         
         ```
         
-    -   _Note:_ It only links when the Receiver is known (assigned in the Inspector, or found by an earlier `LinkContext()` call, e.g. from Link On Awake). Otherwise, call `LinkContext()` afterwards.
-        
 -   **`void SetReceiver(EntityController receiver)`**
     
-    -   Sets the Receiver and links if a Provider is set. It does not remove the link from the previous Receiver; call `RemoveLink()` first.
+    -   Moves the link: removes it from the previous Receiver, then links to the new one if a Provider is set.
         
 -   **`void SetAlias(SemanticKey alias)`**
     
-    -   Changes the Alias only: it neither removes the link under the old alias nor links under the new one. To move an existing link, call `RemoveLink()` before and `LinkContext()` after.
+    -   Changes the Alias. An existing link moves to the new alias.
         
 -   **`void RemoveLink()`**
     
-    -   Removes the provider for the Alias from the Receiver (`UnregisterExternalProvider`). Does nothing unless both Receiver and Provider are set. Called automatically in `OnDestroy`.
+    -   Removes the link this component registered (`UnregisterExternalProvider`), unless another component has registered a different provider under the same alias since. Does nothing if this component isn't linked. Called automatically in `OnDestroy`.
         
     -   Any `AttributeConnection`s traversing this link remove their modifiers until a new link is established, and attribute references through the alias read as 0.
         

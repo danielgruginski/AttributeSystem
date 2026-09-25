@@ -81,7 +81,7 @@ Methods for retrieving or creating the attribute objects.
         
     -   Pointers stack: the newest pointer on an alias is the active one. A missing target reads as 0.
         
-    -   Prevents local circular dependencies: pointing an alias to itself (`A -> A`) logs a warning, and a cycle such as `A -> B -> A` or `A -> B -> C -> A` logs an error. In both cases the pointer is not created.
+    -   Prevents local circular dependencies: pointing an alias to itself (`A -> A`) logs a warning, and a cycle such as `A -> B -> A` or `A -> B -> C -> A` logs an error. In both cases the pointer is not created. Only local pointers are checked; a pointer with a provider path targets another entity's attribute and is never treated as a local cycle.
         
 -   To remove a pointer, dispose the handle returned by `SetPointer`. This does **not** affect the Target attribute; the alias falls back to the previous pointer on its stack, or to its own base value.
     
