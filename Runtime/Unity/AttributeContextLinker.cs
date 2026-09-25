@@ -1,4 +1,6 @@
-﻿using SemanticKeys;
+﻿using ReactiveSolutions.AttributeSystem.Core;
+using SemanticKeys;
+using UniRx;
 using UnityEngine;
 
 namespace ReactiveSolutions.AttributeSystem.Unity
@@ -33,6 +35,11 @@ namespace ReactiveSolutions.AttributeSystem.Unity
             }
         }
 
+        // The registration this component made, so it can be undone exactly even after the fields change.
+        private Entity _linkedReceiver;
+        private Entity _linkedProvider;
+        private SemanticKey _linkedAlias;
+
         /// <summary>
         /// Establishes the relationship between the two processors.
         /// </summary>
@@ -46,23 +53,44 @@ namespace ReactiveSolutions.AttributeSystem.Unity
 
             Debug.Assert(_receiver != null, $"[AttributeContextLinker] No Receiver (Target) Controller assigned on {gameObject.name}");
             Debug.Assert(_provider != null, $"[AttributeContextLinker] No Provider (Source) Controller assigned for Alias '{_alias}' on {gameObject.name}");
-            Debug.Assert(!string.IsNullOrEmpty(_alias), $"[AttributeContextLinker] Alias cannot be empty on {gameObject.name}");
+            Debug.Assert(_alias != SemanticKey.None, $"[AttributeContextLinker] Alias cannot be empty on {gameObject.name}");
 
-            if (_receiver != null && _provider != null)
+            if (_receiver == null || _provider == null || _alias == SemanticKey.None) return;
+
+            var receiverEntity = _receiver.Instance;
+
+            // Re-linking replaces this component's previous registration. Registering over the same alias on
+            // the same receiver swaps the provider directly, without a transient "missing provider".
+            if (_linkedReceiver != null && (_linkedReceiver != receiverEntity || _linkedAlias != _alias))
             {
-                // Register the provider's processor inside the receiver's processor
-                _receiver.Instance.RegisterExternalProvider(_alias, _provider.Instance);
-
-                Debug.Log($"[AttributeContextLinker] Successfully linked '{_provider.name}' to '{_receiver.name}' as '{_alias}'.");
+                RemoveLink();
             }
+
+            // Register the provider's processor inside the receiver's processor
+            _linkedReceiver = receiverEntity;
+            _linkedProvider = _provider.Instance;
+            _linkedAlias = _alias;
+            _linkedReceiver.RegisterExternalProvider(_linkedAlias, _linkedProvider);
+
+            Debug.Log($"[AttributeContextLinker] Successfully linked '{_provider.name}' to '{_receiver.name}' as '{_alias}'.");
         }
 
+        /// <summary>
+        /// Removes the link this component registered, unless something else has re-registered that alias since.
+        /// </summary>
         public void RemoveLink()
         {
-            if (_receiver != null && _provider != null)
+            if (_linkedReceiver == null) return;
+
+            Entity current = null;
+            _linkedReceiver.ObserveProvider(_linkedAlias).Take(1).Subscribe(provider => current = provider);
+            if (current == _linkedProvider)
             {
-                _receiver.Instance.UnregisterExternalProvider(_alias);
+                _linkedReceiver.UnregisterExternalProvider(_linkedAlias);
             }
+
+            _linkedReceiver = null;
+            _linkedProvider = null;
         }
 
         private void OnDestroy()
@@ -72,20 +100,32 @@ namespace ReactiveSolutions.AttributeSystem.Unity
 
         /// <summary>
         /// Sets the provider at runtime (e.g., when a player picks up this weapon).
+        /// Passing null removes the link (e.g., when the weapon is dropped).
         /// </summary>
         public void SetProvider(EntityController provider)
         {
             _provider = provider;
+            if (_provider != null) LinkContext();
+            else RemoveLink();
+        }
+
+        public void SetReceiver(EntityController receiver)
+        {
+            RemoveLink();
+            _receiver = receiver;
             if (_receiver != null && _provider != null)
                 LinkContext();
         }
 
-        public void SetReceiver(EntityController receiver) 
+        /// <summary>
+        /// Changes the alias. An existing link moves to the new alias.
+        /// </summary>
+        public void SetAlias(SemanticKey alias)
         {
-            _receiver = receiver;
-            if(_receiver != null && _provider != null)
-                LinkContext();
+            bool wasLinked = _linkedReceiver != null;
+            RemoveLink();
+            _alias = alias;
+            if (wasLinked) LinkContext();
         }
-        public void SetAlias(SemanticKey alias) => _alias = alias;
     }
 }

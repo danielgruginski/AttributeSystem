@@ -2,17 +2,21 @@
 
 ## Overview
 
-The `AttributeReference` class is a data structure designed to uniquely identify an attribute within the attribute system, potentially across different entities. It consists of a `Name` (SemanticKey) and an optional `Path` (List of SemanticKeys).
+The `AttributeReference` struct is a data structure designed to uniquely identify an attribute within the attribute system, potentially across different entities. It consists of a `Name` (SemanticKey) and an optional `Path` (List of SemanticKeys).
 
-It serves as the "Address" for finding a value. When a `ValueSource` is in `Attribute` mode, it holds an `AttributeReference` to tell the system _where_ to look for that value.
+It serves as the "Address" for finding a value. When a `ValueSource` is in `Attribute` mode, it holds an `AttributeReference` to tell the system _where_ to look for that value. StatBlock pointers (`PointerSpec.Target`) and `Attribute.ActivePointerTarget` use it too.
 
 ## Class Definition
 
-```
+```csharp
+// namespace ReactiveSolutions.AttributeSystem.Core.Data
 [System.Serializable]
-public class AttributeReference
+public struct AttributeReference
 {
-    // ...
+    public SemanticKey Name;
+    public List<SemanticKey> Path;
+
+    public AttributeReference(SemanticKey name, List<SemanticKey> path = null);
 }
 
 ```
@@ -23,80 +27,103 @@ public class AttributeReference
 
 -   **`SemanticKey Name`**
     
-    -   The name of the target attribute (e.g., "Strength", "Damage").
+    -   The name of the target attribute (e.g., `Stats.Strength`, `Stats.Damage`).
         
 -   **`List<SemanticKey> Path`**
     
-    -   An ordered list of keys representing the traversal path to find the target processor.
+    -   An ordered list of provider keys representing the traversal path to find the target entity.
         
-    -   **Empty / Null:** Refers to the _same_ processor (Local).
+    -   **Empty / Null:** Refers to the _same_ entity (Local).
         
-    -   **Example `["Owner"]`:** Refers to the processor registered as "Owner" on the current processor.
+    -   **Example `[Links.Owner]`:** Refers to the entity registered as provider `Links.Owner` on the current entity (`RegisterExternalProvider`).
         
-    -   **Example `["Owner", "Hireling"]`:** Refers to the "Hireling" of the "Owner".
+    -   **Example `[Links.Owner, Links.Hireling]`:** Refers to the "Hireling" of the "Owner".
         
 
-### Methods
+### Constructor
 
--   **`IObservable<Attribute> Resolve(AttributeProcessor startContext)`**
+-   **`AttributeReference(SemanticKey name, List<SemanticKey> path = null)`**
     
-    -   The primary logic for finding the attribute at runtime.
+    -   A `null` path becomes an empty list (Local). A `default` reference has a `null` path, which also means Local.
+        
+
+### Resolving a Reference
+
+`AttributeReference` is plain data with no methods of its own (there is no `Resolve`). The `Entity` you start from resolves it:
+
+-   **`IObservable<Attribute> entity.GetAttributeObservable(reference.Name, reference.Path)`**
+    
+    -   The primary way to find the attribute at runtime.
         
     -   **Logic:**
         
-        1.  Start at `startContext`.
+        1.  Start at `entity`.
             
-        2.  Recursively resolve the `Path` using `AttributeProcessor.ObserveProvider()`.
+        2.  Follow the `Path` one provider at a time (as `Entity.ObserveProvider()` does), re-resolving whenever a provider on the path is registered, replaced or unregistered.
             
-        3.  Once the final processor is found, call `GetAttributeObservable(Name)`.
+        3.  On the entity at the end of the path, observe the attribute `Name`.
             
-    -   **Return:** An observable that emits the `Attribute` object. If the path is broken (e.g., "Owner" is null), it may not emit or will switch to a new stream when the path is repaired.
+    -   **Return:** An observable that emits the `Attribute` object once it exists (and again if it is replaced). While a provider on the path is missing (e.g., no "Owner" is registered) it emits `null`, and it switches to the new stream when the path is repaired.
         
+-   **`IObservable<float> entity.ObserveValue(reference.Name, reference.Path)`**
+    
+    -   Emits the attribute's final value; nothing while the attribute or a provider on the path is missing.
+        
+-   **`Attribute entity.GetAttribute(reference.Name, reference.Path)`**
+    
+    -   A one-off lookup; returns `null` if the attribute or a provider on the path is missing.
+        
+-   `ValueSource` (Attribute mode) and pointers resolve references the same way, but read a missing attribute or provider as 0.
+    
 
-## JSON Representation
+## In JSON Files
 
-When serialized within a `StatBlock` or `ValueSource`:
+In StatBlock and entity profile files, an `AttributeReference` is one string: the names of the path's steps, then the attribute's, separated by `/`. `"Owner/Intelligence"` is the Intelligence of the entity registered as `Owner`, and `"Intelligence"` is a local attribute. The names are resolved with the file's table of keys (see [JSON Format](JSON%20Format.md)).
 
-```
-{
-  "Name": "Intelligence",
-  "Path": [ "Owner" ]
-}
-
-```
+In code, `AttributeReference.Of(Stats.Intelligence, Links.Owner)` creates the same reference.
 
 ## Usage Examples
 
+The keys (`Stats.Health`, `Links.Owner`, ...) come from static classes generated from KeyDomains; see [Semantic Keys](Semantic%20Keys.md).
+
 ### 1. Local Reference (Code)
 
-```
+```csharp
 // Refers to "Health" on the current entity
-var localRef = new AttributeReference(new SemanticKey("Health"));
+var localRef = new AttributeReference(Stats.Health);
 
 ```
 
 ### 2. Remote Reference (Code)
 
-```
+```csharp
 // Refers to "Strength" on the entity's "Owner"
 var remoteRef = new AttributeReference(
-    new SemanticKey("Strength"),
-    new List<SemanticKey> { new SemanticKey("Owner") }
+    Stats.Strength,
+    new List<SemanticKey> { Links.Owner }
 );
 
 ```
 
 ### 3. Resolving Manually
 
-```
-AttributeReference ref = ...;
-AttributeProcessor myProcessor = ...;
+```csharp
+var player = new Entity();
+player.SetOrUpdateBaseValue(Stats.Strength, 10f);
+var sword = new Entity();
 
-ref.Resolve(myProcessor).Subscribe(attr => 
+sword.GetAttributeObservable(remoteRef.Name, remoteRef.Path).Subscribe(attr => 
 {
     if (attr != null)
-        Debug.Log($"Found attribute: {attr.Name} with value {attr.CurrentValue}");
+        Debug.Log($"Found attribute: {attr.Name} with value {attr.ObservableValue.Value}");
 });
+// Nothing logged yet: the sword has no "Owner", so attr is null.
+
+sword.RegisterExternalProvider(Links.Owner, player);
+// Logs: "Found attribute: Strength with value 10"
+
+// To follow the value itself:
+sword.ObserveValue(remoteRef.Name, remoteRef.Path).Subscribe(v => Debug.Log($"Owner's Strength: {v}"));
 
 ```
 
@@ -106,6 +133,6 @@ The power of `AttributeReference` lies in its ability to traverse dynamic relati
 
 -   **Scenario:** A "Squad Leader" aura that boosts "Soldier" morale.
     
--   **Path:** `["SquadLeader"]`
+-   **Path:** `[Links.SquadLeader]`
     
--   **Dynamic:** If a Soldier switches squads, the `SquadLeader` provider changes. The `AttributeReference` (via `Resolve`) automatically unsubscribes from the old leader's stats and subscribes to the new leader's stats without any manual code.
+-   **Dynamic:** If a Soldier switches squads, the `SquadLeader` provider changes (`RegisterExternalProvider(Links.SquadLeader, newLeader)`). Whatever resolves the `AttributeReference` (a `ValueSource`, a pointer, or `GetAttributeObservable`) automatically unsubscribes from the old leader's stats and subscribes to the new leader's stats without any manual code.

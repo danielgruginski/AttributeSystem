@@ -1,9 +1,9 @@
 ﻿using NUnit.Framework;
 using ReactiveSolutions.AttributeSystem.Core;
+using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using ReactiveSolutions.AttributeSystem.Core.Builders;
 using ReactiveSolutions.AttributeSystem.Core.Data;
 using SemanticKeys;
-using sk;
 using System.Linq;
 
 namespace ReactiveSolutions.AttributeSystem.Tests
@@ -41,7 +41,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var profile = ProfileBuilder.Create("OrcBlueprint").Build();
 
             Assert.IsNotNull(profile);
-            Assert.AreEqual("OrcBlueprint", profile.name);
+            Assert.AreEqual("OrcBlueprint", profile.ProfileName);
         }
 
         [Test]
@@ -164,10 +164,9 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             var spec = statBlock.Modifiers[0];
             Assert.AreEqual(_healthKey, spec.TargetAttribute);
-            Assert.AreEqual(Modifiers.Static, spec.LogicType);
+            Assert.IsInstanceOf<ValueLogic>(spec.Logic);
             Assert.AreEqual(ModifierType.Additive, spec.Type);
-            Assert.AreEqual(1, spec.Arguments.Count);
-            Assert.AreEqual(100f, spec.Arguments[0].ConstantValue);
+            Assert.AreEqual(100f, ((ValueLogic)spec.Logic).Value.ConstantValue);
         }
 
         [Test]
@@ -181,9 +180,9 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             var spec = statBlock.Modifiers[0];
             Assert.AreEqual(_speedKey, spec.TargetAttribute);
-            Assert.AreEqual(Modifiers.Static, spec.LogicType);
+            Assert.IsInstanceOf<ValueLogic>(spec.Logic);
             Assert.AreEqual(ModifierType.Multiplicative, spec.Type);
-            Assert.AreEqual(0.25f, spec.Arguments[0].ConstantValue);
+            Assert.AreEqual(1.25f, ((ValueLogic)spec.Logic).Value.ConstantValue); // +25% => x1.25
         }
 
         [Test]
@@ -216,6 +215,34 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             Assert.AreEqual(_healthKey, sb.Modifiers[0].TargetAttribute);
             Assert.AreEqual(1, sb.Tags.Count);
             Assert.AreEqual(_undeadTag, sb.Tags[0]);
+        }
+
+        [Test]
+        public void StatBlockBuilder_CoversEveryStatBlockField()
+        {
+            var statBlock = StatBlockBuilder.Create("Everything")
+                .SetCondition(StatBlockCondition.HasTag(_undeadTag, _rightHandKey))
+                .AddBaseValue(_healthKey, 50f)
+                .AddRemoteTag(_undeadTag, _rightHandKey)
+                .AddPointer(_maxHealthAlias, _healthKey, _rightHandKey)
+                .AddModifier(AttributeReference.Of(_damageKey, _rightHandKey), new ValueLogic(2f), ModifierType.Override, priority: 5, sourceId: "Curse")
+                .Build();
+
+            Assert.AreEqual(StatBlockCondition.Mode.Tag, statBlock.ActivationCondition.Type);
+            CollectionAssert.AreEqual(new[] { _rightHandKey }, statBlock.ActivationCondition.TagTarget);
+            Assert.AreEqual(_healthKey, statBlock.BaseValues[0].Name);
+            Assert.AreEqual(50f, statBlock.BaseValues[0].Value);
+            CollectionAssert.AreEqual(new[] { _rightHandKey }, statBlock.RemoteTags[0].TargetPath);
+            Assert.AreEqual(_maxHealthAlias, statBlock.Pointers[0].Alias);
+            Assert.AreEqual(_healthKey, statBlock.Pointers[0].Target.Name);
+            CollectionAssert.AreEqual(new[] { _rightHandKey }, statBlock.Pointers[0].Target.Path);
+
+            var spec = statBlock.Modifiers[0];
+            Assert.AreEqual(_damageKey, spec.TargetAttribute);
+            CollectionAssert.AreEqual(new[] { _rightHandKey }, spec.TargetPath);
+            Assert.AreEqual(ModifierType.Override, spec.Type);
+            Assert.AreEqual(5, spec.Priority);
+            Assert.AreEqual("Curse", spec.SourceId);
         }
     }
 }

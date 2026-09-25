@@ -1,5 +1,5 @@
 ﻿using ReactiveSolutions.AttributeSystem.Core;
-using ReactiveSolutions.AttributeSystem.Unity.Data; // Import the SO wrapper
+using ReactiveSolutions.AttributeSystem.Core.Data;
 using SemanticKeys;
 using System;
 using UniRx;
@@ -9,18 +9,37 @@ namespace ReactiveSolutions.AttributeSystem.Unity
 {
     public class EntityController : MonoBehaviour
     {
-        [SerializeField]
-        [Tooltip("The ScriptableObject wrapper containing the entity's blueprint.")]
-        public EntityProfileSO _profileSO;
+        [Tooltip("A profile saved as JSON under Resources/Data/EntityProfiles (see Window > Attribute System > Entity Profile Editor). Applied first.")]
+        [EntityProfileID]
+        public string ProfileId;
+
+        [Tooltip("A profile authored here. Applied after the Profile Id's, so its base values win. Leave it empty to use only the Profile Id.")]
+        public EntityProfile Profile = new EntityProfile();
 
         private Entity _entity;
-        public Entity Instance => _entity;
 
-        private IModifierFactory _modifierFactory;
+        /// <summary>
+        /// The entity driven by this controller. Created on first access, so other components can use it
+        /// from their own Awake regardless of script execution order.
+        /// </summary>
+        public Entity Instance
+        {
+            get
+            {
+                if (_entity == null) InitializeEntity();
+                return _entity;
+            }
+        }
 
         private void Awake()
         {
             InitializeEntity();
+        }
+
+        private void OnDestroy()
+        {
+            // Releases the entity's subscriptions to other entities (and its innate StatBlocks).
+            _entity?.Dispose();
         }
 
         public void InitializeEntity()
@@ -28,17 +47,14 @@ namespace ReactiveSolutions.AttributeSystem.Unity
             if (_entity != null) return;
 
             _entity = new Entity();
-            _modifierFactory = new ModifierFactory();
 
-            if (_profileSO != null && _profileSO.Profile != null)
+            if (!string.IsNullOrEmpty(ProfileId))
             {
-                // We pass the pure POCO data down into the core engine!
-                _entity.ApplyProfile(_profileSO.Profile, _modifierFactory);
+                // The loader logs an error if the JSON can't be loaded; the entity then starts from the inline profile.
+                _entity.ApplyProfile(EntityProfileJsonLoader.Load(ProfileId));
             }
-            else
-            {
-                Debug.LogWarning($"[EntityController] No EntityProfileSO assigned on {gameObject.name}. Entity initialized completely empty.");
-            }
+
+            _entity.ApplyProfile(Profile);
         }
     }
 }

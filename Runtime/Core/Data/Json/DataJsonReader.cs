@@ -1,0 +1,802 @@
+using ReactiveSolutions.AttributeSystem.Core.Builders;
+using ReactiveSolutions.AttributeSystem.Core.Modifiers;
+using SemanticKeys;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using UnityEngine;
+
+namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
+{
+    /// <summary>
+    /// Builds StatBlocks and EntityProfiles from JSON by calling their builders: each property of the file is a
+    /// builder call ("tags": ["Magical"] is AddTag(Magical), a modifier is AddModifier(...)). Keys are written by
+    /// name and resolved with the file's "keys" table. Every error says where it is: its path in the file, line
+    /// and column. See Documentation/JSON Format.md.
+    /// </summary>
+    internal sealed class DataJsonReader
+    {
+        private static readonly string[] StatBlockProperties =
+            { "statBlock", "condition", "baseValues", "tags", "remoteTags", "pointers", "modifiers", "keys" };
+        private static readonly string[] ProfileProperties =
+        {
+            "profile", "templates", "parentKey", "baseAttributes", "innateTags", "linkGroups", "nestedEntities", "pointers",
+            "innateStatBlocks", "keys"
+        };
+        private static readonly string[] ModifierProperties = { "target", "type", "priority", "source" };
+        private static readonly string[] ConditionKinds = { "hasTag", "lacksTag", "compare", "all", "any" };
+
+        private const string AttributeExample = "an attribute such as \"Strength\" or \"Owner/Strength\"";
+        private const string TagExample = "a tag such as \"Stunned\" or \"Owner/Stunned\"";
+
+        private readonly KeyTableReader _keys;
+
+        private DataJsonReader(KeyTableReader keys)
+        {
+            _keys = keys;
+        }
+
+        public static StatBlock ReadStatBlock(string json, Func<string, SemanticKey> findKey)
+        {
+            var root = JsonParser.Parse(json);
+            return Create(root, findKey).StatBlock(root, "", isRoot: true);
+        }
+
+        public static EntityProfile ReadProfile(string json, Func<string, SemanticKey> findKey)
+        {
+            var root = JsonParser.Parse(json);
+            return Create(root, findKey).Profile(root, "", isRoot: true);
+        }
+
+        private static DataJsonReader Create(JsonNode root, Func<string, SemanticKey> findKey)
+        {
+            if (root.Kind != JsonKind.Object) throw Error(root, "", $"expected an object ({{ ... }}), found {root.Describe()}");
+            CheckDuplicates(root, "");
+            return new DataJsonReader(new KeyTableReader(root.Find("keys"), findKey));
+        }
+
+        // ---------------------------------------------------------------- StatBlocks and profiles
+
+        private StatBlock StatBlock(JsonNode node, string path, bool isRoot)
+        {
+            ExpectObject(node, path, "a StatBlock");
+            CheckDuplicates(node, path);
+
+            var name = node.Find("statBlock");
+            var builder = StatBlockBuilder.Create(name != null ? String(name, Child(path, "statBlock")) ?? "" : "");
+
+            foreach (var property in node.Properties)
+            {
+                string at = Child(path, property.Key);
+                var value = property.Value;
+
+                switch (Match(property.Key, StatBlockProperties))
+                {
+                    case "statBlock":
+                        break;
+
+                    case "condition":
+                        builder.SetCondition(Condition(value, at));
+                        break;
+
+                    case "baseValues":
+                        foreach (var entry in Map(value, at, "attributes and their base values, e.g. { \"Durability\": 100 }"))
+                        {
+                            string entryPath = Child(at, entry.Key);
+                            builder.AddBaseValue(KeyName(entry.Key, entry.Value, entryPath), Float(entry.Value, entryPath));
+                        }
+                        break;
+
+                    case "tags":
+                        foreach (var (item, itemPath) in Array(value, at, "an array of tags, e.g. [\"Magical\"]"))
+                        {
+                            builder.AddTag(Key(item, itemPath));
+                        }
+                        break;
+
+                    case "remoteTags":
+                        foreach (var (item, itemPath) in Array(value, at, "an array of tags on other entities, e.g. [\"Owner/Armed\"]"))
+                        {
+                            var tag = Reference(item, itemPath, TagExample);
+                            builder.AddRemoteTag(tag.Name, tag.Path.ToArray());
+                        }
+                        break;
+
+                    case "pointers":
+                        foreach (var entry in Map(value, at, "aliases and the attributes they point to, e.g. { \"MainStat\": \"Owner/Strength\" }"))
+                        {
+                            string entryPath = Child(at, entry.Key);
+                            var target = Reference(entry.Value, entryPath, AttributeExample);
+                            builder.AddPointer(KeyName(entry.Key, entry.Value, entryPath), target.Name, target.Path.ToArray());
+                        }
+                        break;
+
+                    case "modifiers":
+                        foreach (var (item, itemPath) in Array(value, at, "an array of modifiers"))
+                        {
+                            Modifier(builder, item, itemPath);
+                        }
+                        break;
+
+                    case "keys":
+                        if (!isRoot) throw Error(value, at, "the \"keys\" table belongs at the top level of the file");
+                        break;
+
+                    default:
+                        throw UnknownProperty(property, at, StatBlockProperties,
+                            isRoot && Match(property.Key, ProfileProperties) != null ? " (is this an entity profile file?)" : "");
+                }
+            }
+
+            return builder.Build();
+        }
+
+        private EntityProfile Profile(JsonNode node, string path, bool isRoot)
+        {
+            ExpectObject(node, path, "an entity profile");
+            CheckDuplicates(node, path);
+
+            var name = node.Find("profile");
+            var builder = ProfileBuilder.Create(name != null ? String(name, Child(path, "profile")) ?? "" : "");
+
+            foreach (var property in node.Properties)
+            {
+                string at = Child(path, property.Key);
+                var value = property.Value;
+
+                switch (Match(property.Key, ProfileProperties))
+                {
+                    case "profile":
+                        break;
+
+                    case "templates":
+                        foreach (var (item, itemPath) in Array(value, at, "an array of template profile IDs, e.g. [\"Templates/Character\"]"))
+                        {
+                            if (item.Kind == JsonKind.Object)
+                            {
+                                builder.AddTemplate(Profile(item, itemPath, isRoot: false));
+                            }
+                            else
+                            {
+                                builder.AddTemplate(String(item, itemPath, "a template's profile ID such as \"Templates/Character\", or a profile object"));
+                            }
+                        }
+                        break;
+
+                    case "parentKey":
+                        builder.SetParentKey(Key(value, at));
+                        break;
+
+                    case "baseAttributes":
+                        foreach (var entry in Map(value, at, "attributes and their base values, e.g. { \"Health\": 100 }"))
+                        {
+                            string entryPath = Child(at, entry.Key);
+                            builder.AddBaseAttribute(KeyName(entry.Key, entry.Value, entryPath), Float(entry.Value, entryPath));
+                        }
+                        break;
+
+                    case "innateTags":
+                        foreach (var (item, itemPath) in Array(value, at, "an array of tags, e.g. [\"Undead\"]"))
+                        {
+                            builder.AddInnateTag(Key(item, itemPath));
+                        }
+                        break;
+
+                    case "linkGroups":
+                        foreach (var (item, itemPath) in Array(value, at, "an array of link group names, e.g. [\"Inventory\"]"))
+                        {
+                            builder.AddLinkGroup(Key(item, itemPath));
+                        }
+                        break;
+
+                    case "nestedEntities":
+                        foreach (var entry in Map(value, at, "provider keys and profile IDs, e.g. { \"RightHand\": \"Weapons/Sword\" }"))
+                        {
+                            string entryPath = Child(at, entry.Key);
+                            var key = KeyName(entry.Key, entry.Value, entryPath);
+                            if (entry.Value.Kind == JsonKind.Object)
+                            {
+                                builder.AddNestedEntity(key, Profile(entry.Value, entryPath, isRoot: false));
+                            }
+                            else
+                            {
+                                builder.AddNestedEntity(key, String(entry.Value, entryPath, "a profile ID such as \"Weapons/Sword\", or a profile object"));
+                            }
+                        }
+                        break;
+
+                    case "pointers":
+                        foreach (var entry in Map(value, at, "aliases and the attributes they point to, e.g. { \"MainStat\": \"RightHand/Damage\" }"))
+                        {
+                            string entryPath = Child(at, entry.Key);
+                            var target = Reference(entry.Value, entryPath, AttributeExample);
+                            builder.AddPointer(KeyName(entry.Key, entry.Value, entryPath), target.Name, target.Path.ToArray());
+                        }
+                        break;
+
+                    case "innateStatBlocks":
+                        foreach (var (item, itemPath) in Array(value, at, "an array of StatBlock IDs and StatBlocks"))
+                        {
+                            if (item.Kind == JsonKind.Object)
+                            {
+                                builder.AddInnateStatBlock(StatBlock(item, itemPath, isRoot: false));
+                            }
+                            else
+                            {
+                                builder.AddInnateStatBlock((StatBlockID)String(item, itemPath, "a StatBlock ID such as \"Passives/Tough\", or a StatBlock object"));
+                            }
+                        }
+                        break;
+
+                    case "keys":
+                        if (!isRoot) throw Error(value, at, "the \"keys\" table belongs at the top level of the file");
+                        break;
+
+                    default:
+                        throw UnknownProperty(property, at, ProfileProperties,
+                            isRoot && Match(property.Key, StatBlockProperties) != null ? " (is this a StatBlock file?)" : "");
+                }
+            }
+
+            return builder.Build();
+        }
+
+        // ---------------------------------------------------------------- Modifiers and logic
+
+        private void Modifier(StatBlockBuilder builder, JsonNode node, string path)
+        {
+            ExpectObject(node, path, "a modifier, e.g. { \"target\": \"Damage\", \"value\": 5 }");
+            CheckDuplicates(node, path);
+
+            var target = new AttributeReference(SemanticKey.None);
+            var type = ModifierType.Additive;
+            int priority = 0;
+            string source = null;
+            ModifierLogic logic = null;
+            string logicProperty = null;
+
+            foreach (var property in node.Properties)
+            {
+                string at = Child(path, property.Key);
+                var value = property.Value;
+
+                switch (Match(property.Key, ModifierProperties))
+                {
+                    case "target":
+                        target = Reference(value, at, AttributeExample);
+                        break;
+                    case "type":
+                        type = (ModifierType)Enum(typeof(ModifierType), value, at);
+                        break;
+                    case "priority":
+                        priority = (int)Integer(value, at, typeof(int));
+                        break;
+                    case "source":
+                        source = String(value, at);
+                        break;
+                    default:
+                        // Any other property is the logic, named after its class: "linear": { ... }
+                        var logicType = LogicTypes.Find(property.Key, out string ambiguity);
+                        if (logicType == null)
+                        {
+                            throw NameError(property, at, ambiguity ??
+                                $"'{property.Key}' is neither a modifier property ({string.Join(", ", ModifierProperties)}) nor a logic. " +
+                                $"The logic names are: {string.Join(", ", LogicTypes.AllNames())}");
+                        }
+                        if (logicProperty != null)
+                        {
+                            throw NameError(property, at, $"a modifier has one logic, but this one has both '{logicProperty}' and '{property.Key}'");
+                        }
+                        logicProperty = property.Key;
+                        logic = Logic(logicType, value, at);
+                        break;
+                }
+            }
+
+            builder.AddModifier(target, logic, type, priority, source);
+        }
+
+        private ModifierLogic Logic(Type type, JsonNode value, string path)
+        {
+            var logic = LogicTypes.Create(type);
+            var fields = Fields(type, value, path);
+            string what = $"the {ModifierLogic.GetDisplayName(type)} logic";
+
+            if (value.Kind == JsonKind.Object)
+            {
+                ReadFields(logic, fields, value, path, what);
+            }
+            else if (fields.Length == 1)
+            {
+                // A logic with one field can be written as that field's value: "value": 5
+                fields[0].Info.SetValue(logic, Value(fields[0].Type, fields[0].IsReference, value, path));
+            }
+            else
+            {
+                throw Error(value, path, $"expected an object with the fields of {what} ({JsonField.ListNames(fields)}), found {value.Describe()}");
+            }
+
+            return logic;
+        }
+
+        /// <summary>A logic object in a [SerializeReference] field: { "linear": { ... } }.</summary>
+        private ModifierLogic LogicReference(Type fieldType, JsonNode node, string path)
+        {
+            if (node.Kind == JsonKind.Null) return null;
+            if (node.Kind != JsonKind.Object || node.Properties.Count != 1)
+            {
+                throw Error(node, path, $"expected a logic, e.g. {{ \"linear\": {{ \"input\": \"Strength\" }} }}, found {node.Describe()}");
+            }
+
+            var property = node.Properties[0];
+            string at = Child(path, property.Key);
+            var type = LogicTypes.Find(property.Key, out string ambiguity);
+            if (type == null)
+            {
+                throw NameError(property, at, ambiguity ??
+                    $"there is no logic named '{property.Key}'. The logic names are: {string.Join(", ", LogicTypes.AllNames())}");
+            }
+            if (!fieldType.IsAssignableFrom(type))
+            {
+                throw NameError(property, at, $"expected a {ModifierLogic.GetDisplayName(fieldType)} logic, found {ModifierLogic.GetDisplayName(type)}");
+            }
+            return Logic(type, property.Value, at);
+        }
+
+        private void ReadFields(object target, JsonField[] fields, JsonNode node, string path, string what)
+        {
+            CheckDuplicates(node, path);
+            foreach (var property in node.Properties)
+            {
+                string at = Child(path, property.Key);
+                var field = JsonField.Find(fields, property.Key);
+                if (field == null) throw NameError(property, at, $"{what} has no field '{property.Key}' ({JsonField.ListNames(fields)})");
+                field.Info.SetValue(target, Value(field.Type, field.IsReference, property.Value, at));
+            }
+        }
+
+        private static JsonField[] Fields(Type type, JsonNode at, string path)
+        {
+            try
+            {
+                return JsonField.Of(type);
+            }
+            catch (InvalidOperationException e)
+            {
+                throw Error(at, path, e.Message);
+            }
+        }
+
+        // ---------------------------------------------------------------- Field values
+
+        /// <summary>The value of a field of type <paramref name="type"/>. Mirrors DataJsonWriter.Value.</summary>
+        private object Value(Type type, bool isReference, JsonNode node, string path)
+        {
+            if (type == typeof(ValueSource)) return ValueSource(node, path);
+            if (type == typeof(SemanticKey)) return Key(node, path);
+            if (type == typeof(AttributeReference)) return Reference(node, path, AttributeExample);
+            if (type == typeof(StatBlockCondition)) return node.Kind == JsonKind.Null ? null : Condition(node, path);
+            if (JsonTypes.TryGetListElement(type, out var element)) return List(type, element, isReference, node, path);
+            if (isReference)
+            {
+                if (node.Kind == JsonKind.Null) return null;
+                if (!JsonTypes.CanHoldLogic(type)) throw Error(node, path, $"a [SerializeReference] {type.Name} can't be read from JSON: only logic objects can");
+                return LogicReference(type, node, path);
+            }
+
+            if (type == typeof(string)) return String(node, path);
+            if (type == typeof(bool)) return Bool(node, path);
+            if (type == typeof(float)) return Float(node, path);
+            if (type == typeof(double)) return Double(node, path);
+            if (type == typeof(char)) return Char(node, path);
+            if (JsonTypes.IsInteger(type)) return Integer(node, path, type);
+            if (type.IsEnum) return Enum(type, node, path);
+            if (type == typeof(AnimationCurve)) return Curve(node, path);
+            if (JsonTypes.IsRecord(type)) return Record(type, node, path);
+
+            throw Error(node, path, $"{type.Name} values can't be read from JSON");
+        }
+
+        private object List(Type type, Type element, bool isReference, JsonNode node, string path)
+        {
+            if (node.Kind == JsonKind.Null) return null;
+            if (node.Kind != JsonKind.Array) throw Error(node, path, $"expected an array, found {node.Describe()}");
+
+            if (type.IsArray)
+            {
+                var array = System.Array.CreateInstance(element, node.Items.Count);
+                for (int i = 0; i < node.Items.Count; i++)
+                {
+                    array.SetValue(Value(element, isReference, node.Items[i], Index(path, i)), i);
+                }
+                return array;
+            }
+
+            var list = (IList)Activator.CreateInstance(type);
+            for (int i = 0; i < node.Items.Count; i++)
+            {
+                list.Add(Value(element, isReference, node.Items[i], Index(path, i)));
+            }
+            return list;
+        }
+
+        private object Record(Type type, JsonNode node, string path)
+        {
+            if (node.Kind == JsonKind.Null && !type.IsValueType) return null;
+            ExpectObject(node, path, $"an object with the fields of {type.Name}");
+
+            object record;
+            try
+            {
+                record = Activator.CreateInstance(type, nonPublic: true);
+            }
+            catch (MissingMethodException)
+            {
+                throw Error(node, path, $"{type.Name} can't be read from JSON: it needs a parameterless constructor");
+            }
+
+            // A struct is boxed here, so setting its fields changes the box that is returned.
+            ReadFields(record, Fields(type, node, path), node, path, type.Name);
+            return record;
+        }
+
+        private static AnimationCurve Curve(JsonNode node, string path)
+        {
+            if (node.Kind == JsonKind.Null) return null;
+            ExpectObject(node, path, "a curve, e.g. { \"keys\": [{ \"time\": 0, \"value\": 0 }, { \"time\": 1, \"value\": 1 }] }");
+            CheckDuplicates(node, path);
+
+            var curve = new AnimationCurve();
+            foreach (var property in node.Properties)
+            {
+                string at = Child(path, property.Key);
+                switch (Match(property.Key, new[] { "keys", "preWrapMode", "postWrapMode" }))
+                {
+                    case "keys":
+                        var keys = new List<Keyframe>();
+                        foreach (var (item, itemPath) in Array(property.Value, at, "an array of keys"))
+                        {
+                            keys.Add(Keyframe(item, itemPath));
+                        }
+                        curve.keys = keys.ToArray();
+                        break;
+                    case "preWrapMode":
+                        curve.preWrapMode = (WrapMode)Enum(typeof(WrapMode), property.Value, at);
+                        break;
+                    case "postWrapMode":
+                        curve.postWrapMode = (WrapMode)Enum(typeof(WrapMode), property.Value, at);
+                        break;
+                    default:
+                        throw UnknownProperty(property, at, new[] { "keys", "preWrapMode", "postWrapMode" }, "");
+                }
+            }
+            return curve;
+        }
+
+        private static Keyframe Keyframe(JsonNode node, string path)
+        {
+            var names = new[] { "time", "value", "inTangent", "outTangent", "inWeight", "outWeight", "weightedMode" };
+            ExpectObject(node, path, "a key, e.g. { \"time\": 0, \"value\": 1 }");
+            CheckDuplicates(node, path);
+
+            var key = new Keyframe();
+            foreach (var property in node.Properties)
+            {
+                string at = Child(path, property.Key);
+                switch (Match(property.Key, names))
+                {
+                    case "time": key.time = Float(property.Value, at); break;
+                    case "value": key.value = Float(property.Value, at); break;
+                    case "inTangent": key.inTangent = Float(property.Value, at); break;
+                    case "outTangent": key.outTangent = Float(property.Value, at); break;
+                    case "inWeight": key.inWeight = Float(property.Value, at); break;
+                    case "outWeight": key.outWeight = Float(property.Value, at); break;
+                    case "weightedMode": key.weightedMode = (WeightedMode)Enum(typeof(WeightedMode), property.Value, at); break;
+                    default: throw UnknownProperty(property, at, names, "");
+                }
+            }
+            return key;
+        }
+
+        // ---------------------------------------------------------------- Conditions
+
+        private StatBlockCondition Condition(JsonNode node, string path)
+        {
+            ExpectObject(node, path, "a condition, e.g. { \"hasTag\": \"Equipped\" }");
+            CheckDuplicates(node, path);
+            if (node.Properties.Count == 0) return StatBlockCondition.Always();
+
+            string kind = null;
+            JsonNode kindValue = null;
+            string kindPath = null;
+            JsonNode tolerance = null;
+
+            foreach (var property in node.Properties)
+            {
+                string at = Child(path, property.Key);
+                if (Match(property.Key, new[] { "tolerance" }) != null)
+                {
+                    tolerance = property.Value;
+                    continue;
+                }
+
+                string match = Match(property.Key, ConditionKinds);
+                if (match == null)
+                {
+                    throw NameError(property, at,
+                        $"unknown property '{property.Key}': a condition is one of {string.Join(", ", ConditionKinds)}, or {{}} for always");
+                }
+                if (kind != null)
+                {
+                    throw NameError(property, at, $"a condition is one of {string.Join(", ", ConditionKinds)}, but this one has both " +
+                                                  $"'{kind}' and '{property.Key}'. Combine conditions with \"all\" or \"any\"");
+                }
+                kind = match;
+                kindValue = property.Value;
+                kindPath = at;
+            }
+
+            if (kind == null) throw Error(node, path, $"a condition needs one of {string.Join(", ", ConditionKinds)}");
+            if (tolerance != null && kind != "compare") throw Error(tolerance, Child(path, "tolerance"), "\"tolerance\" only applies to \"compare\"");
+
+            switch (kind)
+            {
+                case "hasTag":
+                case "lacksTag":
+                    var tag = Reference(kindValue, kindPath, TagExample);
+                    return kind == "hasTag"
+                        ? StatBlockCondition.HasTag(tag.Name, tag.Path.ToArray())
+                        : StatBlockCondition.LacksTag(tag.Name, tag.Path.ToArray());
+
+                case "compare":
+                    if (kindValue.Kind != JsonKind.Array || kindValue.Items.Count != 3)
+                    {
+                        throw Error(kindValue, kindPath, $"expected [value, operator, value], e.g. [\"Health\", \"<\", 50], found {kindValue.Describe()}");
+                    }
+                    return StatBlockCondition.Compare(
+                        ValueSource(kindValue.Items[0], Index(kindPath, 0)),
+                        Comparison(kindValue.Items[1], Index(kindPath, 1)),
+                        ValueSource(kindValue.Items[2], Index(kindPath, 2)),
+                        tolerance != null ? Float(tolerance, Child(path, "tolerance")) : StatBlockCondition.DefaultTolerance);
+
+                default:
+                    var conditions = Array(kindValue, kindPath, "an array of conditions")
+                        .Select(item => Condition(item.node, item.path))
+                        .ToArray();
+                    return kind == "all" ? StatBlockCondition.All(conditions) : StatBlockCondition.Any(conditions);
+            }
+        }
+
+        private static readonly string[] ComparisonSymbols = { "==", "!=", ">", "<", ">=", "<=" };
+
+        private static readonly StatBlockCondition.Comparison[] ComparisonValues =
+        {
+            StatBlockCondition.Comparison.Equal, StatBlockCondition.Comparison.NotEqual,
+            StatBlockCondition.Comparison.Greater, StatBlockCondition.Comparison.Less,
+            StatBlockCondition.Comparison.GreaterOrEqual, StatBlockCondition.Comparison.LessOrEqual
+        };
+
+        internal static string Symbol(StatBlockCondition.Comparison comparison)
+        {
+            int index = System.Array.IndexOf(ComparisonValues, comparison);
+            return index >= 0 ? ComparisonSymbols[index] : null;
+        }
+
+        private static StatBlockCondition.Comparison Comparison(JsonNode node, string path)
+        {
+            if (node.Kind == JsonKind.String)
+            {
+                int index = System.Array.IndexOf(ComparisonSymbols, node.Text.Trim());
+                if (index >= 0) return ComparisonValues[index];
+
+                foreach (var name in System.Enum.GetNames(typeof(StatBlockCondition.Comparison)))
+                {
+                    if (string.Equals(name, node.Text, StringComparison.OrdinalIgnoreCase))
+                    {
+                        return (StatBlockCondition.Comparison)System.Enum.Parse(typeof(StatBlockCondition.Comparison), name);
+                    }
+                }
+            }
+            throw Error(node, path, $"expected a comparison ({string.Join(", ", ComparisonSymbols)}), found {node.Describe()}");
+        }
+
+        // ---------------------------------------------------------------- Keys, paths and values
+
+        /// <summary>A number (a constant) or an attribute ("Owner/Strength").</summary>
+        private ValueSource ValueSource(JsonNode node, string path)
+        {
+            switch (node.Kind)
+            {
+                case JsonKind.Null:
+                    return null;
+                case JsonKind.Number:
+                    return Core.ValueSource.Const(Float(node, path));
+                case JsonKind.String:
+                    var reference = Reference(node, path, AttributeExample);
+                    return new ValueSource { Mode = Core.ValueSource.SourceMode.Attribute, AttributeRef = reference };
+                default:
+                    throw Error(node, path, $"expected a number or {AttributeExample}, found {node.Describe()}");
+            }
+        }
+
+        /// <summary>"Owner/Strength": the key names of the provider path, then the attribute (or tag). Null is no key.</summary>
+        private AttributeReference Reference(JsonNode node, string path, string expected)
+        {
+            if (node.Kind == JsonKind.Null) return new AttributeReference(SemanticKey.None);
+            if (node.Kind != JsonKind.String) throw Error(node, path, $"expected {expected}, found {node.Describe()}");
+
+            var steps = node.Text.Split('/');
+            var keys = new List<SemanticKey>(steps.Length);
+            foreach (var step in steps)
+            {
+                string name = step.Trim();
+                if (name.Length == 0) throw Error(node, path, $"\"{node.Text}\" has an empty step: a path is key names separated by '/'");
+                keys.Add(_keys.Resolve(name, node, path));
+            }
+
+            var target = keys[keys.Count - 1];
+            keys.RemoveAt(keys.Count - 1);
+            return new AttributeReference(target, keys);
+        }
+
+        /// <summary>A key on its own (not a path). Null is no key.</summary>
+        private SemanticKey Key(JsonNode node, string path)
+        {
+            if (node.Kind == JsonKind.Null) return SemanticKey.None;
+            if (node.Kind != JsonKind.String) throw Error(node, path, $"expected a key name, found {node.Describe()}");
+            return KeyName(node.Text, node, path);
+        }
+
+        /// <summary>A key name, e.g. a property name in "baseValues".</summary>
+        private SemanticKey KeyName(string name, JsonNode at, string path)
+        {
+            if (name.Contains("/")) throw Error(at, path, $"expected a key name, found the path \"{name}\"");
+            string trimmed = name.Trim();
+            if (trimmed.Length == 0) throw Error(at, path, "expected a key name, found an empty name");
+            return _keys.Resolve(trimmed, at, path);
+        }
+
+        private static string String(JsonNode node, string path, string expected = "text in double quotes")
+        {
+            if (node.Kind == JsonKind.Null) return null;
+            if (node.Kind != JsonKind.String) throw Error(node, path, $"expected {expected}, found {node.Describe()}");
+            return node.Text;
+        }
+
+        private static char Char(JsonNode node, string path)
+        {
+            if (node.Kind != JsonKind.String || node.Text.Length != 1) throw Error(node, path, $"expected a single character in double quotes, found {node.Describe()}");
+            return node.Text[0];
+        }
+
+        private static bool Bool(JsonNode node, string path)
+        {
+            if (node.Kind != JsonKind.Bool) throw Error(node, path, $"expected true or false, found {node.Describe()}");
+            return node.BoolValue;
+        }
+
+        private static float Float(JsonNode node, string path)
+        {
+            if (node.Kind == JsonKind.String && TryParseSpecial(node.Text, out double special)) return (float)special;
+            if (node.Kind != JsonKind.Number) throw Error(node, path, $"expected a number, found {node.Describe()}");
+
+            float value;
+            try
+            {
+                value = float.Parse(node.Text, NumberStyles.Float, CultureInfo.InvariantCulture);
+            }
+            catch (OverflowException)
+            {
+                value = float.PositiveInfinity;
+            }
+            if (float.IsInfinity(value)) throw Error(node, path, $"{node.Text} is too large for a float");
+            return value;
+        }
+
+        private static double Double(JsonNode node, string path)
+        {
+            if (node.Kind == JsonKind.String && TryParseSpecial(node.Text, out double special)) return special;
+            if (node.Kind != JsonKind.Number) throw Error(node, path, $"expected a number, found {node.Describe()}");
+            return node.NumberValue;
+        }
+
+        /// <summary>NaN and infinities, which JSON numbers can't hold, are written as strings.</summary>
+        private static bool TryParseSpecial(string text, out double value)
+        {
+            switch (text)
+            {
+                case "NaN": value = double.NaN; return true;
+                case "Infinity": value = double.PositiveInfinity; return true;
+                case "-Infinity": value = double.NegativeInfinity; return true;
+                default: value = 0; return false;
+            }
+        }
+
+        private static object Integer(JsonNode node, string path, Type type)
+        {
+            if (node.Kind != JsonKind.Number) throw Error(node, path, $"expected a whole number, found {node.Describe()}");
+
+            try
+            {
+                decimal value = decimal.Parse(node.Text, NumberStyles.Float, CultureInfo.InvariantCulture);
+                if (value != decimal.Truncate(value)) throw Error(node, path, $"expected a whole number, found {node.Text}");
+                return Convert.ChangeType(value, type, CultureInfo.InvariantCulture);
+            }
+            catch (OverflowException)
+            {
+                throw Error(node, path, $"{node.Text} is out of range for {type.Name}");
+            }
+        }
+
+        private static object Enum(Type type, JsonNode node, string path)
+        {
+            var names = System.Enum.GetNames(type);
+            if (node.Kind == JsonKind.String)
+            {
+                bool isFlags = type.IsDefined(typeof(FlagsAttribute), false);
+                var parts = isFlags ? node.Text.Split(',') : new[] { node.Text };
+                var matched = new List<string>();
+                foreach (var part in parts)
+                {
+                    string name = names.FirstOrDefault(n => string.Equals(n, part.Trim(), StringComparison.OrdinalIgnoreCase));
+                    if (name == null) break;
+                    matched.Add(name);
+                }
+                if (matched.Count == parts.Length) return System.Enum.Parse(type, string.Join(", ", matched));
+            }
+            throw Error(node, path, $"expected one of {string.Join(", ", names)}, found {node.Describe()}");
+        }
+
+        // ---------------------------------------------------------------- Structure
+
+        private static IEnumerable<(JsonNode node, string path)> Array(JsonNode node, string path, string expected)
+        {
+            if (node.Kind == JsonKind.Null) return Enumerable.Empty<(JsonNode, string)>();
+            if (node.Kind != JsonKind.Array) throw Error(node, path, $"expected {expected}, found {node.Describe()}");
+            return node.Items.Select((item, i) => (item, Index(path, i))).ToList();
+        }
+
+        private static List<KeyValuePair<string, JsonNode>> Map(JsonNode node, string path, string expected)
+        {
+            if (node.Kind == JsonKind.Null) return new List<KeyValuePair<string, JsonNode>>();
+            if (node.Kind != JsonKind.Object) throw Error(node, path, $"expected {expected}, found {node.Describe()}");
+            return node.Properties;
+        }
+
+        private static void ExpectObject(JsonNode node, string path, string expected)
+        {
+            if (node.Kind != JsonKind.Object) throw Error(node, path, $"expected {expected} ({{ ... }}), found {node.Describe()}");
+        }
+
+        private static void CheckDuplicates(JsonNode node, string path)
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var property in node.Properties)
+            {
+                if (!seen.Add(property.Key)) throw NameError(property, Child(path, property.Key), $"'{property.Key}' appears twice");
+            }
+        }
+
+        /// <summary>The name in <paramref name="names"/> that <paramref name="name"/> is (ignoring case), or null.</summary>
+        private static string Match(string name, string[] names) =>
+            names.FirstOrDefault(n => string.Equals(n, name, StringComparison.OrdinalIgnoreCase));
+
+        private static JsonFormatException UnknownProperty(KeyValuePair<string, JsonNode> property, string path, string[] names, string hint) =>
+            NameError(property, path, $"unknown property '{property.Key}'{hint}. The properties here are: {string.Join(", ", names)}");
+
+        internal static string Child(string path, string name) => path.Length == 0 ? name : path + "." + name;
+
+        private static string Index(string path, int index) => $"{path}[{index}]";
+
+        internal static JsonFormatException Error(JsonNode at, string path, string message) =>
+            new JsonFormatException($"{(path.Length == 0 ? "The file" : path)}: {message}", at?.Line ?? 0, at?.Column ?? 0);
+
+        /// <summary>An error about a property's name (e.g. a typo): it points at the name rather than the value.</summary>
+        private static JsonFormatException NameError(KeyValuePair<string, JsonNode> property, string path, string message) =>
+            property.Value.NameLine > 0
+                ? new JsonFormatException($"{path}: {message}", property.Value.NameLine, property.Value.NameColumn)
+                : Error(property.Value, path, message);
+    }
+}

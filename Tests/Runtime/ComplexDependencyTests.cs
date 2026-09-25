@@ -1,6 +1,6 @@
 using NUnit.Framework;
 using ReactiveSolutions.AttributeSystem.Core;
-using ReactiveSolutions.AttributeSystem.Core.Modifiers; // For LinearAttributeModifier
+using ReactiveSolutions.AttributeSystem.Core.Modifiers; // LogicModifier, LinearLogic
 using ReactiveSolutions.AttributeSystem.Core.Data; // For ValueSource
 using UnityEngine;
 using System;
@@ -23,17 +23,9 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         // We wrap steps in Actions to allow easy permutation testing
         private Dictionary<string, Action> _steps;
 
-        // Helper to wrap inputs into standard Linear Modifier Args (Input, 1, 0)
-        private AttributeModifierSpec CreateLinearSpecs(string sourceId, ValueSource input)
-        {
-            return new AttributeModifierSpec() { 
-                SourceId = sourceId,
-                Type = ModifierType.Additive,
-                Priority = 0,
-                LogicType = TestKeys.Mock("Linear"),
-                Arguments = new List<ValueSource> { input, ValueSource.Const(1f), ValueSource.Const(0f) }
-            };
-        }
+        // An additive modifier worth Input * 1 + 0. Its input resolves relative to 'context' (default: the modified entity).
+        private static LogicModifier CreateLinearModifier(string sourceId, ValueSource input, Entity context = null)
+            => new LogicModifier(new LinearLogic { Input = input }, ModifierType.Additive, 0, sourceId, context);
 
         private ValueSource AttrSource(string attributeName, List<SemanticKey> providerPath = null)
         {
@@ -80,7 +72,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             var source = AttrSource("CasterLevel", new List<SemanticKey> { TestKeys.Mock("Owner") });
 
 
-            var mod = new LinearModifier(CreateLinearSpecs("CasterScaling", source));
+            var mod = CreateLinearModifier("CasterScaling", source);
 
             var AttributeName = TestKeys.Mock("ItemLevel");
             var ProviderPath = new List<SemanticKey> { TestKeys.Mock("EquippedWeapon") };
@@ -116,7 +108,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
 
             var source = AttrSource("ItemLevel", new List<SemanticKey> { TestKeys.Mock("EquippedWeapon") });
 
-            var mod = new LinearModifier(CreateLinearSpecs("ItemScaling", source));
+            var mod = CreateLinearModifier("ItemScaling", source);
 
             // Weapon adds this to its Owner
 
@@ -202,17 +194,16 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // 3. Setup MagicSword Modifiers
 
             // Mod A: Self Damage += Self CasterLevel
-            // Source: CasterLevel (Local/Baked to MagicSword context)
+            // Source: CasterLevel, read from the MagicSword (the modifier's context)
             var sourceA = AttrSource("CasterLevel");
-            sourceA.BakeContext(magicSword);
-            var modA = new LinearModifier(CreateLinearSpecs("MagicSwordSelfBuff", sourceA));
+            var modA = CreateLinearModifier("MagicSwordSelfBuff", sourceA, magicSword);
             magicSword.AddModifier("SelfBuff", modA, TestKeys.Mock("Damage"));
 
             // Mod B: Owner->Hireling->EquippedWeapon->Damage += Self CasterLevel
             var sourceB = AttrSource("CasterLevel");
-            sourceB.BakeContext(magicSword);
-            
-            var modB = new LinearModifier(CreateLinearSpecs("MagicSwordShareBuff", sourceB));
+
+            // Applied to another entity's Damage, but reads the MagicSword's CasterLevel
+            var modB = CreateLinearModifier("MagicSwordShareBuff", sourceB, magicSword);
 
             // Target Path: Owner -> Hireling -> EquippedWeapon
             var targetPath = new List<SemanticKey>

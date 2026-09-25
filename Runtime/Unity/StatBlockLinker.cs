@@ -21,18 +21,11 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         private EntityController _controller;
         private List<ActiveStatBlock> _activeBlocks = new List<ActiveStatBlock>();
 
-        // Cache the factory so we don't recreate it for every block
-        private IModifierFactory _modifierFactory;
-
         private void Awake()
         {
             if(_controller == null)
             { 
                 _controller = GetComponent<EntityController>();
-            }
-            if(_modifierFactory == null)
-            { 
-                _modifierFactory = new ModifierFactory(); 
             }
         }
 
@@ -56,7 +49,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
 
             if (_controller == null || _controller.Instance == null)
             {
-                Debug.LogWarning("[StatBlockLinker] No AttributeController/Processor found.");
+                Debug.LogWarning("[StatBlockLinker] No EntityController assigned or found.");
                 return;
             }
 
@@ -87,19 +80,18 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         public void AddStatBlock(StatBlockID statBlockID)
         {
             if (string.IsNullOrEmpty(statBlockID)) return;
+            if (_controller == null)
+            {
+                Debug.LogWarning($"[StatBlockLinker] No EntityController to apply '{statBlockID}' to.");
+                return;
+            }
 
-            StatBlock block = new StatBlock();
-            StatBlockJsonLoader.LoadIntoStatBlock(statBlockID, block);
-            if (block != null)
-            {
-                // Apply the block and store the handle
-                var activeHandle = block.ApplyToEntity(_controller.Instance, _modifierFactory);
-                _activeBlocks.Add(activeHandle);
-            }
-            else
-            {
-                Debug.LogWarning($"[StatBlockLinker] Could not load StatBlock with ID: {statBlockID}");
-            }
+            // StatBlockJsonLoader logs an error if the JSON can't be loaded, and returns an empty block.
+            StatBlock block = StatBlockJsonLoader.Load(statBlockID);
+
+            // Apply the block and store the handle
+            var activeHandle = block.ApplyToEntity(_controller.Instance);
+            _activeBlocks.Add(activeHandle);
         }
     }
 }

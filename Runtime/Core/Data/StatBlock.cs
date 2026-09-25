@@ -1,3 +1,4 @@
+using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using SemanticKeys;
 using System;
 using System.Collections.Generic;
@@ -12,7 +13,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
     /// and perfect for deserializing from JSON at runtime.
     /// </summary>
     [System.Serializable]
-    public class StatBlock
+    public class StatBlock : ISerializationCallbackReceiver
     {
         [System.Serializable]
         public struct BaseValueEntry
@@ -49,12 +50,17 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         public List<BaseValueEntry> BaseValues = new List<BaseValueEntry>();
         public List<AttributeModifierSpec> Modifiers = new List<AttributeModifierSpec>();
 
+        public void OnBeforeSerialize() { }
+
+        // A modifier duplicated in the Inspector can share its logic object with the original; give it its own.
+        public void OnAfterDeserialize() => ModifierLogic.Unshare(Modifiers);
+
         /// <summary>
         /// Populates a processor and returns an ActiveStatBlock handle to manage the lifecycle of applied modifiers.
+        /// Applying never modifies the block, so one block can be applied to any number of entities.
         /// </summary>
-        public ActiveStatBlock ApplyToEntity(Entity entity, IModifierFactory factory)
+        public ActiveStatBlock ApplyToEntity(Entity entity)
         {
-            factory ??= new ModifierFactory();
             var activeBlockHandle = new ActiveStatBlock();
 
             // 1. Set Base Values (Permanent for the session, generally not reverted by ActiveStatBlock)
@@ -62,7 +68,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
             // If dynamic base stats are needed, they should be Modifiers (Override type).
             foreach (var entry in BaseValues)
             {
-                if (!string.IsNullOrEmpty(entry.Name))
+                if (entry.Name != SemanticKey.None)
                 {
                     entity.SetOrUpdateBaseValue(entry.Name, entry.Value);
                 }
@@ -80,21 +86,38 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
                 ? ConditionEvaluator.Observe(ActivationCondition, entity)
                 : Observable.Return(true);
 
+            // If applying or removing the content flips the condition itself (e.g. "while Health < 50: +100 Health"),
+            // there is no stable state; toggling would recurse until the stack overflows. Detect it and disable the block.
+            bool isTransitioning = false;
+            bool isFaulted = false;
+
             var subscription = conditionStream
                 .DistinctUntilChanged()
                 .Subscribe(isActive =>
                 {
-                    if (isActive)
+                    if (isFaulted) return;
+
+                    if (isTransitioning)
                     {
-                        // ACTIVATE: Apply everything and store the receipt in the SerialDisposable
-                        // This automatically disposes any previous receipt if it existed (though Distinct prevents thrashing)
-                        innerHandleSerial.Disposable = ApplyContent(entity, factory);
+                        isFaulted = true;
+                        Debug.LogError($"[StatBlock] '{BlockName}' was disabled: its activation condition depends on its own effects " +
+                                       "(applying or removing the block flips the condition).");
+                        return;
                     }
-                    else
+
+                    isTransitioning = true;
+                    try
                     {
-                        // DEACTIVATE: Dispose the inner content
-                        innerHandleSerial.Disposable = null;
+                        // ACTIVATE: Apply everything and store the receipt in the SerialDisposable.
+                        // DEACTIVATE: Dispose the inner content.
+                        innerHandleSerial.Disposable = isActive ? ApplyContent(entity) : null;
                     }
+                    finally
+                    {
+                        isTransitioning = false;
+                    }
+
+                    if (isFaulted) innerHandleSerial.Disposable = null;
                 });
 
             activeBlockHandle.AddHandle(subscription);
@@ -105,7 +128,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         /// <summary>
         /// Helper to apply the actual modifiers/tags. Returns a disposable handle for them.
         /// </summary>
-        private IDisposable ApplyContent(Entity processor, IModifierFactory factory)
+        private IDisposable ApplyContent(Entity processor)
         {
             var contentHandle = new ActiveStatBlock();
 
@@ -143,16 +166,23 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
             // 4. Apply Modifiers
             foreach (var spec in Modifiers)
             {
-                var modifier = factory.Create(spec, processor);
-                if (modifier != null)
+                if (spec == null) continue;
+
+                if (spec.TargetAttribute == SemanticKey.None)
                 {
-                    var handle = processor.AddModifier(spec.SourceId, modifier, spec.TargetAttribute, spec.TargetPath);
-                    contentHandle.AddHandle(handle);
+                    Debug.LogWarning($"[StatBlock] '{BlockName}': skipped a '{ModifierLogic.GetDisplayName(spec.Logic?.GetType())}' modifier with no Target Attribute.");
+                    continue;
                 }
-                else
+
+                if (spec.Logic == null)
                 {
-                    Debug.LogWarning($"StatBlock.ApplyToProcessor: Could not create modifier of type '{spec.LogicType}'");
+                    Debug.LogWarning($"[StatBlock] '{BlockName}': skipped a modifier on '{spec.TargetAttribute}' with no Logic.");
+                    continue;
                 }
+
+                // The modifier's inputs resolve relative to this entity, even when TargetPath points elsewhere.
+                var modifier = spec.CreateModifier(processor);
+                contentHandle.AddHandle(processor.AddModifier(spec.SourceId, modifier, spec.TargetAttribute, spec.TargetPath));
             }
 
             return contentHandle;

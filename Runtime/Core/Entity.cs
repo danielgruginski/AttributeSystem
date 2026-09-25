@@ -1,5 +1,4 @@
 using ReactiveSolutions.AttributeSystem.Core.Data;
-using ReactiveSolutions.AttributeSystem.Unity.Data;
 using SemanticKeys;
 using System;
 using System.Collections.Generic;
@@ -11,10 +10,11 @@ namespace ReactiveSolutions.AttributeSystem.Core
 {
     /// <summary>
     /// The core engine for an entity in the attribute system.
-    /// (Tip: Rename this class to "Entity" using your IDE's refactor tool!)
     /// </summary>
     public class Entity : IDisposable
     {
+        public bool IsDisposed { get; private set; }
+
         private readonly ReactiveDictionary<SemanticKey, Attribute> _attributes = new();
         public IReadOnlyReactiveDictionary<SemanticKey, Attribute> Attributes => _attributes;
 
@@ -30,20 +30,68 @@ namespace ReactiveSolutions.AttributeSystem.Core
         private readonly CompositeDisposable _profileDisposables = new CompositeDisposable();
         private readonly List<Entity> _nestedEntities = new List<Entity>();
 
-        public void ApplyProfile(EntityProfileSO profileSO, IModifierFactory modifierFactory)
-        => ApplyProfile(profileSO.Profile, modifierFactory);
+        // The profiles applied to this entity, directly or as templates: profile objects, and the IDs of JSON profiles.
+        private readonly HashSet<object> _appliedProfiles = new HashSet<object>();
 
         /// <summary>
-        /// Applies an EntityProfile to this processor, setting up base stats, tags, nested entities, and innate buffs.
+        /// The key under which this entity reaches the entity it is nested in (e.g. Owner), from its profile's
+        /// ParentKey; SemanticKey.None if its profile names none.
         /// </summary>
-        public void ApplyProfile(EntityProfile profile, IModifierFactory modifierFactory)
+        public SemanticKey ParentKey { get; private set; }
+
+        /// <summary>
+        /// Applies an EntityProfile to this entity: first its templates, then its base stats, tags, link groups, nested
+        /// entities, pointers and innate StatBlocks. Templates, nested profiles and StatBlocks referenced by ID are loaded
+        /// from their JSON files. Each profile is applied once per entity, whether directly or as a template: a template
+        /// that several profiles build on is applied the first time only, and applying a profile again logs a warning.
+        /// </summary>
+        public void ApplyProfile(EntityProfile profile)
         {
             if (profile == null) return;
+            if (Implements(profile))
+            {
+                Debug.LogWarning($"[Entity] Skipped profile '{profile.ProfileName}': it is already applied to this entity.");
+                return;
+            }
+            ApplyProfile(profile, new HashSet<object>());
+        }
+
+        /// <summary>
+        /// Whether the profile JSON <paramref name="profileId"/> (e.g. "Templates/Character") has been applied to this
+        /// entity, directly or as a template.
+        /// </summary>
+        public bool Implements(string profileId) =>
+            !string.IsNullOrEmpty(profileId) && _appliedProfiles.Contains(EntityProfileJsonLoader.NormalizeId(profileId));
+
+        /// <summary>Whether <paramref name="profile"/> has been applied to this entity, directly or as a template.</summary>
+        public bool Implements(EntityProfile profile) =>
+            profile != null && (_appliedProfiles.Contains(profile) || (profile.JsonId != null && _appliedProfiles.Contains(profile.JsonId)));
+
+        /// <param name="applying">The profiles (objects, and the IDs of JSON profiles) being applied further up, as
+        /// templates or through nesting, so a profile that builds on or nests itself is reported instead of recursing forever.</param>
+        private void ApplyProfile(EntityProfile profile, HashSet<object> applying)
+        {
+            if (profile == null) return;
+
+            _appliedProfiles.Add(profile);
+            if (profile.JsonId != null) _appliedProfiles.Add(profile.JsonId);
+            applying.Add(profile);
+            if (profile.JsonId != null) applying.Add(profile.JsonId);
+
+            // SemanticKey is a struct: unassigned entries are SemanticKey.None, never null.
+
+            // 0. Templates, first: their values are defaults that this profile's own values override.
+            foreach (var template in profile.Templates ?? new List<TemplateEntry>())
+            {
+                ApplyTemplate(template, profile, applying);
+            }
+
+            if (profile.ParentKey != SemanticKey.None) ParentKey = profile.ParentKey;
 
             // 1. Base Attributes
             foreach (var entry in profile.BaseAttributes)
             {
-                if (entry.Attribute != null)
+                if (entry.Attribute != SemanticKey.None)
                 {
                     SetOrUpdateBaseValue(entry.Attribute, entry.BaseValue);
                 }
@@ -52,48 +100,108 @@ namespace ReactiveSolutions.AttributeSystem.Core
             // 2. Innate Tags
             foreach (var tag in profile.InnateTags)
             {
-                if (tag != null) AddTag(tag);
+                if (tag != SemanticKey.None) AddTag(tag);
             }
 
             // 3. Link Groups
             foreach (var groupKey in profile.LinkGroups)
             {
-                if (groupKey != null) GetOrCreateLinkGroup(groupKey);
+                if (groupKey != SemanticKey.None) GetOrCreateLinkGroup(groupKey);
             }
 
-            // 4. Nested Entities (Recursive Composition)
+            // 4. Nested Entities (Recursive Composition): a profile built in code, or one saved as JSON
             foreach (var nestedEntry in profile.NestedEntities)
             {
-                if (nestedEntry.ProviderKey != null && nestedEntry.Profile != null)
-                {
-                    var childEntity = new Entity();
-                    childEntity.ApplyProfile(nestedEntry.Profile, modifierFactory);
+                if (nestedEntry.ProviderKey == SemanticKey.None) continue;
 
-                    RegisterExternalProvider(nestedEntry.ProviderKey, childEntity);
-                    _nestedEntities.Add(childEntity);
+                string nestedId = nestedEntry.Profile == null && !string.IsNullOrEmpty(nestedEntry.ProfileId)
+                    ? EntityProfileJsonLoader.NormalizeId(nestedEntry.ProfileId)
+                    : null;
+                if (nestedEntry.Profile == null && nestedId == null) continue;
+
+                bool isApplying = nestedEntry.Profile != null
+                    ? applying.Contains(nestedEntry.Profile) || (nestedEntry.Profile.JsonId != null && applying.Contains(nestedEntry.Profile.JsonId))
+                    : applying.Contains(nestedId);
+                if (isApplying)
+                {
+                    string profileName = nestedEntry.Profile != null ? nestedEntry.Profile.ProfileName : nestedId;
+                    Debug.LogError($"[Entity] Skipped nested entity '{nestedEntry.ProviderKey}': profile '{profileName}' " +
+                                   "is already being applied further up. A profile can't nest itself.");
+                    continue;
                 }
+
+                // The loader logs an error if the JSON can't be loaded.
+                var nestedProfile = nestedEntry.Profile ?? EntityProfileJsonLoader.Load(nestedId);
+                if (nestedProfile == null) continue;
+
+                var childEntity = new Entity();
+                childEntity.ApplyProfile(nestedProfile, applying);
+
+                RegisterExternalProvider(nestedEntry.ProviderKey, childEntity);
+                // The child reaches this entity under the key its profile names (e.g. a sword's Owner).
+                if (childEntity.ParentKey != SemanticKey.None) childEntity.RegisterExternalProvider(childEntity.ParentKey, this);
+                _nestedEntities.Add(childEntity);
             }
 
             // 5. Attribute Pointers
             foreach (var pointer in profile.Pointers)
             {
-                if (pointer.Alias != null && pointer.TargetAttribute != null)
+                if (pointer.Alias != SemanticKey.None && pointer.TargetAttribute != SemanticKey.None)
                 {
                     SetPointer(pointer.Alias, pointer.TargetAttribute, pointer.ProviderPath);
                 }
             }
 
-            // 6. Innate Stat Blocks
+            // 6. Innate Stat Blocks: JSON files by ID, then the ones stored in the profile
+            foreach (var statBlockId in profile.InnateStatBlockIds)
+            {
+                if (string.IsNullOrEmpty(statBlockId)) continue;
+
+                // The loader logs an error if the JSON can't be loaded.
+                if (StatBlockJsonLoader.TryLoad(statBlockId, out var statBlock)) ApplyInnateStatBlock(statBlock);
+            }
+
             foreach (var statBlock in profile.InnateStatBlocks)
             {
-                if (statBlock != null)
-                {
-                    var handle = statBlock.ApplyToEntity(this, modifierFactory);
-                    if (handle != null)
-                    {
-                        _profileDisposables.Add(handle);
-                    }
-                }
+                if (statBlock != null) ApplyInnateStatBlock(statBlock);
+            }
+
+            applying.Remove(profile);
+            if (profile.JsonId != null) applying.Remove(profile.JsonId);
+        }
+
+        private void ApplyTemplate(TemplateEntry entry, EntityProfile profile, HashSet<object> applying)
+        {
+            string id = entry.Profile == null && !string.IsNullOrEmpty(entry.ProfileId)
+                ? EntityProfileJsonLoader.NormalizeId(entry.ProfileId)
+                : null;
+            if (entry.Profile == null && id == null) return;
+
+            bool isApplying = entry.Profile != null
+                ? applying.Contains(entry.Profile) || (entry.Profile.JsonId != null && applying.Contains(entry.Profile.JsonId))
+                : applying.Contains(id);
+            if (isApplying)
+            {
+                string templateName = entry.Profile != null ? entry.Profile.ProfileName : id;
+                Debug.LogError($"[Entity] Skipped template '{templateName}' of profile '{profile.ProfileName}': it is already " +
+                               "being applied further up. A template can't build on itself.");
+                return;
+            }
+
+            // Once per entity: a template that several profiles build on is applied the first time only.
+            if (entry.Profile != null ? Implements(entry.Profile) : _appliedProfiles.Contains(id)) return;
+
+            // The loader logs an error if the JSON can't be loaded.
+            var template = entry.Profile ?? EntityProfileJsonLoader.Load(id);
+            if (template != null) ApplyProfile(template, applying);
+        }
+
+        private void ApplyInnateStatBlock(StatBlock statBlock)
+        {
+            var handle = statBlock.ApplyToEntity(this);
+            if (handle != null)
+            {
+                _profileDisposables.Add(handle);
             }
         }
 
@@ -131,7 +239,10 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 return Disposable.Empty;
             }
 
-            if (IsLocallyCircular(alias, target))
+            // Only a local pointer can close a loop among this entity's own aliases; a remote target
+            // (non-empty path) is a different attribute even if it shares the name.
+            bool isLocal = path == null || path.Count == 0;
+            if (isLocal && IsLocallyCircular(alias, target))
             {
                 Debug.LogError($"[Entity] Circular pointer detected: {alias} -> {target}");
                 return Disposable.Empty;
@@ -165,6 +276,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         public void RegisterExternalProvider(SemanticKey key, Entity processor)
         {
+            if (IsDisposed) return;
             Debug.Assert(processor != null, $"[Entity] Trying to register a null provider for key: {key}");
             _externalProviders[key] = processor;
             _onProviderRegistered.OnNext(key);
@@ -172,6 +284,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         public void UnregisterExternalProvider(SemanticKey key)
         {
+            if (IsDisposed) return;
             if (_externalProviders.ContainsKey(key))
             {
                 _externalProviders.Remove(key);
@@ -190,11 +303,30 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         // --- Retrieval ---
 
+        /// <summary>
+        /// Emits the attribute (and any replacement of it) once it exists.
+        /// Emits null while a provider on the path is missing.
+        /// </summary>
         public IObservable<Attribute> GetAttributeObservable(SemanticKey attributeName, List<SemanticKey> providerPath = null)
+            => ObserveAttribute(attributeName, providerPath, emitNullIfMissing: false);
+
+        /// <summary>
+        /// Emits the attribute's final value; nothing while the attribute (or a provider on the path) is missing.
+        /// </summary>
+        public IObservable<float> ObserveValue(SemanticKey attributeName, List<SemanticKey> providerPath = null)
+            => GetAttributeObservable(attributeName, providerPath)
+                .Select(attr => attr == null ? Observable.Empty<float>() : (IObservable<float>)attr.ObservableValue)
+                .Switch();
+
+        /// <summary>
+        /// Like GetAttributeObservable, but with emitNullIfMissing a missing LOCAL attribute also emits null,
+        /// so value lookups (modifier arguments, pointers, conditions) can read it as 0 instead of waiting.
+        /// </summary>
+        internal IObservable<Attribute> ObserveAttribute(SemanticKey attributeName, List<SemanticKey> providerPath, bool emitNullIfMissing)
         {
             if (providerPath == null || providerPath.Count == 0)
             {
-                return GetLocalAttributeObservable(attributeName);
+                return GetLocalAttributeObservable(attributeName, emitNullIfMissing);
             }
 
             SemanticKey nextProviderKey = providerPath[0];
@@ -205,18 +337,22 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 .Where(k => k == nextProviderKey)
                 .Select(_ => _externalProviders.TryGetValue(nextProviderKey, out var p) ? p : null)
                 .Select(p => p != null
-                    ? p.GetAttributeObservable(attributeName, remainingPath)
+                    ? p.ObserveAttribute(attributeName, remainingPath, emitNullIfMissing)
                     : Observable.Return<Attribute>(null))
                 .Switch();
         }
 
-        private IObservable<Attribute> GetLocalAttributeObservable(SemanticKey name)
+        private IObservable<Attribute> GetLocalAttributeObservable(SemanticKey name, bool emitNullIfMissing)
         {
             return Observable.Create<Attribute>(observer =>
             {
                 if (_attributes.TryGetValue(name, out var current))
                 {
                     observer.OnNext(current);
+                }
+                else if (emitNullIfMissing)
+                {
+                    observer.OnNext(null);
                 }
 
                 var updates = Observable.Merge(
@@ -267,6 +403,8 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         public IDisposable AddModifier(string sourceId, IAttributeModifier modifier, SemanticKey attributeName, List<SemanticKey> providerPath)
         {
+            if (IsDisposed) return Disposable.Empty;
+
             if (providerPath == null || providerPath.Count == 0)
             {
                 var attr = GetOrCreateAttribute(attributeName, 0f);
@@ -280,6 +418,9 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         public void Dispose()
         {
+            if (IsDisposed) return;
+            IsDisposed = true;
+
             // Clean up profile stat blocks
             _profileDisposables.Dispose();
 
@@ -289,6 +430,13 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 nested.Dispose();
             }
             _nestedEntities.Clear();
+
+            // Stop every attribute pipeline, releasing its subscriptions to other entities.
+            // Attributes stay readable (last value) but no longer update.
+            foreach (var attribute in new List<Attribute>(_attributes.Values))
+            {
+                attribute.Dispose();
+            }
         }
     }
 }

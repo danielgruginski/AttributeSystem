@@ -3,7 +3,6 @@ using SemanticKeys;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using sk; // Included to match your test files (e.g., Modifiers.Static)
 
 namespace ReactiveSolutions.AttributeSystem.Core.Builders
 {
@@ -23,12 +22,36 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
         public static ProfileBuilder Create(string profileName = "NewProfile")
         {
             var builder = new ProfileBuilder();
-            builder._profile.name = profileName;
+            builder._profile.ProfileName = profileName;
             return builder;
         }
 
-        // Helper to instantly convert strings to SemanticKeys
-        //private SemanticKey Key(string name) => new SemanticKey(name, name, null);
+        /// <summary>
+        /// Builds on a template profile JSON (e.g. "Templates/Character" under Resources/Data/EntityProfiles): it is applied
+        /// before this profile, once per entity, so this profile's values override the template's.
+        /// </summary>
+        public ProfileBuilder AddTemplate(string profileId)
+        {
+            _profile.Templates.Add(new TemplateEntry { ProfileId = profileId });
+            return this;
+        }
+
+        /// <summary>Builds on a template profile built in code: applied before this profile, once per entity.</summary>
+        public ProfileBuilder AddTemplate(EntityProfile template)
+        {
+            _profile.Templates.Add(new TemplateEntry { Profile = template });
+            return this;
+        }
+
+        /// <summary>
+        /// When an entity created from this profile is nested in another (e.g. a sword in a RightHand), it reaches that
+        /// entity under <paramref name="key"/> (e.g. Links.Owner).
+        /// </summary>
+        public ProfileBuilder SetParentKey(SemanticKey key)
+        {
+            _profile.ParentKey = key;
+            return this;
+        }
 
         public ProfileBuilder AddBaseAttribute(SemanticKey name, float value)
         {
@@ -95,9 +118,31 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
             return AddNestedEntity(providerKey, nestedBuilder.Build());
         }
 
+        /// <summary>
+        /// Adds a nested entity created from a profile JSON file (e.g. "Weapons/IronSword" under Resources/Data/EntityProfiles).
+        /// </summary>
+        public ProfileBuilder AddNestedEntity(SemanticKey providerKey, string profileId)
+        {
+            _profile.NestedEntities.Add(new NestedEntityEntry
+            {
+                ProviderKey = providerKey,
+                ProfileId = profileId
+            });
+            return this;
+        }
+
         public ProfileBuilder AddInnateStatBlock(StatBlock statBlock)
         {
             _profile.InnateStatBlocks.Add(statBlock);
+            return this;
+        }
+
+        /// <summary>
+        /// Adds an innate StatBlock JSON file by ID (e.g. "Passives/Undead" under Resources/Data/StatBlocks).
+        /// </summary>
+        public ProfileBuilder AddInnateStatBlock(StatBlockID statBlockId)
+        {
+            _profile.InnateStatBlockIds.Add(statBlockId);
             return this;
         }
 

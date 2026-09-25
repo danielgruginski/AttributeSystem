@@ -4,7 +4,6 @@ using ReactiveSolutions.AttributeSystem.Core.Data;
 using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using ReactiveSolutions.AttributeSystem.Unity;
 using SemanticKeys;
-using sk;
 using System.Collections;
 using System.Collections.Generic;
 using UniRx;
@@ -98,18 +97,8 @@ namespace ReactiveSolutions.AttributeSystem.Tests
                 AttributeRef = new AttributeReference(strKey, new List<SemanticKey> { ownerKey })
             };
 
-            var spec = new AttributeModifierSpec() { 
-                TargetAttribute = dmgKey,
-                SourceId = "StrengthScaling",
-                Type = ModifierType.Additive,
-                Priority = 0,
-                LogicType = Modifiers.Linear,
-                Arguments = new List<ValueSource> { source, ValueSource.Const(2f), ValueSource.Const(0f) }
-            };
-
-
-            // Note: Assuming 'LinearModifier' logic is available via manual instantiation or Factory
-            var mod = new LinearModifier(spec);
+            // Damage += Owner.Strength * 2
+            var mod = new LogicModifier(new LinearLogic { Input = source, Coefficient = 2f }, ModifierType.Additive, 0, "StrengthScaling");
 
             _swordController.Instance.AddModifier("Scaling", mod, dmgKey);
 
@@ -160,17 +149,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             // 2. Create a "Fake" applied stat block (Manual simulation of Linker internals)
             var activeBlock = new ActiveStatBlock();
 
-            var spec = new AttributeModifierSpec()
-            {
-                TargetAttribute = key,
-                SourceId = "TestSource",
-                Type = ModifierType.Additive,
-                Priority = 0,
-                LogicType = Modifiers.Static,
-                Arguments = new List<ValueSource> { ValueSource.Const(5f) }
-            };
-
-            var mod = new StaticAttributeModifier(spec);
+            var mod = new LogicModifier(new ValueLogic(5f), ModifierType.Additive, 0, "TestSource");
             var handle = _playerController.Instance.AddModifier("TestSource", mod, key);
 
             activeBlock.AddHandle(handle);

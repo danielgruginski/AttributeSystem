@@ -18,33 +18,22 @@ namespace ReactiveSolutions.AttributeSystem.Core
         [Tooltip("The attribute to read from.")]
         public AttributeReference AttributeRef;
 
-        // Stores the processor that 'owns' this source definition (e.g., the Weapon).
-        // This is not serialized; it is set at runtime when the StatBlock is applied.
-        private Entity _bakedContext;
-
-        public void BakeContext(Entity context)
-        {
-            _bakedContext = context;
-        }
-        // ---------------------------
-
         /// <summary>
-        /// Resolves the value into a reactive stream.
+        /// Resolves the value into a reactive stream. An attribute is read from <paramref name="context"/> (or through
+        /// the reference's provider path from it); a missing context, provider or attribute reads as 0.
         /// </summary>
-        public IObservable<float> GetObservable(Entity localProcessor)
+        public IObservable<float> GetObservable(Entity context)
         {
             if (Mode == SourceMode.Constant)
                 return Observable.Return(ConstantValue);
 
-            var contextToUse = _bakedContext ?? localProcessor;
-            if (contextToUse == null) return Observable.Return(0f);
+            if (context == null) return Observable.Return(0f);
 
-            // Use the structured reference.
             // .Switch() is used to hot-swap if the attribute instance changes (e.g. pointer).
-            return contextToUse.GetAttributeObservable(AttributeRef.Name, AttributeRef.Path)
+            return context.ObserveAttribute(AttributeRef.Name, AttributeRef.Path, emitNullIfMissing: true)
                 .Select(attr =>
                 {
-                    // FIX: Handle NULL attribute (e.g. missing provider or broken pointer)
+                    // A missing attribute, provider or pointer target reads as 0.
                     if (attr == null) return Observable.Return(0f);
                     return attr.ObservableValue;
                 })
@@ -52,5 +41,15 @@ namespace ReactiveSolutions.AttributeSystem.Core
         }
 
         public static ValueSource Const(float val) => new ValueSource { Mode = ValueSource.SourceMode.Constant, ConstantValue = val };
+
+        /// <summary>An attribute's value: <paramref name="name"/>, local or at the end of the provider <paramref name="path"/>.</summary>
+        public static ValueSource FromAttribute(SemanticKey name, params SemanticKey[] path) => new ValueSource
+        {
+            Mode = SourceMode.Attribute,
+            AttributeRef = new AttributeReference(name, new List<SemanticKey>(path))
+        };
+
+        /// <summary>A constant, so code can write <c>Coefficient = 0.5f</c>.</summary>
+        public static implicit operator ValueSource(float value) => Const(value);
     }
 }

@@ -5,8 +5,7 @@ using UniRx;
 namespace ReactiveSolutions.AttributeSystem.Core
 {
     /// <summary>
-    /// Contract for an Attribute.
-    /// Allows concrete implementation (Attribute) and virtual implementation (PointerAttribute).
+    /// Contract for an Attribute (implemented by Attribute).
     /// </summary>
     public interface IAttribute : IDisposable
     {
@@ -27,8 +26,9 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
 
         /// <summary>
-        /// Sets the base value. 
-        /// For pointers, this redirects to the target.
+        /// Sets the base value.
+        /// While a pointer is active, the pointer target replaces the base value as the pipeline's
+        /// starting point; the base value is kept and used again once the pointer is removed.
         /// </summary>
         void SetBaseValue(float value);
 

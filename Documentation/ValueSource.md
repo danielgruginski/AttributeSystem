@@ -2,7 +2,7 @@
 
 ## Overview
 
-`ValueSource` is the fundamental "Atom" of the Attribute System's modifier logic. It represents a single numerical input that can be supplied to a modifier (e.g., the "5" in "+5 Damage" or the "Strength" in "+10% of Strength").
+`ValueSource` is the fundamental "Atom" of the Attribute System's modifier logic. It represents a single numerical input of a logic class (e.g., the "5" in "+5 Damage" or the "Strength" in "+10% of Strength"; see [Modifier Logic](Modifier%20Logic.md)). Stat block conditions use it too.
 
 Its primary power lies in its **Dual Nature**:
 
@@ -15,10 +15,12 @@ This abstraction allows _any_ modifier logic (Linear, Polynomial, etc.) to autom
 
 ## Class Definition
 
-```
+```csharp
+// namespace ReactiveSolutions.AttributeSystem.Core
 [System.Serializable]
 public class ValueSource
 {
+    public enum SourceMode { Constant, Attribute }
     // ...
 }
 
@@ -42,39 +44,45 @@ public class ValueSource
         
 -   **`AttributeReference AttributeRef`**
     
-    -   The definition of the remote attribute (Name + Path) used when `Mode` is `Attribute`.
+    -   The definition of the attribute to read (Name + Path; an empty path means the entity the source is resolved from) used when `Mode` is `Attribute`.
         
-    -   _See `AttributeReference` documentation for details on paths._
+    -   _See [AttributeReference](AttributeReference.md) documentation for details on paths._
         
 
 ### Runtime Methods
 
--   **`IObservable<float> GetObservable(AttributeProcessor context)`**
+-   **`IObservable<float> GetObservable(Entity context)`**
     
-    -   The main method used by Modifiers.
+    -   The main method used by logic classes: they pass the entity their inputs are read from (see [Context](#key-concept-context) below).
         
     -   **If Constant:** Returns `Observable.Return(ConstantValue)`.
         
     -   **If Attribute:**
         
-        1.  Uses `AttributeReference.Resolve(context)` to find the target attribute.
+        1.  Starts from `context` (a `null` context reads as 0).
             
-        2.  Subscribes to its `ReactivePropertyAccess`.
+        2.  Follows `AttributeRef.Path` through the providers and observes the attribute `AttributeRef.Name` on the entity at the end of the path, switching automatically when a provider on the path or the attribute itself changes.
             
-        3.  If the attribute is missing or the path is broken, defaults to `0f` (or the last known value).
+        3.  Emits that attribute's final value (`ObservableValue`) and every change to it.
             
--   **`void BakeContext(AttributeProcessor context)`**
+        4.  If the attribute or a provider on the path is missing (local or remote), it reads as `0f` until it exists; it never blocks the modifier.
+            
+-   **`static ValueSource Const(float val)`**
     
-    -   _Advanced:_ Pre-assigns a specific processor as the "Root" for path resolution.
+    -   Shorthand for a `Constant` source. A `float` also converts to a constant implicitly, so `Coefficient = 0.5f` works in code.
         
-    -   Used when a modifier is created from a specific context (like a Sword) but applied elsewhere. It ensures "Self" refers to the Sword, not the Player holding it.
+-   **`static ValueSource FromAttribute(SemanticKey name, params SemanticKey[] path)`**
+    
+    -   Shorthand for an `Attribute` source: `FromAttribute(Stats.Strength)` (local) or `FromAttribute(Stats.Strength, Links.Owner)` (through the `Owner` provider).
         
 
 ## Usage Examples
 
+`AttributeReference` lives in `ReactiveSolutions.AttributeSystem.Core.Data`. The keys (`Stats.Strength`, `Links.Owner`, ...) come from static classes generated from KeyDomains; see [Semantic Keys](Semantic%20Keys.md).
+
 ### 1. Defining a Constant (Code)
 
-```
+```csharp
 var constSource = ValueSource.Const(50f);
 // Result: Always returns 50.
 
@@ -82,64 +90,45 @@ var constSource = ValueSource.Const(50f);
 
 ### 2. Defining a Local Reference (Code)
 
-```
-// Reference to "Strength" on the SAME processor
-var localSource = new ValueSource 
+```csharp
+// Reference to "Strength" on the SAME entity
+var localSource = ValueSource.FromAttribute(Stats.Strength);
+
+// The same, spelled out
+var spelledOut = new ValueSource 
 { 
     Mode = ValueSource.SourceMode.Attribute,
-    AttributeRef = new AttributeReference(new SemanticKey("Strength"))
+    AttributeRef = new AttributeReference(Stats.Strength)
 };
 
 ```
 
 ### 3. Defining a Remote Reference (Code)
 
-```
+```csharp
 // Reference to "Intelligence" on the "Owner" provider
-var remoteSource = new ValueSource 
-{ 
-    Mode = ValueSource.SourceMode.Attribute,
-    AttributeRef = new AttributeReference(
-        new SemanticKey("Intelligence"), 
-        new List<SemanticKey> { new SemanticKey("Owner") }
-    )
-};
+var remoteSource = ValueSource.FromAttribute(Stats.Intelligence, Links.Owner);
 
 ```
 
-### 4. JSON Representation
+### 4. In JSON Files
 
-When serialized in a `StatBlock` JSON:
+In StatBlock and entity profile files, a constant is a number and an attribute is its name, after the names of its provider path's steps: a Linear logic whose Input is the Dexterity of the Owner's Driver, with a Coefficient of 15, is
 
-**Constant:**
-
-```
-{
-  "Mode": 0,
-  "ConstantValue": 15.0
-}
-
+```json
+"linear": { "input": "Owner/Driver/Dexterity", "coefficient": 15 }
 ```
 
-**Attribute (Remote):**
+The names are resolved with the file's table of keys (see [JSON Format](JSON%20Format.md)).
 
-```
-{
-  "Mode": 1,
-  "AttributeRef": {
-    "Name": "Dexterity",
-    "Path": [ "Owner", "Driver" ]
-  }
-}
+## Key Concept: Context
 
-```
+A `ValueSource` doesn't know which entity it belongs to: the logic that uses it passes a **context** entity, and an attribute reference is resolved from there.
 
-## Key Concept: "Context Baking"
-
-When a modifier is created, it needs to know _where_ to start looking for attributes.
-
--   **Scenario:** A "Fire Sword" has a modifier: `Damage += 10% of (Self) HeatLevel`.
+-   **Scenario:** A "Fire Sword" has a modifier: `Damage += 10% of (Self) HeatLevel`, applied to its owner's Damage (target path `Owner`).
     
--   **Problem:** When the Sword is equipped by the Player, the modifier is applied to the _Player's_ Damage attribute. If we aren't careful, `(Self)` might be interpreted as the Player.
+-   **In StatBlocks**, the context is the entity the block is applied to (the Sword), even though the modifier lives on the Player's Damage. So `HeatLevel` is read from the Sword. To read one of the Player's stats instead, give the reference a path relative to the Sword (e.g. Name `Stats.Strength`, Path `[Links.Owner]`).
     
--   **Solution:** The system "Bakes" the Sword's processor into the `ValueSource` before applying it. This ensures that even when the modifier lives on the Player, it correctly reads `HeatLevel` from the Sword.
+-   **Shared data stays untouched:** the context is kept by each applied modifier (`LogicModifier.Context`), not written into the `ValueSource`, so the same StatBlock can be applied to many entities (e.g. from one profile or a LinkGroup), and each application reads its own entity's attributes.
+    
+-   **In code**, a `LogicModifier` created without a context reads its inputs from the entity that owns the modified attribute, i.e. the remote entity for a remote target (see [Attribute Modifiers](Attribute%20Modifiers.md#logicmodifier)).

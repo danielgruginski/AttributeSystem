@@ -2,6 +2,7 @@
 using UniRx;
 using System;
 using SemanticKeys;
+using ReactiveSolutions.AttributeSystem.Core;
 
 namespace ReactiveSolutions.AttributeSystem.Unity.UI
 {
@@ -41,10 +42,10 @@ namespace ReactiveSolutions.AttributeSystem.Unity.UI
         {
             Debug.Assert(!string.IsNullOrEmpty(attributeName), $"[AttributeUI] Attribute name is null or empty on {gameObject.name}");
 
+            // Switch-based: retargeting (or clearing) the controller drops the previous entity's subscription.
             _targetController
-                .Where(controller => controller != null)
-                .SelectMany(controller => controller.Instance.GetAttributeObservable(attributeName))
-                .SelectMany(attribute => attribute.ObservableValue)
+                .Select(controller => controller != null ? controller.Instance : null)
+                .ObserveAttributeValue(attributeName)
                 .Subscribe(onValueChanged)
                 .AddTo(_disposables);
         }

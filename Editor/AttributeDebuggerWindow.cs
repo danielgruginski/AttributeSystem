@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using ReactiveSolutions.AttributeSystem.Unity;
 using ReactiveSolutions.AttributeSystem.Core;
+using ReactiveSolutions.AttributeSystem.Core.Modifiers;
 using System.Linq;
 using System.Collections.Generic;
 using SemanticKeys;
@@ -13,10 +14,6 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         private EntityController _selectedController;
         private Vector2 _scrollPosition;
         private bool _autoRefresh = true;
-
-        // Tag Filter State (for Attributes) - Keeping this for UI organization
-        private string _selectedTagFilter = null;
-        private List<string> _availableTags = new List<string>();
 
         [MenuItem("Window/Attribute System/Attribute Debugger")]
         public static void ShowWindow()
@@ -55,9 +52,12 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             GUILayout.Space(5);
 
             DrawAttributesList();
+        }
 
-            // Repaint constantly for live updates if requested
-            if (_autoRefresh && Application.isPlaying)
+        // Called ~10 times per second; repainting from OnGUI itself would redraw every editor frame.
+        private void OnInspectorUpdate()
+        {
+            if (_autoRefresh && Application.isPlaying && _selectedController != null)
             {
                 Repaint();
             }
@@ -73,7 +73,8 @@ namespace ReactiveSolutions.AttributeSystem.Editor
                 foreach (var tag in tags)
                 {
                     GUI.backgroundColor = new Color(1f, 0.9f, 0.6f); // Light Yellow for Entity Tags
-                    //GUILayout.Label(tag, EditorStyles.helpBox);
+                    // Value is the tag's reference count (how many sources applied it).
+                    GUILayout.Label(tag.Value > 1 ? $"{tag.Key} x{tag.Value}" : tag.Key.ToString(), EditorStyles.helpBox);
                     GUI.backgroundColor = Color.white;
                 }
                 GUILayout.FlexibleSpace();
@@ -138,6 +139,14 @@ namespace ReactiveSolutions.AttributeSystem.Editor
 
             GUILayout.Label($"Value: {current:0.##}", EditorStyles.largeLabel);
             GUILayout.FlexibleSpace();
+            var pointer = attr.ActivePointerTarget;
+            if (pointer.HasValue)
+            {
+                var path = pointer.Value.Path != null && pointer.Value.Path.Count > 0
+                    ? string.Join(".", pointer.Value.Path) + "."
+                    : string.Empty;
+                GUILayout.Label($"-> {path}{pointer.Value.Name}", EditorStyles.miniLabel);
+            }
             GUILayout.Label($"Base: {attr.BaseValue:0.##}", EditorStyles.miniLabel);
             GUILayout.EndHorizontal();
 
@@ -159,16 +168,10 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         {
             EditorGUILayout.BeginHorizontal();
 
-            // Source ID
-            // Assuming we cast to a base class or interface has SourceId? 
-            // The interface IAttributeModifier defined in documentation earlier didn't strictly force SourceId prop, 
-            // but the concrete classes do. Let's check IAttributeModifier definition from previous context.
-            // Documentation says: public interface IAttributeModifier { Type, Priority, GetMagnitude }
-            // It missed SourceId in the interface definition in documentation, but ModifierArgs has it.
-            // Let's assume standard modifiers have it or we display Type.
-
-            // We'll try to reflect 'SourceId' or just show Type
-            var typeName = mod.GetType().Name;
+            // For modifiers from StatBlocks (or LogicModifier), the logic class says more than the wrapper's.
+            var typeName = mod is LogicModifier logicModifier
+                ? ModifierLogic.GetDisplayName(logicModifier.Logic.GetType())
+                : mod.GetType().Name;
             var opType = mod.Type.ToString();
 
             // Basic Info
@@ -180,14 +183,8 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             // We can't easily get the 'current' value from an Observable without a property.
             // So we skip displaying exact modifier magnitude for now unless we cache it.
 
-            // Helper to get SourceId if possible
-            string sourceId = "Unknown Source";
-            var prop = mod.GetType().GetProperty("SourceId");
-            if (prop != null)
-            {
-                var val = prop.GetValue(mod);
-                if (val != null) sourceId = val.ToString();
-            }
+            // SourceId is part of IAttributeModifier (some modifiers implement it explicitly, so no reflection).
+            string sourceId = string.IsNullOrEmpty(mod.SourceId) ? "Unknown Source" : mod.SourceId;
 
             EditorGUILayout.LabelField(sourceId);
 
