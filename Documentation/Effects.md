@@ -51,7 +51,7 @@ This goes for action targets, costs, the inputs of formulas and conditions (`{ "
     
 -   **In code**, `Effect.Source(Stats.SpellPower)` and `Effect.Target(Stats.Health)` are these references. `Effect.Target(Stats.Durability, Links.MainHand)` goes further, and conditions take the role as their path: `StatBlockCondition.HasTag(Tags.Undead, EffectRoles.Target)`.
     
--   **In the Inspector and the Effect Editor**, a path's first key is **Source** or **Target**, from the package's **Effect Roles** KeyDomain (`EffectRoles.Source` and `EffectRoles.Target` in code).
+-   **In the Inspector and the Effect Editor**, a path's first key is **Source** or **Target**, from the package's **Effect Roles** KeyDomain (`EffectRoles.Source` and `EffectRoles.Target` in code). Don't use **Generate Static Class** on that domain: the package already has the `EffectRoles` class, and a second one would clash with it.
     
 -   **In files**, they are written by name, and don't go in the key table. A key of your own named "Target" still works after the first step: `"Source/Target/Health"` is the Health of the source's Target.
     
