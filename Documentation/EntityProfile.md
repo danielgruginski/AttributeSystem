@@ -25,6 +25,7 @@ Namespace: `ReactiveSolutions.AttributeSystem.Core.Data`. Keys such as `Links.Ri
 | `Templates` | Profiles this one builds on, applied first and once per entity (see [Templates](#templates)). |
 | `ParentKey` | When an entity created from this profile is nested in another, the key under which it reaches that entity (see [Nested Entities](#nested-entities)). |
 | `BaseAttributes` | Attributes and their starting base values. |
+| `Pools` | Resources that are spent and restored, such as Health up to MaxHealth (see [Resource Pools](Resource%20Pools.md)). |
 | `InnateTags` | Tags added when the profile is applied. |
 | `LinkGroups` | Link groups created empty (e.g. `Groups.Inventory`). |
 | `InnateStatBlockIds` | StatBlock JSON files, by ID, applied as innate passives. |
@@ -32,7 +33,7 @@ Namespace: `ReactiveSolutions.AttributeSystem.Core.Data`. Keys such as `Links.Ri
 | `NestedEntities` | Child entities, each registered as a provider under its `ProviderKey`. `ProfileId` names the profile JSON it is created from. |
 | `Pointers` | Aliases to other attributes, local or through a provider path. |
 
-`ApplyProfile` applies them in this order: templates, base attributes, innate tags, link groups, nested entities, pointers, innate StatBlocks (the ones given by ID first). Entries with an unassigned key (`SemanticKey.None`) or an empty ID are skipped. Each profile is applied once per entity: applying a profile the entity already has logs a warning and does nothing.
+`ApplyProfile` applies them in this order: templates, base attributes, pools, innate tags, link groups, nested entities, pointers, innate StatBlocks (the ones given by ID first). Entries with an unassigned key (`SemanticKey.None`) or an empty ID are skipped. Each profile is applied once per entity: applying a profile the entity already has logs a warning and does nothing.
 
 ## JSON Files and IDs
 
@@ -63,6 +64,7 @@ A template is a profile that other profiles build on. Every character can build 
 {
   "profile": "Character",
   "baseAttributes": { "Level": 1, "Strength": 10, "Vitality": 10 },
+  "pools": { "Health": "MaxHealth" },
   "innateTags": ["Character"],
   "innateStatBlocks": [
     {
@@ -81,6 +83,7 @@ A template is a profile that other profiles build on. Every character can build 
   "profile": "Caster",
   "templates": ["Templates/Character"],
   "baseAttributes": { "Intelligence": 12 },
+  "pools": { "Mana": "MaxMana" },
   "innateTags": ["Caster"],
   "innateStatBlocks": [
     {
@@ -102,7 +105,7 @@ A template is a profile that other profiles build on. Every character can build 
 }
 ```
 
-A Goblin Shaman gets the Character and Caster tags, stats and formulas, with its own Strength and Vitality: MaxHealth 70, AttackPower 12, MaxMana 60.
+A Goblin Shaman gets the Character and Caster tags, stats, formulas and pools, with its own Strength and Vitality: MaxHealth 70, AttackPower 12, MaxMana 60, and it starts with 70 Health and 60 Mana.
 
 -   **Templates first:** a profile's templates are applied before the profile itself, in the order listed. So a template's values are defaults: the shaman's Strength of 6 replaces Character's 10.
     
@@ -150,11 +153,11 @@ A nested entity is a child `Entity` created from its own profile and registered 
 -   **Reaching the parent:** a nested entity reaches the entity it is nested in if its profile names a **Parent Key** (`"parentKey"` in JSON, `SetParentKey` in code): the parent is registered as its provider under that key, e.g. a sword's `Owner`. A template can set it for all its profiles (every weapon's parent is its Owner), and a profile's own Parent Key replaces its templates'.
     
 
-For entities you link at runtime, such as a sword equipped from an inventory, register both links yourself. The entity's `ParentKey` property holds the key from its profile:
+For entities you link at runtime, such as a sword equipped from an inventory, `Attach` links both ways, using the sword's `ParentKey`, and `Detach` unlinks them:
 
 ```csharp
-hero.RegisterExternalProvider(Links.MainHand, sword);
-sword.RegisterExternalProvider(sword.ParentKey, hero); // e.g. Links.Owner
+hero.Attach(Links.MainHand, sword); // The sword reaches the hero as its Owner
+Entity unequipped = hero.Detach(Links.MainHand);
 ```
 
 A profile that nests itself, directly or through other profiles, is caught: that nested entry is skipped with the error `[Entity] Skipped nested entity '...': profile '...' is already being applied further up.` The same profile can still appear several times side by side (e.g. a dagger in each hand).

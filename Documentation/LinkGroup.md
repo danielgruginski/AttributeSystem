@@ -86,6 +86,28 @@ IDisposable blessingHandle = inventory.ApplyStatBlock(lawBlessingStatBlock, isLe
 
 The StatBlock's own `ActivationCondition` still applies on top of the group condition. Keep the group condition independent of what the StatBlock itself does (for example, the blessing must not add or remove the "Stolen" tag): unlike a StatBlock's `ActivationCondition`, the group condition is not protected against such feedback loops.
 
+### 4. Totals over a Group
+
+`GroupTotalLogic` totals an attribute over a group's members, as a modifier's value: the weight of everything in the inventory, how many members the party has, the party's average level. It updates as members join, leave or change. A member without the attribute counts as 0, and an empty group totals 0.
+
+```json
+{
+  "statBlock": "Encumbrance",
+  "modifiers": [
+    { "target": "CarriedWeight", "groupTotal": { "group": "Inventory", "attribute": "Weight" } }
+  ]
+}
+```
+
+With that, a StatBlock whose condition is `{ "compare": ["CarriedWeight", ">", "CarryCapacity"] }` can slow an over-encumbered hero down. `Operation` is `Sum` (the default), `Average`, `Min`, `Max` or `Count`, and `Group` can go through a provider path: `"Owner/Party"` is the party of the entity's Owner. In code:
+
+```csharp
+var carried = new GroupTotalLogic { Group = new AttributeReference(Groups.Inventory), Attribute = Stats.Weight };
+StatBlock encumbrance = StatBlockBuilder.Create("Encumbrance").AddModifier(Stats.CarriedWeight, carried).Build();
+```
+
+Reading a group that doesn't exist yet creates it (empty), so members added later are counted.
+
 ## Architecture Notes
 
 The `LinkGroup` embraces the Hybrid design philosophy of the Reactive Attribute System:

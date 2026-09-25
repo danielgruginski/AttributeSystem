@@ -14,5 +14,12 @@
     "rpg",
     "unirx",
     "reactive"
+  ],
+  "samples": [
+    {
+      "displayName": "RPG Starter",
+      "description": "A small RPG built from JSON data: character templates, Health and Mana pools, gear that adds to its owner, inventory weight, a party aura and a frenzied goblin. Add the RPG Starter Demo component to an empty GameObject and press Play.",
+      "path": "Samples~/RPG Starter"
+    }
   ]
 }

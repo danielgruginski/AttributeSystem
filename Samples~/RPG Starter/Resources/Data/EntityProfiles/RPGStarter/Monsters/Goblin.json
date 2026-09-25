@@ -1,0 +1,15 @@
+{
+  "profile": "Goblin",
+  "templates": ["RPGStarter/Templates/Character"],
+  "baseAttributes": { "Strength": 8, "Dexterity": 12, "Vitality": 6 },
+  "innateTags": ["Goblin"],
+  "nestedEntities": { "MainHand": "RPGStarter/Items/RustyDagger" },
+  "innateStatBlocks": ["RPGStarter/Passives/GoblinFrenzy"],
+  "keys": {
+    "Strength": "9e256588-17ae-4ef0-b572-f1688003a231",
+    "Dexterity": "1db97840-ebb3-4850-b5b5-b7173754ba03",
+    "Vitality": "43f08865-e8c4-4c55-bfb3-00b61e59b8f9",
+    "Goblin": "58e178d6-3d0a-484e-9008-c47625c71f3e",
+    "MainHand": "af0b9161-f594-4631-8350-0a4534a97994"
+  }
+}

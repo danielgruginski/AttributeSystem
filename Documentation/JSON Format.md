@@ -85,7 +85,7 @@ Every property is optional. See [StatBlock](StatBlock.md) for what each part doe
 
 ### Logic
 
-A modifier's logic is named after its class, in camelCase and without the "Logic" suffix: `value`, `linear`, `polynomial`, `clamp`, `min`, `max`, `floor`, `step`, `ratio`, `exponential`, `diminishingReturns`, `scaledTriangular`, `segmented` (see [Modifier Logic](Modifier%20Logic.md)). Your own `DistanceBonusLogic` is `distanceBonus`. The class name (`"LinearLogic"`) and the full name with the namespace work too; if two classes have the same name, files use the full name.
+A modifier's logic is named after its class, in camelCase and without the "Logic" suffix: `value`, `linear`, `polynomial`, `clamp`, `min`, `max`, `floor`, `step`, `ratio`, `exponential`, `diminishingReturns`, `scaledTriangular`, `segmented`, `groupTotal` (see [Modifier Logic](Modifier%20Logic.md)). Your own `DistanceBonusLogic` is `distanceBonus`. The class name (`"LinearLogic"`) and the full name with the namespace work too; if two classes have the same name, files use the full name.
 
 Its value is an object with the logic's fields, named in camelCase: `Coefficient` is `coefficient`, and a private `[SerializeField] float _maxRange` is `maxRange`.
 
@@ -154,6 +154,7 @@ Fields that Unity doesn't save (a `Dictionary`, an interface without `[Serialize
 | `templates` | `AddTemplate(...)` | The profiles this one builds on, applied first and once per entity: `["Templates/Character"]` (see [Templates](EntityProfile.md#templates)). |
 | `parentKey` | `SetParentKey(key)` | When nested in another entity, the key under which it reaches that entity: `"Owner"`. |
 | `baseAttributes` | `AddBaseAttribute(attribute, value)` | `{ "Health": 40, "Strength": 8 }` |
+| `pools` | `AddPool(resource, max, ...)` | Resources that are spent and restored, and their maximum: `{ "Health": "MaxHealth" }`, or `{ "Mana": { "max": "MaxMana", "onMaxChange": "AddDifference" } }` (see [Resource Pools](Resource%20Pools.md)). |
 | `innateTags` | `AddInnateTag(tag)` | `["Undead"]` |
 | `linkGroups` | `AddLinkGroup(group)` | `["Inventory"]` |
 | `nestedEntities` | `AddNestedEntity(key, ...)` | `{ "RightHand": "Weapons/RustySword" }`: a profile ID, or a profile written in full (see below). |

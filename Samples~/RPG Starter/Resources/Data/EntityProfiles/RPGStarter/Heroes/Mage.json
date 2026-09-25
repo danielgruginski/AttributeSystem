@@ -1,0 +1,11 @@
+{
+  "profile": "Mage",
+  "templates": ["RPGStarter/Templates/Caster", "RPGStarter/Templates/InventoryHolder"],
+  "baseAttributes": { "Intelligence": 18, "Vitality": 8 },
+  "nestedEntities": { "MainHand": "RPGStarter/Items/OakStaff" },
+  "keys": {
+    "Intelligence": "7613c1c1-7183-4a90-99a5-36dabb004f0a",
+    "Vitality": "43f08865-e8c4-4c55-bfb3-00b61e59b8f9",
+    "MainHand": "af0b9161-f594-4631-8350-0a4534a97994"
+  }
+}

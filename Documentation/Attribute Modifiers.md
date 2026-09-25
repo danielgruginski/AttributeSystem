@@ -64,7 +64,7 @@ For example, with Health at a base of 80 and MaxHealth at 100:
 | the same, plus MaxHealth as a Clamp Max | min(150, 100) = 100 |
 | the same, with the base dropped to 40 | min((40 + 20) x 1.5, 100) = 90 |
 
-A clamp only limits the value: when the value drops below the limit again, the clamp has no effect.
+A clamp only limits the value: when the value drops below the limit again, the clamp has no effect. For current Health that is damaged and healed, use a [pool](Resource%20Pools.md) instead: it keeps the amount itself between 0 and MaxHealth, so healing past the maximum is lost rather than stored.
 
 -   `Type` and `Priority` are read when the modifier is added, to place it in the pipeline; its position doesn't change afterwards.
     

@@ -22,8 +22,8 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
             { "statBlock", "condition", "baseValues", "tags", "remoteTags", "pointers", "modifiers", "keys" };
         private static readonly string[] ProfileProperties =
         {
-            "profile", "templates", "parentKey", "baseAttributes", "innateTags", "linkGroups", "nestedEntities", "pointers",
-            "innateStatBlocks", "keys"
+            "profile", "templates", "parentKey", "baseAttributes", "pools", "innateTags", "linkGroups", "nestedEntities",
+            "pointers", "innateStatBlocks", "keys"
         };
         private static readonly string[] ModifierProperties = { "target", "type", "priority", "source" };
         private static readonly string[] ConditionKinds = { "hasTag", "lacksTag", "compare", "all", "any" };
@@ -177,6 +177,23 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
                         }
                         break;
 
+                    case "pools":
+                        foreach (var entry in Map(value, at, "resources and their maximum, e.g. { \"Health\": \"MaxHealth\" }"))
+                        {
+                            string entryPath = Child(at, entry.Key);
+                            var resource = KeyName(entry.Key, entry.Value, entryPath);
+                            if (entry.Value.Kind == JsonKind.Object)
+                            {
+                                var (max, onMaxChange) = Pool(entry.Value, entryPath);
+                                builder.AddPool(resource, max, onMaxChange);
+                            }
+                            else
+                            {
+                                builder.AddPool(resource, ValueSource(entry.Value, entryPath));
+                            }
+                        }
+                        break;
+
                     case "innateTags":
                         foreach (var (item, itemPath) in Array(value, at, "an array of tags, e.g. [\"Undead\"]"))
                         {
@@ -241,6 +258,36 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
             }
 
             return builder.Build();
+        }
+
+        /// <summary>A pool's settings: { "max": "MaxMana", "onMaxChange": "AddDifference" }.</summary>
+        private (ValueSource max, PoolMaxChange onMaxChange) Pool(JsonNode node, string path)
+        {
+            CheckDuplicates(node, path);
+            var names = new[] { "max", "onMaxChange" };
+            ValueSource max = null;
+            bool hasMax = false;
+            var onMaxChange = PoolMaxChange.KeepPercent;
+
+            foreach (var property in node.Properties)
+            {
+                string at = Child(path, property.Key);
+                switch (Match(property.Key, names))
+                {
+                    case "max":
+                        max = ValueSource(property.Value, at);
+                        hasMax = true;
+                        break;
+                    case "onMaxChange":
+                        onMaxChange = (PoolMaxChange)Enum(typeof(PoolMaxChange), property.Value, at);
+                        break;
+                    default:
+                        throw UnknownProperty(property, at, names, "");
+                }
+            }
+
+            if (!hasMax) throw Error(node, path, "a pool needs a \"max\": an attribute such as \"MaxHealth\", or a number");
+            return (max, onMaxChange);
         }
 
         // ---------------------------------------------------------------- Modifiers and logic

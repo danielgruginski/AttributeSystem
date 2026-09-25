@@ -1,0 +1,11 @@
+{
+  "statBlock": "Poison",
+  "tags": ["Poisoned"],
+  "modifiers": [
+    { "target": "MoveSpeed", "type": "Multiplicative", "value": 0.8 }
+  ],
+  "keys": {
+    "Poisoned": "b95b7004-6b13-4df1-91c7-873aa465f875",
+    "MoveSpeed": "955ca18a-b7e0-4c37-81c3-51402ddd4457"
+  }
+}

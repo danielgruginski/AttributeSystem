@@ -29,8 +29,9 @@ Namespace: `ReactiveSolutions.AttributeSystem.Core.Modifiers`. Keys such as `Sta
 | `DiminishingReturnsLogic` | `Input`, `MaxBonus`, `SoftCap` | `MaxBonus * Input / (Input + SoftCap)`: approaches MaxBonus, half of it at `Input = SoftCap`. A negative input counts as 0, and the result is 0 when `Input + SoftCap <= 0`. |
 | `ScaledTriangularLogic` | `Input`, `Scale` (1) | `Scale * 0.5 * (sqrt(1 + 8 * Input / Scale) - 1)`, never more than `Input`. A negative input counts as 0. |
 | `SegmentedLogic` | `Input`, `Default` (1), `Segments` | Breakpoints: the `Value` of the highest `Threshold` that Input reaches, or `Default` below all of them. |
+| `GroupTotalLogic` | `Group`, `Attribute`, `Operation` (Sum) | An attribute totaled over a link group's members: `Sum`, `Average`, `Min`, `Max`, or `Count` of the members. See [LinkGroup](LinkGroup.md#totals-over-a-group). |
 
-All fields are `ValueSource`s except `SegmentedLogic`'s `Default` and `Segments`. Defaults are in parentheses; the others default to 0. The dropdown shows the names without the "Logic" suffix (e.g. "Diminishing Returns").
+All fields are `ValueSource`s except `SegmentedLogic`'s `Default` and `Segments`, and `GroupTotalLogic`'s. Defaults are in parentheses; the others default to 0. The dropdown shows the names without the "Logic" suffix (e.g. "Diminishing Returns").
 
 ## Writing Your Own Logic
 

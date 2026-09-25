@@ -1,0 +1,21 @@
+{
+  "profile": "Oak Staff",
+  "templates": ["RPGStarter/Templates/Weapon"],
+  "baseAttributes": { "Damage": 3, "Weight": 4 },
+  "innateStatBlocks": [
+    {
+      "statBlock": "Arcane Focus",
+      "condition": { "hasTag": "Owner/Caster" },
+      "modifiers": [
+        { "target": "Owner/SpellPower", "value": 10 }
+      ]
+    }
+  ],
+  "keys": {
+    "Damage": "dccb28f9-8c40-452f-991a-a585042406bd",
+    "Weight": "6d456038-da30-4c11-96d0-a52c92072dc5",
+    "Owner": "d4e54e90-b55a-499e-a71d-cf05e6c4935f",
+    "Caster": "cd8ccf77-20f0-472d-b57f-c13eea18d0cc",
+    "SpellPower": "baaa3e21-3883-4291-ade4-85b357f1da51"
+  }
+}

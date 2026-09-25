@@ -236,6 +236,21 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         }
 
         [Test]
+        public void EntityName_ComesFromTheProfile_NotItsTemplates()
+        {
+            var sword = ProfileBuilder.Create("Iron Sword").AddTemplate(WeaponTemplate()).Build();
+            var knight = ProfileBuilder.Create("Knight").AddTemplate(CharacterTemplate()).AddNestedEntity(MainHand, sword).Build();
+
+            var e = new Entity();
+            e.ApplyProfile(knight);
+            e.ApplyProfile(ProfileBuilder.Create("Knight Extras").Build());
+
+            Assert.AreEqual("Knight", e.Name, "The first profile applied names the entity.");
+            Assert.AreEqual("Iron Sword", e.GetProvider(MainHand).Name);
+            Assert.AreEqual("Sir Galahad", new Entity { Name = "Sir Galahad" }.Name);
+        }
+
+        [Test]
         public void TemplatesAndParentKey_RoundTripThroughJson()
         {
             var profile = ProfileBuilder.Create("Goblin Shaman")

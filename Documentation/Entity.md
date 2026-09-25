@@ -173,14 +173,26 @@ Methods for establishing relationships between entities.
     
     -   Returns an `IObservable<Entity>` that emits the current provider (or null) on subscribe, then fires whenever the specific provider is registered, changed, or unregistered (resolving to null).
         
+-   **`GetProvider(SemanticKey key)`**
+    
+    -   The entity registered under the key (e.g. what's in `Links.MainHand`), or `null`.
+        
+-   **`Attach(SemanticKey key, Entity child)`** / **`Detach(SemanticKey key)`**
+    
+    -   Link two entities both ways, as a nested entity is linked: `hero.Attach(Links.MainHand, sword)` registers the sword under `MainHand`, and the hero under the sword's `ParentKey` (e.g. `Owner`) if its profile names one. An entity already under the key is detached first. `Detach` removes both links and returns the detached entity. The attached entity isn't owned: disposing the parent doesn't dispose it.
+        
 
 ### 7. Profiles & Link Groups
 
 -   **`ApplyProfile(EntityProfile profile)`**
     
-    -   Initializes the entity from a blueprint, in this order: templates, base attributes, innate tags, link groups, nested entities (registered as providers), pointers, innate StatBlocks. Entries with an unassigned key (`SemanticKey.None`) are skipped, and a `null` profile is ignored. Templates, nested profiles and StatBlocks given by ID are loaded from their JSON files; a profile that nests or builds on itself is skipped with an error. See [EntityProfile](EntityProfile.md); profiles can also be built in code with `ProfileBuilder` (see [Fluent Builders](Fluent%20Builders.md)).
+    -   Initializes the entity from a blueprint, in this order: templates, base attributes, pools, innate tags, link groups, nested entities (registered as providers), pointers, innate StatBlocks. Entries with an unassigned key (`SemanticKey.None`) are skipped, and a `null` profile is ignored. Templates, nested profiles and StatBlocks given by ID are loaded from their JSON files; a profile that nests or builds on itself is skipped with an error. See [EntityProfile](EntityProfile.md); profiles can also be built in code with `ProfileBuilder` (see [Fluent Builders](Fluent%20Builders.md)).
         
     -   Each profile is applied once per entity, directly or as a template: a template that several of the entity's profiles build on is applied the first time only, and applying a profile the entity already has logs a warning and does nothing.
+        
+-   **`AddPool(SemanticKey resource, ValueSource max, PoolMaxChange onMaxChange = KeepPercent)`** / **`GetPool(SemanticKey resource)`**
+    
+    -   Make an attribute (e.g. Health) a pool: an amount that is spent and restored, between 0 and `max` (e.g. MaxHealth). `GetPool` returns `null` for an attribute that isn't one. See [Resource Pools](Resource%20Pools.md).
         
 -   **`Implements(string profileId)`** / **`Implements(EntityProfile profile)`**
     
@@ -188,7 +200,11 @@ Methods for establishing relationships between entities.
         
 -   **`ParentKey`**
     
-    -   The key under which this entity reaches the entity it is nested in (e.g. `Links.Owner`), from its profile's `ParentKey`. When a profile's nested entity names one, `ApplyProfile` registers the parent as the child's provider under that key.
+    -   The key under which this entity reaches the entity it is nested in (e.g. `Links.Owner`), from its profile's `ParentKey`. When a profile's nested entity names one, `ApplyProfile` registers the parent as the child's provider under that key, and `Attach` does the same at runtime.
+        
+-   **`Name`**
+    
+    -   A name for logs and tools: the name of the first profile applied to the entity (not its templates'), unless you set it. Nested entities are named after their profiles.
         
 -   **`GetOrCreateLinkGroup(SemanticKey key)`** / **`GetLinkGroup(SemanticKey key)`**
     

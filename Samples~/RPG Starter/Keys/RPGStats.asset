@@ -1,0 +1,77 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e68a6191930f610478778e7936293652, type: 3}
+  m_Name: RPGStats
+  m_EditorClassIdentifier: 
+  _domainName: RPGStats
+  _guid: 67fe491d-2da3-41d5-b731-b486bcc093a3
+  _keys:
+  - _name: Level
+    _guid: 29ef14b1-dffd-4a15-83e4-2cb2178d5fe6
+    _description: 
+  - _name: Strength
+    _guid: 9e256588-17ae-4ef0-b572-f1688003a231
+    _description: 
+  - _name: Dexterity
+    _guid: 1db97840-ebb3-4850-b5b5-b7173754ba03
+    _description: 
+  - _name: Intelligence
+    _guid: 7613c1c1-7183-4a90-99a5-36dabb004f0a
+    _description: 
+  - _name: Vitality
+    _guid: 43f08865-e8c4-4c55-bfb3-00b61e59b8f9
+    _description: 
+  - _name: MaxHealth
+    _guid: 21ded034-2146-470d-ad6c-da1fa0c0633e
+    _description: 
+  - _name: Health
+    _guid: 0fb4fa22-7d58-465f-9c3c-7258a14b9149
+    _description: 
+  - _name: HealthPercent
+    _guid: 9abad6c2-6d2e-4dff-a936-828a59f7f580
+    _description: 
+  - _name: MaxMana
+    _guid: 3edc201d-a87e-49d3-8983-6f06d015e647
+    _description: 
+  - _name: Mana
+    _guid: 3181edf0-d48e-443e-954b-5066d4cb22ef
+    _description: 
+  - _name: AttackPower
+    _guid: d61b2749-7a12-44df-8748-cb3100762878
+    _description: 
+  - _name: SpellPower
+    _guid: baaa3e21-3883-4291-ade4-85b357f1da51
+    _description: 
+  - _name: Defense
+    _guid: ce8f7ca3-3a79-4411-8b98-0be06c78cd1a
+    _description: 
+  - _name: CritChance
+    _guid: eab968c8-e357-4c0d-a79a-634b2a58cee8
+    _description: 
+  - _name: MoveSpeed
+    _guid: 955ca18a-b7e0-4c37-81c3-51402ddd4457
+    _description: 
+  - _name: CarryCapacity
+    _guid: 737aacbf-712f-4c17-aa34-db44a3291d16
+    _description: 
+  - _name: CarriedWeight
+    _guid: b2f544bc-b74d-45be-b7c0-d9a1ebb7a7ea
+    _description: 
+  - _name: Damage
+    _guid: dccb28f9-8c40-452f-991a-a585042406bd
+    _description: 
+  - _name: ArmorRating
+    _guid: b4e1f9eb-1bcc-49ef-aaf5-d55c5d615708
+    _description: 
+  - _name: Weight
+    _guid: 6d456038-da30-4c11-96d0-a52c92072dc5
+    _description: 

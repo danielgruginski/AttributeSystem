@@ -15,6 +15,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
     {
         public bool IsDisposed { get; private set; }
 
+        /// <summary>
+        /// A name for logs and tools: the name of the first profile applied to the entity (not its templates'), unless
+        /// set otherwise.
+        /// </summary>
+        public string Name { get; set; }
+
         private readonly ReactiveDictionary<SemanticKey, Attribute> _attributes = new();
         public IReadOnlyReactiveDictionary<SemanticKey, Attribute> Attributes => _attributes;
 
@@ -32,6 +38,8 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         // The profiles applied to this entity, directly or as templates: profile objects, and the IDs of JSON profiles.
         private readonly HashSet<object> _appliedProfiles = new HashSet<object>();
+
+        private readonly Dictionary<SemanticKey, ResourcePool> _pools = new Dictionary<SemanticKey, ResourcePool>();
 
         /// <summary>
         /// The key under which this entity reaches the entity it is nested in (e.g. Owner), from its profile's
@@ -53,6 +61,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 Debug.LogWarning($"[Entity] Skipped profile '{profile.ProfileName}': it is already applied to this entity.");
                 return;
             }
+            if (string.IsNullOrEmpty(Name)) Name = profile.ProfileName;
             ApplyProfile(profile, new HashSet<object>());
         }
 
@@ -97,6 +106,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 }
             }
 
+            // 1b. Pools (e.g. Health up to MaxHealth). A pool this profile defines again replaces its template's.
+            foreach (var pool in profile.Pools ?? new List<PoolEntry>())
+            {
+                if (pool.Resource != SemanticKey.None) AddPool(pool.Resource, pool.Max, pool.OnMaxChange);
+            }
+
             // 2. Innate Tags
             foreach (var tag in profile.InnateTags)
             {
@@ -134,7 +149,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 var nestedProfile = nestedEntry.Profile ?? EntityProfileJsonLoader.Load(nestedId);
                 if (nestedProfile == null) continue;
 
-                var childEntity = new Entity();
+                var childEntity = new Entity { Name = nestedProfile.ProfileName };
                 childEntity.ApplyProfile(nestedProfile, applying);
 
                 RegisterExternalProvider(nestedEntry.ProviderKey, childEntity);
@@ -272,6 +287,31 @@ namespace ReactiveSolutions.AttributeSystem.Core
             return false;
         }
 
+        // --- Resource Pools ---
+
+        /// <summary>
+        /// Makes <paramref name="resource"/> (e.g. Health) a pool: an amount that is spent and restored, between 0 and
+        /// <paramref name="max"/> (e.g. ValueSource.FromAttribute(Stats.MaxHealth), or a constant). A new pool is full;
+        /// one that replaces the resource's previous pool keeps its amount. See ResourcePool.
+        /// </summary>
+        public ResourcePool AddPool(SemanticKey resource, ValueSource max, PoolMaxChange onMaxChange = PoolMaxChange.KeepPercent)
+        {
+            if (IsDisposed || resource == SemanticKey.None) return null;
+
+            _pools.TryGetValue(resource, out var previous);
+            previous?.Dispose();
+
+            var pool = new ResourcePool(this, resource, max, onMaxChange, previous);
+            _pools[resource] = pool;
+            return pool;
+        }
+
+        /// <summary>The pool of <paramref name="resource"/> (e.g. Health), or null if it isn't one.</summary>
+        public ResourcePool GetPool(SemanticKey resource) => _pools.TryGetValue(resource, out var pool) ? pool : null;
+
+        /// <summary>This entity's pools.</summary>
+        public IEnumerable<ResourcePool> Pools => _pools.Values;
+
         // --- External Providers ---
 
         public void RegisterExternalProvider(SemanticKey key, Entity processor)
@@ -290,6 +330,40 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 _externalProviders.Remove(key);
                 _onProviderRegistered.OnNext(key);
             }
+        }
+
+        /// <summary>The entity registered under <paramref name="key"/> (e.g. MainHand), or null.</summary>
+        public Entity GetProvider(SemanticKey key) => _externalProviders.TryGetValue(key, out var provider) ? provider : null;
+
+        /// <summary>
+        /// Links <paramref name="child"/> under <paramref name="key"/> (e.g. a sword in MainHand), and this entity under the
+        /// child's ParentKey (e.g. its Owner), so each reaches the other as with a nested entity. An entity already under
+        /// <paramref name="key"/> is detached first. The child isn't owned: disposing this entity doesn't dispose it.
+        /// </summary>
+        public void Attach(SemanticKey key, Entity child)
+        {
+            if (IsDisposed || key == SemanticKey.None || child == null) return;
+
+            Detach(key);
+            RegisterExternalProvider(key, child);
+            if (child.ParentKey != SemanticKey.None) child.RegisterExternalProvider(child.ParentKey, this);
+        }
+
+        /// <summary>
+        /// Unlinks the entity under <paramref name="key"/> and its link back to this entity, and returns it (null if
+        /// there was none).
+        /// </summary>
+        public Entity Detach(SemanticKey key)
+        {
+            var child = GetProvider(key);
+            if (child == null) return null;
+
+            UnregisterExternalProvider(key);
+            if (child.ParentKey != SemanticKey.None && child.GetProvider(child.ParentKey) == this)
+            {
+                child.UnregisterExternalProvider(child.ParentKey);
+            }
+            return child;
         }
 
         public IObservable<Entity> ObserveProvider(SemanticKey key)
@@ -423,6 +497,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
             // Clean up profile stat blocks
             _profileDisposables.Dispose();
+
+            foreach (var pool in _pools.Values)
+            {
+                pool.Dispose();
+            }
+            _pools.Clear();
 
             // Cascade disposal to nested entities
             foreach (var nested in _nestedEntities)

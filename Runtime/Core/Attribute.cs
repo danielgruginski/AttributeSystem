@@ -38,6 +38,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
         protected readonly ReactiveProperty<float> _baseValue;
         public virtual float BaseValue => _baseValue.Value;
 
+        /// <summary>The base value as it changes (a pool's current amount).</summary>
+        internal IReadOnlyReactiveProperty<float> ObservableBaseValue => _baseValue;
+
+        /// <summary>Set by a ResourcePool: keeps every new base value (the pool's amount) within the pool's bounds.</summary>
+        internal Func<float, float> BaseValueFilter;
+
         public virtual IReadOnlyReactiveProperty<float> ObservableValue => _finalValue;
         public bool IsDisposed { get; private set; }
 
@@ -81,6 +87,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
         public virtual void SetBaseValue(float value)
         {
             if (IsDisposed) return;
+            if (BaseValueFilter != null) value = BaseValueFilter(value);
             _baseValue.Value = value;
         }
 
