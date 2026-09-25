@@ -2,15 +2,15 @@
 
 ## Overview
 
-The `AttributeConnection` class is a pivotal component in the **Reactive Attribute System**, responsible for managing "Remote Modifiers." It acts as a persistent, self-sustaining link that applies a modifier to a target attribute located on a different `AttributeProcessor` (e.g., a Sword applying a buff to its Owner's Strength).
+The `AttributeConnection` class is a pivotal component in the **Reactive Attribute System**, responsible for managing "Remote Modifiers." It acts as a persistent, self-sustaining link that applies a modifier to a target attribute located on a different `Entity` (e.g., a Sword applying a buff to its Owner's Strength).
 
-Unlike local modifiers which are applied directly, remote modifiers depend on a **Context Path** (e.g., `Owner` -> `EquippedWeapon`). The `AttributeConnection` automatically monitors this path. If the path topology changes (e.g., the Owner changes, or the weapon is unequipped), the connection reacts by moving the modifier to the new target or entering a pending state.
+Unlike local modifiers which are applied directly, remote modifiers depend on a **Context Path** (e.g., `Owner` -> `EquippedWeapon`), where each step is a provider alias registered with `RegisterExternalProvider`. The `AttributeConnection` automatically monitors this path. If the path topology changes (e.g., the Owner changes, or the weapon is unequipped), the connection reacts by moving the modifier to the new target or entering a pending state.
 
-This class implements `IDisposable`, making it a "Handle" that controls the lifecycle of the modifier application.
+This class implements `IDisposable`, making it a "Handle" that controls the lifecycle of the modifier application. You rarely create one yourself: `Entity.AddModifier(sourceId, modifier, attribute, providerPath)` creates it whenever `providerPath` is not empty (for example for a `StatBlock` modifier with a `TargetPath`) and returns it as the handle.
 
 ## Key Features
 
--   **Reactive Path Resolution:** Uses `UniRx` to recursively observe the provider path. It handles dynamic changes in the object graph (e.g., `A` links to `B`, then `A` links to `C`).
+-   **Reactive Path Resolution:** Uses `UniRx` to observe the first provider on the path and hands the rest of the path to that provider, which does the same (one connection per step). It handles dynamic changes in the object graph (e.g., `A` links to `B`, then `A` links to `C`).
     
 -   **Self-Sustaining Lifecycle:** Once created, the connection keeps itself alive via its internal subscriptions. It does not require an external manager to "tick" or update it.
     
@@ -21,17 +21,19 @@ This class implements `IDisposable`, making it a "Handle" that controls the life
 
 ## Class Definition
 
-```
+The class lives in the `ReactiveSolutions.AttributeSystem.Core` namespace.
+
+```csharp
 public class AttributeConnection : IDisposable
 
 ```
 
 ### Constructor
 
-```
+```csharp
 public AttributeConnection(
-    AttributeProcessor root,
-    List<SemanticKey> path,
+    Entity localProcessor,
+    List<SemanticKey> providerPath,
     SemanticKey targetAttribute,
     IAttributeModifier modifier,
     string sourceId
@@ -39,75 +41,90 @@ public AttributeConnection(
 
 ```
 
--   **`root`**: The `AttributeProcessor` where the path resolution begins (the "Source" of the modifier).
+-   **`localProcessor`**: The `Entity` where the path resolution begins (the "Source" of the modifier).
     
--   **`path`**: A list of `SemanticKey`s representing the steps to traverse to find the target (e.g., `["Owner", "Hireling"]`).
+-   **`providerPath`**: A list of `SemanticKey`s (provider aliases) representing the steps to traverse to find the target (e.g., `{ Links.Owner, Links.RightHand }`). It must contain at least one key; for a local modifier, call `Entity.AddModifier` without a path.
     
--   **`targetAttribute`**: The name of the attribute to modify on the final processor found at the end of the path.
+-   **`targetAttribute`**: The name of the attribute to modify on the final entity found at the end of the path.
     
 -   **`modifier`**: The actual `IAttributeModifier` logic/payload to apply.
     
--   **`sourceId`**: A string identifier for the source (used for debugging or bulk removal by ID, though the Handle approach is preferred).
+-   **`sourceId`**: A string identifier for the source. It is passed along each step of the path but not stored on the attribute: tools such as the Attribute Debugger show the modifier's own `SourceId`. There is no removal by ID; dispose the connection (the handle) instead.
     
 
 ## Internal Logic
 
-### 1. Connection Establishment (`Connect`)
+### 1. Connection Establishment (constructor)
 
-Upon instantiation, the connection starts a `ResolvePathRecursively` observable chain. This chain monitors the `AttributeProcessor`'s provider registry.
+Upon instantiation, the connection subscribes to `localProcessor.ObserveProvider(providerPath[0])`. This stream emits the entity currently registered under the first key of the path (or `null`), and then every change to that registration.
 
-### 2. Path Resolution (`ResolvePathRecursively`)
+### 2. Path Resolution (one step at a time)
 
-This method constructs a dynamic observable stream:
+The connection only watches the first step of the path. When that provider exists, it hands the rest of the path to it by calling `provider.AddModifier(sourceId, modifier, targetAttribute, remainingPath)`:
 
--   It observes the provider at the current index of the path.
+-   If steps remain, that call creates another `AttributeConnection` on the provider, which watches the next step, and so on.
     
--   If that provider changes, it `Switch`es to a new observable for the _rest_ of the path.
+-   At the last step, the modifier is added to the target attribute directly.
     
--   When the end of the path is reached, it emits the final `AttributeProcessor`.
-    
--   If any link in the chain is broken (null), it emits `null`.
+-   Because each step is watched by its own connection, a change anywhere along the path only rebuilds the connections after that point.
     
 
-### 3. Application (`ApplyToTarget`)
+`PathConnection`, the base class of `TagConnection` (which `StatBlock` uses for remote tags), works differently: it resolves the whole path in a single observable chain and moves the tag when the entity at the end of the path changes.
 
-When the resolved path emits a new target processor (or null):
+### 3. Application (`Entity.AddModifier`)
 
-1.  **Cleanup:** If a modifier was previously applied to a different target, it is removed from that old target.
+When the first provider changes (or disappears):
+
+1.  **Apply:** If a provider exists, the modifier is applied through it as described above. If it is `null`, nothing is applied until a provider is registered again.
     
-2.  **Apply:** If a new valid target exists, the modifier is added to it.
-    
-    -   _Note:_ It uses `GetOrCreateAttribute` to ensure the target attribute exists before modifying it.
+    -   _Note:_ At the last step, `Entity.AddModifier` uses `GetOrCreateAttribute`, so the target attribute is created (with a base value of 0) if it doesn't exist yet.
         
+    -   _Note:_ Exceptions thrown while applying are caught and logged as `[AttributeConnection] Failed to apply modifier to provider '<key>': ...`.
+        
+2.  **Cleanup:** The previous application, held in a `SerialDisposable`, is then disposed. This removes the modifier from the old target (or disposes the nested connection that holds it).
+    
+
+The `ValueSource` arguments of the built-in modifiers are read relative to the entity whose attribute is modified (the one `GetMagnitude` receives), unless they were baked to another entity. `ModifierFactory.Create(spec, entity)`, which StatBlocks use, bakes the entity the block was applied to: a sword's StatBlock modifier on its Owner's Damage reads `Strength` from the sword, and needs the path `Owner` in the argument's reference to read the Owner's Strength. A missing attribute reads as 0.
 
 ### 4. Lifecycle (`Dispose`)
 
 When `Dispose()` is called:
 
-1.  The reactive subscription to the path is severed (`_pathSubscription.Dispose()`). This stops the connection from reacting to future changes.
+1.  The subscription to the first provider is disposed (`_topologySubscription.Dispose()`). This stops the connection from reacting to future changes.
     
-2.  The modifier is immediately removed from the `_currentTarget` (if one exists).
+2.  The current application is disposed (`_modifierHandle.Dispose()`), which removes the modifier from its target and disposes any nested connections further along the path.
     
-3.  References are cleared to allow garbage collection.
+3.  Further calls to `Dispose()` do nothing.
     
 
 ## Usage Example
 
-```
+`Links.Owner` and `Stats.Health` are keys from classes generated from your KeyDomains (see [Semantic Keys](Semantic%20Keys.md)). `StaticAttributeModifier` is in the `ReactiveSolutions.AttributeSystem.Core.Modifiers` namespace.
+
+```csharp
 // Scenario: A "Curse" component wants to apply -10 Health to the "Owner" of this object.
 
 // 1. Define the modifier
-var modifier = new StaticAttributeModifier(new ModifierArgs("Curse", ModifierType.Additive, 0, new List<ValueSource> { ValueSource.Const(-10f) }));
+var modifier = new StaticAttributeModifier(new AttributeModifierSpec
+{
+    SourceId = "Curse",
+    Type = ModifierType.Additive,
+    Priority = 0,
+    Arguments = new List<ValueSource> { ValueSource.Const(-10f) }
+});
 
 // 2. Define the path (Look for "Owner")
-var path = new List<SemanticKey> { new SemanticKey("Owner") };
+var path = new List<SemanticKey> { Links.Owner };
 
 // 3. Create the connection (This immediately starts trying to find the Owner)
-// The 'root' is the processor on the Cursed Item itself.
-var connection = new AttributeConnection(itemProcessor, path, new SemanticKey("Health"), modifier, "CurseSource");
+// The first argument is the Entity of the Cursed Item itself.
+var connection = new AttributeConnection(itemEntity, path, Stats.Health, modifier, "CurseSource");
+// Equivalent, and what StatBlocks do for a modifier with a TargetPath:
+// var connection = itemEntity.AddModifier("CurseSource", modifier, Stats.Health, path);
 
 // ... Time passes ...
-// The item is picked up by a Player. The 'Owner' link is established.
+// The item is picked up by a Player. The 'Owner' link is established:
+// itemEntity.RegisterExternalProvider(Links.Owner, playerEntity);
 // The Connection automatically detects this and applies -10 Health to the Player.
 
 // ... Later ...

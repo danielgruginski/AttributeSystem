@@ -17,22 +17,32 @@ It is responsible for:
     
 5.  **Aliasing:** Manages Attribute Pointers.
     
+6.  **Composition:** Applying `EntityProfile` blueprints and holding `LinkGroup`s.
+    
 
 ## Key Features
 
 -   **Reactive Storage:** Uses `ReactiveDictionary` to store attributes, allowing systems (like UI) to reactively detect when new attributes are added dynamically.
     
--   **Dependency Injection (Providers):** Allows registering other entities as "Providers" (e.g., `RegisterExternalProvider("Owner", playerEntity)`), enabling cross-entity stat scaling.
+-   **Dependency Injection (Providers):** Allows registering other entities as "Providers" (e.g., `RegisterExternalProvider(Links.Owner, playerEntity)`), enabling cross-entity stat scaling.
     
 -   **Handle-Based Modification:** Adding a modifier returns an `IDisposable` handle. Disposing this handle removes the modifier, ensuring clean lifecycle management without relying on string IDs.
     
--   **Lazy Resolution:** Can accept modifiers or observers for attributes/providers that do not exist yet. It waits for them to appear and connects automatically.
+-   **Lazy Resolution:** Can accept modifiers or observers for attributes/providers that do not exist yet. It waits for them to appear and connects automatically. Meanwhile, values that modifiers, pointers and conditions read from a missing attribute or provider count as 0.
     
+
+Keys such as `Stats.Strength` and `Links.Owner` on this page come from classes generated from KeyDomains (see [Semantic Keys](Semantic%20Keys.md)).
 
 ## Class Definition
 
-```
-public class Entity
+```csharp
+namespace ReactiveSolutions.AttributeSystem.Core
+{
+    public class Entity : IDisposable
+    {
+        // ...
+    }
+}
 
 ```
 
@@ -46,30 +56,34 @@ Methods for retrieving or creating the attribute objects.
     
     -   Retrieves a local attribute. Returns `null` if not found.
         
--   **`GetAttributeObservable(SemanticKey key)`** - Returns an `IObservable<float>` stream of the attribute's final value. Handles resolution of aliases automatically.
+-   **`GetAttribute(SemanticKey name, List<SemanticKey> providerPath)`**
     
+    -   Retrieves an attribute through a provider path (e.g., `Owner`'s `Strength`). Returns `null` if a provider or the attribute is missing.
+        
 -   **`GetOrCreateAttribute(SemanticKey name, float defaultBaseIfMissing = 0f)`**
     
     -   Safely gets an attribute, creating it with the specified base value if it doesn't exist. Ideal for ensuring a stat exists before modifying it.
         
--   **`SetOrUpdateBaseValue(SemanticKey name, float newBase)`**
+-   **`SetOrUpdateBaseValue(SemanticKey key, float value)`**
     
     -   The primary way to initialize stats. Creates the attribute if missing and sets its base (unmodified) value.
         
 -   **`Attributes`** (Property)
     
-    -   Access to the underlying `IReadOnlyReactiveDictionary`. Useful for debugging or listing all stats.
+    -   Access to the underlying `IReadOnlyReactiveDictionary<SemanticKey, Attribute>`. Useful for debugging or listing all stats.
         
 
 ### 2. Pointer Management
 
--   `SetPointer(SemanticKey alias, SemanticKey target)`: Creates or updates an alias.
+-   `IDisposable SetPointer(SemanticKey alias, SemanticKey target, List<SemanticKey> path = null)`: Makes `alias` read the final value of `target` (a local attribute, or one at the end of `path`). Returns a handle.
     
-    -   If `alias` already exists as a concrete attribute, it is **overwritten** by the pointer (previous data is lost).
+    -   If `alias` already exists as a concrete attribute, it is kept: while the pointer is active, its pipeline starts from the target's value instead of its own base value (which is shadowed, not lost), and its own modifiers still apply on top.
         
-    -   Prevents circular dependencies (e.g., `A -> B -> A`, `A -> A`, `A -> B -> C -> A`).
+    -   Pointers stack: the newest pointer on an alias is the active one. A missing target reads as 0.
         
--   `RemovePointer(SemanticKey alias)`: Deletes the alias. This does **not** affect the Target attribute.
+    -   Prevents local circular dependencies: pointing an alias to itself (`A -> A`) logs a warning, and a cycle such as `A -> B -> A` or `A -> B -> C -> A` logs an error. In both cases the pointer is not created.
+        
+-   To remove a pointer, dispose the handle returned by `SetPointer`. This does **not** affect the Target attribute; the alias falls back to the previous pointer on its stack, or to its own base value.
     
 
 ### 3. Tag Management
@@ -99,17 +113,27 @@ Methods for observing values, even across complex chains.
 
 -   **`GetAttributeObservable(SemanticKey name, List<SemanticKey> providerPath = null)`**
     
-    -   Returns an `IObservable<Attribute>` that resolves to the target attribute.
+    -   Returns an `IObservable<Attribute>` that resolves to the target attribute. It emits the attribute once it exists (and again if it is replaced).
         
     -   **Local:** If `providerPath` is null/empty, observes the local dictionary.
         
-    -   **Remote:** If `providerPath` is provided, recursively observes the provider chain.
+    -   **Remote:** If `providerPath` is provided, recursively observes the provider chain. Emits `null` while a provider on the path is missing.
         
     -   _Usage:_ Valid for UI elements waiting for a stat that might not exist yet (e.g., waiting for "Mana" to be added to the character).
         
--   **`OnAttributeAdded`**
+-   **`ObserveValue(SemanticKey name, List<SemanticKey> providerPath = null)`**
     
-    -   Stream that fires whenever a new `Attribute` is created locally.
+    -   Returns an `IObservable<float>` stream of the attribute's final value: the current value on subscribe, then every change. Emits nothing while the attribute (or a provider on the path) is missing, and follows the attribute across provider changes. This is usually what UI and gameplay code want.
+        
+-   **`ObserveAttributeValue(this IObservable<Entity> entities, SemanticKey name)`** (extension method, `EntityObservableExtensions`)
+    
+    -   Follows whichever entity the source currently holds and emits that entity's attribute values. Switching entities drops the previous subscription; a `null` entity emits nothing.
+        
+    -   _Usage:_ `sword.ObserveProvider(Links.Owner).ObserveAttributeValue(Stats.Health)` streams the Health of whoever currently owns the sword. `AttributeUIBehaviour` uses it to follow its controller.
+        
+-   **`Attributes.ObserveAdd()`**
+    
+    -   Stream (from UniRx's `IReadOnlyReactiveDictionary`) that fires whenever a new `Attribute` is created locally.
         
 
 ### 5. Modifier Management (The Handle System)
@@ -126,7 +150,7 @@ The entity manages the application of modifiers.
         
 -   **`IDisposable AddModifier(string sourceId, IAttributeModifier modifier, SemanticKey attributeName, List<SemanticKey> providerPath)`**
     
-    -   **Remote Application:** Adds a modifier to a target located at the end of `providerPath`.
+    -   **Remote Application:** Adds a modifier to a target located at the end of `providerPath`. The modifier is applied once every provider on the path exists, and follows provider changes (removed while a provider is missing, re-applied when one is registered).
         
     -   **Returns:** An `AttributeConnection` (which implements `IDisposable`). This object keeps the link alive. Disposing it removes the modifier from wherever it is currently applied.
         
@@ -137,41 +161,88 @@ Methods for establishing relationships between entities.
 
 -   **`RegisterExternalProvider(SemanticKey key, Entity entity)`**
     
-    -   Registers another entity under an alias (e.g., linking the Player as "Owner").
+    -   Registers another entity under an alias (e.g., linking the Player as `Links.Owner`), replacing any provider already registered under that key.
         
     -   Triggers any pending observers or connections waiting for this key.
         
 -   **`UnregisterExternalProvider(SemanticKey key)`**
     
-    -   Removes a link. Any `AttributeConnection` traversing this link will momentarily lose its target (applying nothing) until the link is re-established.
+    -   Removes a link. Any `AttributeConnection` traversing this link will momentarily lose its target (applying nothing) until the link is re-established, and values read through the link count as 0.
         
 -   **`ObserveProvider(SemanticKey key)`**
     
-    -   Returns an `IObservable<Entity>` that fires whenever the specific provider is registered, changed, or unregistered (resolving to null).
+    -   Returns an `IObservable<Entity>` that emits the current provider (or null) on subscribe, then fires whenever the specific provider is registered, changed, or unregistered (resolving to null).
+        
+
+### 7. Profiles & Link Groups
+
+-   **`ApplyProfile(EntityProfile profile, IModifierFactory modifierFactory)`**
+    
+    -   Initializes the entity from a blueprint, in this order: base attributes, innate tags, link groups, nested entities (registered as providers), pointers, innate StatBlocks. Entries with an unassigned key (`SemanticKey.None`) are skipped. An overload takes an `EntityProfileSO`. Profiles can be built in code with `ProfileBuilder` (see [Fluent Builders](Fluent%20Builders.md)).
+        
+-   **`GetOrCreateLinkGroup(SemanticKey key)`** / **`GetLinkGroup(SemanticKey key)`**
+    
+    -   Return the entity's `LinkGroup` for that key (e.g., `Groups.Inventory`). `GetLinkGroup` returns `null` if the group doesn't exist. See [LinkGroup](LinkGroup.md).
+        
+
+### 8. Lifecycle
+
+-   **`void Dispose()`** / **`bool IsDisposed`**
+    
+    -   Disposes the innate StatBlocks and nested entities created by `ApplyProfile`, and all attributes: they keep their last value but stop updating and release their subscriptions to other entities.
+        
+    -   A disposed entity ignores new modifiers and provider (un)registrations. `EntityController` disposes its entity automatically in `OnDestroy`.
         
 
 ## Usage Example
 
-```
+```csharp
+using System;
+using System.Collections.Generic;
+using Game.Constants;                                   // Namespace of your generated key classes
+using ReactiveSolutions.AttributeSystem.Core;
+using ReactiveSolutions.AttributeSystem.Core.Data;      // AttributeReference
+using ReactiveSolutions.AttributeSystem.Core.Modifiers; // LinearModifier
+using SemanticKeys;
+
 var player = new Entity();
 var sword = new Entity();
 
 // 1. Setup Stats
-player.SetOrUpdateBaseValue(new SemanticKey("Strength"), 10f);
-sword.SetOrUpdateBaseValue(new SemanticKey("Damage"), 5f);
+player.SetOrUpdateBaseValue(Stats.Strength, 10f);
+sword.SetOrUpdateBaseValue(Stats.Damage, 5f);
 
 // 2. Link Context
-sword.RegisterExternalProvider(new SemanticKey("Owner"), player);
+sword.RegisterExternalProvider(Links.Owner, player);
 
 // 3. Add Modifier (Sword Damage scales with Owner Strength)
 // We want to add to "Damage" (Local), based on "Strength" (Remote Source).
 // Note: This example uses a Modifier that reads from a remote source, 
 // but is applied LOCALLY to the sword.
-var scalingMod = new LinearModifier(...); 
-IDisposable handle = sword.AddModifier("Scaling", scalingMod, new SemanticKey("Damage"));
+var scalingMod = new LinearModifier(new AttributeModifierSpec
+{
+    SourceId = "Scaling",
+    Type = ModifierType.Additive,
+    Arguments = new List<ValueSource>
+    {
+        // Input: Owner.Strength, resolved from the sword
+        new ValueSource
+        {
+            Mode = ValueSource.SourceMode.Attribute,
+            AttributeRef = new AttributeReference(Stats.Strength, new List<SemanticKey> { Links.Owner })
+        },
+        ValueSource.Const(0.5f), // Coefficient
+        ValueSource.Const(0f)    // Addend
+    }
+});
+IDisposable handle = sword.AddModifier("Scaling", scalingMod, Stats.Damage); // Damage: 5 + 10 * 0.5 = 10
 
 // 4. Cleanup
 // When the sword is destroyed or unequipped:
-handle.Dispose();
+handle.Dispose(); // Damage: 5
+
+// When the sword entity itself is discarded, dispose it: its attributes stop
+// updating and release their subscriptions to the player.
+sword.Dispose();
 
 ```

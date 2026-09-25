@@ -2,23 +2,23 @@
 
 ## Overview
 
-The `StatBlockLinker` is a Unity `MonoBehaviour` component that acts as the "Physical Interface" for your data. It connects a JSON-defined `StatBlock` (like an "Iron Sword") to an in-game entity (the GameObject representing that sword).
+The `StatBlockLinker` is a Unity `MonoBehaviour` component that acts as the "Physical Interface" for your data. It connects one or more JSON-defined `StatBlock`s (like an "Iron Sword") to an in-game entity (by default, the `EntityController` on the GameObject representing that sword).
 
-Its primary job is to **Apply** the stats when the object is created (or equipped) and **Remove** them when the object is destroyed (or unequipped), ensuring no "ghost stats" are left behind on the character.
+Its primary job is to **Apply** the stats when the object is created (or equipped) and **Remove** them when the object is destroyed (or unequipped), ensuring no "ghost stats" are left behind on the character. (The exception is a block's base values, which are permanent; see [StatBlock](StatBlock.md).)
 
 ## Key Features
 
 -   **Drag-and-Drop Inspector:** Uses a custom drawer (`StatBlockID`) to allow designers to select StatBlocks from a dropdown list without typing paths manually.
     
--   **Automatic Lifecycle:** Handles the `ActiveStatBlock` receipt internally. When `OnDestroy` is called, it automatically disposes of the modifiers it created.
+-   **Automatic Lifecycle:** Handles the `ActiveStatBlock` receipts internally (one per block). When `OnDestroy` is called, it automatically disposes of the modifiers it created.
     
--   **Lazy Initialization:** Waits for the target `AttributeController` to be ready before applying stats.
+-   **Deferred Application:** Applies its blocks in `Start` rather than `Awake`, so profiles and context links set up in `Awake` (e.g. by an `AttributeContextLinker` on the same object) are already in place.
     
 
 ## Class Definition
 
-```
-[AddComponentMenu("Attribute System/Stat Block Linker")]
+```csharp
+[RequireComponent(typeof(EntityController))]
 public class StatBlockLinker : MonoBehaviour
 {
     // ...
@@ -26,55 +26,55 @@ public class StatBlockLinker : MonoBehaviour
 
 ```
 
+Namespace: `ReactiveSolutions.AttributeSystem.Unity`. Adding the component also adds an `EntityController` to the GameObject if it has none.
+
 ## Inspector Properties
 
--   **`Target Controller`**
+-   **`Stat Block Ids`**
     
-    -   The `AttributeController` that will receive the stats.
+    -   The IDs of the JSON files to load (e.g., "Weapons/IronSword"), applied in list order.
         
-    -   _Default:_ If left empty, it tries to find an `AttributeController` on the same GameObject.
+    -   _Note:_ The custom drawer for each element scans `Assets/Resources/Data/StatBlocks` (including subfolders) to populate a dropdown.
         
--   **`Stat Block`**
+-   **`Controller`**
     
-    -   The ID of the JSON file to load (e.g., "Weapons/IronSword").
+    -   The `EntityController` that will receive the stats.
         
-    -   _Note:_ The custom drawer for this field scans `Resources/Data/StatBlocks` to populate a dropdown.
+    -   _Default:_ If left empty, it uses the `EntityController` on the same GameObject.
         
--   **`Apply On Awake`**
-    
-    -   If `true`, the stats are applied immediately when the GameObject initializes.
-        
-    -   If `false`, you must call `ApplyStatBlock()` manually via script.
-        
+
+There is no "apply on awake" option: the listed blocks are always applied in `Start`. To choose the blocks from script, edit `StatBlockIds` before `Start`, or call `ApplyStatBlocks()` after changing it.
 
 ## Public API
 
 ### Methods
 
--   **`void ApplyStatBlock()`**
+-   **`void ApplyStatBlocks()`**
     
-    -   Loads the JSON specified by `Stat Block` ID.
+    -   Called automatically in `Start`.
         
-    -   Deserializes it into a `StatBlock` object.
+    -   Clears the currently applied blocks (see `ClearStatBlocks()`), then loads every ID in `Stat Block Ids` and applies it to the target controller's `Entity`.
         
-    -   Applies it to the target processor.
+    -   Logs a warning and applies nothing if there is no target controller.
         
-    -   **Crucial:** Stores the returned `ActiveStatBlock` handle internally. If a previous block was applied, it is `Dispose()`d first.
-        
--   **`void SetStatBlock(StatBlockID blockId)`**
+-   **`void AddStatBlock(StatBlockID statBlockID)`**
     
-    -   Changes the block ID at runtime.
+    -   Loads one StatBlock from JSON, applies it to the target, and stores the returned `ActiveStatBlock` handle internally.
         
-    -   _Note:_ Does not automatically re-apply. Call `ApplyStatBlock()` afterwards.
+    -   _Note:_ The ID is not added to `Stat Block Ids`, so the next `ApplyStatBlocks()` call removes the block, including the call in `Start`: add blocks this way after `Start` has run. Empty IDs are ignored; if the JSON file can't be found, `StatBlockJsonLoader` logs an error and nothing is applied.
         
--   **`void SetTarget(AttributeController controller)`**
+-   **`void ClearStatBlocks()`**
+    
+    -   Disposes every stored handle, removing the blocks' modifiers, tags and pointers. Called automatically in `OnDestroy`.
+        
+-   **`void SetTarget(EntityController controller)`**
     
     -   Sets the target controller manually (e.g., when spawning a weapon and assigning it to a specific player).
         
--   **`void Construct(IModifierFactory factory)`**
-    
-    -   _Advanced:_ Injects a specific `ModifierFactory`. If not called, a default factory is created.
+    -   _Note:_ Does not re-apply. Call it before `Start`, or call `ApplyStatBlocks()` afterwards (which also removes the blocks from the previous target).
         
+
+The linker creates its own `ModifierFactory` (with the built-in logic types) in `Awake`; there is no method to inject a different factory.
 
 ## Usage Examples
 
@@ -84,17 +84,19 @@ public class StatBlockLinker : MonoBehaviour
     
 2.  Add a `StatBlockLinker` component.
     
-3.  Select "Weapons/IronSword" in the dropdown.
+3.  Add "Weapons/IronSword" to **Stat Block Ids** using the dropdown.
     
-4.  Link it to the Player's `AttributeController`.
+4.  Drag the Player's `EntityController` into the **Controller** field.
     
-5.  **Result:** When the Sword spawns, the Player gains +10 Damage. When the Sword is destroyed, the +10 Damage is removed.
+5.  **Result:** When the Sword starts, the Player gains the block's bonuses (e.g. +10 Damage). When the Sword is destroyed, they are removed.
     
+
+Attribute references inside the block are resolved from the entity the block is applied to (here, the Player). For blocks that read the owner's stats through an `Owner` path, give the Sword its own stats instead: keep the default **Controller** and link the Player with an `AttributeContextLinker` (see [Getting Started](Getting%20Started.md)).
 
 ### 2. Manual Application (Scripting)
 
-```
-public void EquipItem(GameObject itemPrefab, AttributeController player)
+```csharp
+public void EquipItem(GameObject itemPrefab, EntityController player)
 {
     var item = Instantiate(itemPrefab);
     var linker = item.GetComponent<StatBlockLinker>();
@@ -102,27 +104,29 @@ public void EquipItem(GameObject itemPrefab, AttributeController player)
     // Assign the player as the target for these stats
     linker.SetTarget(player);
     
-    // Force application now
-    linker.ApplyStatBlock();
+    // Force application now (otherwise Start applies them)
+    linker.ApplyStatBlocks();
 }
 
 ```
 
 ## Internal Lifecycle Logic
 
-The class manages a private `ActiveStatBlock _activeHandle`.
+The class manages a private `List<ActiveStatBlock> _activeBlocks`, one handle per applied block.
 
-1.  **On Apply:**
+1.  **On Apply** (`ApplyStatBlocks`, which calls `AddStatBlock` for each ID):
     
-    ```
-    _activeHandle?.Dispose(); // Clean up old stats
-    _activeHandle = statBlock.ApplyToProcessor(...); // Apply new & save receipt
+    ```csharp
+    ClearStatBlocks(); // Clean up old stats
+    // ...then, for each loaded block:
+    var activeHandle = block.ApplyToEntity(_controller.Instance, _modifierFactory); // Apply new
+    _activeBlocks.Add(activeHandle); // Save receipt
     
     ```
     
 2.  **On Destroy:**
     
-    ```
-    _activeHandle?.Dispose(); // Ensure stats die with this object
+    ```csharp
+    ClearStatBlocks(); // Disposes every handle: ensure stats die with this object
     
     ```
