@@ -1,0 +1,13 @@
+{
+  "statBlock": "Goblin Frenzy",
+  "condition": { "compare": ["HealthPercent", "<", 0.5] },
+  "tags": ["Enraged"],
+  "modifiers": [
+    { "target": "AttackPower", "type": "Multiplicative", "value": 1.5 }
+  ],
+  "keys": {
+    "HealthPercent": "9abad6c2-6d2e-4dff-a936-828a59f7f580",
+    "Enraged": "699c7a12-3f4f-4daf-a1ae-153bb185f3d2",
+    "AttackPower": "d61b2749-7a12-44df-8748-cb3100762878"
+  }
+}

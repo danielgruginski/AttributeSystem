@@ -1,0 +1,9 @@
+{
+  "statBlock": "Leadership",
+  "modifiers": [
+    { "target": "AttackPower", "type": "Multiplicative", "value": 1.1 }
+  ],
+  "keys": {
+    "AttackPower": "d61b2749-7a12-44df-8748-cb3100762878"
+  }
+}

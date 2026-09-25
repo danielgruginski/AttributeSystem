@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e68a6191930f610478778e7936293652, type: 3}
+  m_Name: RPGTags
+  m_EditorClassIdentifier: 
+  _domainName: RPGTags
+  _guid: b1dac926-dcc5-426c-9a2c-baa00d6792f5
+  _keys:
+  - _name: Character
+    _guid: cf0d52ba-d9ff-41ce-a2e2-f9fa0b9b7484
+    _description: 
+  - _name: Caster
+    _guid: cd8ccf77-20f0-472d-b57f-c13eea18d0cc
+    _description: 
+  - _name: Weapon
+    _guid: 2119e832-538b-4357-bc44-d3b3a52a06e9
+    _description: 
+  - _name: Armor
+    _guid: 36ca5108-9a46-48e9-844b-d5e8a28ac709
+    _description: 
+  - _name: Goblin
+    _guid: 58e178d6-3d0a-484e-9008-c47625c71f3e
+    _description: 
+  - _name: Enraged
+    _guid: 699c7a12-3f4f-4daf-a1ae-153bb185f3d2
+    _description: 
+  - _name: Encumbered
+    _guid: 57e604d9-7bd6-4bcc-ad99-4e33853526ed
+    _description: 
+  - _name: Poisoned
+    _guid: b95b7004-6b13-4df1-91c7-873aa465f875
+    _description: 

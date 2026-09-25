@@ -1,0 +1,34 @@
+{
+  "profile": "Inventory Holder",
+  "baseAttributes": { "CarryCapacity": 10 },
+  "linkGroups": ["Inventory"],
+  "innateStatBlocks": [
+    {
+      "statBlock": "Carrying",
+      "modifiers": [
+        { "target": "CarryCapacity", "linear": { "input": "Strength", "coefficient": 2 } },
+        {
+          "target": "CarriedWeight",
+          "groupTotal": { "group": "Inventory", "attribute": "Weight" }
+        }
+      ]
+    },
+    {
+      "statBlock": "Encumbered",
+      "condition": { "compare": ["CarriedWeight", ">", "CarryCapacity"] },
+      "tags": ["Encumbered"],
+      "modifiers": [
+        { "target": "MoveSpeed", "type": "Multiplicative", "value": 0.5 }
+      ]
+    }
+  ],
+  "keys": {
+    "CarryCapacity": "737aacbf-712f-4c17-aa34-db44a3291d16",
+    "Inventory": "ff38bdb1-cb68-4327-a63d-ccdbecd52a35",
+    "Strength": "9e256588-17ae-4ef0-b572-f1688003a231",
+    "CarriedWeight": "b2f544bc-b74d-45be-b7c0-d9a1ebb7a7ea",
+    "Weight": "6d456038-da30-4c11-96d0-a52c92072dc5",
+    "Encumbered": "57e604d9-7bd6-4bcc-ad99-4e33853526ed",
+    "MoveSpeed": "955ca18a-b7e0-4c37-81c3-51402ddd4457"
+  }
+}

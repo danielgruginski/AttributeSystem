@@ -1,0 +1,21 @@
+{
+  "profile": "Armor",
+  "parentKey": "Owner",
+  "innateTags": ["Armor"],
+  "innateStatBlocks": [
+    {
+      "statBlock": "Worn",
+      "condition": { "hasTag": "Owner/Character" },
+      "modifiers": [
+        { "target": "Owner/Defense", "value": "ArmorRating" }
+      ]
+    }
+  ],
+  "keys": {
+    "Owner": "d4e54e90-b55a-499e-a71d-cf05e6c4935f",
+    "Armor": "36ca5108-9a46-48e9-844b-d5e8a28ac709",
+    "Character": "cf0d52ba-d9ff-41ce-a2e2-f9fa0b9b7484",
+    "Defense": "ce8f7ca3-3a79-4411-8b98-0be06c78cd1a",
+    "ArmorRating": "b4e1f9eb-1bcc-49ef-aaf5-d55c5d615708"
+  }
+}

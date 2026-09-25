@@ -1,0 +1,9 @@
+{
+  "profile": "Long Sword",
+  "templates": ["RPGStarter/Templates/Weapon"],
+  "baseAttributes": { "Damage": 12, "Weight": 6 },
+  "keys": {
+    "Damage": "dccb28f9-8c40-452f-991a-a585042406bd",
+    "Weight": "6d456038-da30-4c11-96d0-a52c92072dc5"
+  }
+}

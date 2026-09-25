@@ -1,0 +1,15 @@
+{
+  "profile": "Knight",
+  "templates": ["RPGStarter/Templates/Character", "RPGStarter/Templates/InventoryHolder"],
+  "baseAttributes": { "Strength": 14, "Vitality": 12 },
+  "nestedEntities": {
+    "MainHand": "RPGStarter/Items/LongSword",
+    "Body": "RPGStarter/Items/ChainMail"
+  },
+  "keys": {
+    "Strength": "9e256588-17ae-4ef0-b572-f1688003a231",
+    "Vitality": "43f08865-e8c4-4c55-bfb3-00b61e59b8f9",
+    "MainHand": "af0b9161-f594-4631-8350-0a4534a97994",
+    "Body": "434613d2-e537-45b1-8bce-6c4e72e18a19"
+  }
+}

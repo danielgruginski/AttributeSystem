@@ -1,0 +1,9 @@
+{
+  "statBlock": "Blessing",
+  "modifiers": [
+    { "target": "MaxHealth", "value": 20 }
+  ],
+  "keys": {
+    "MaxHealth": "21ded034-2146-470d-ad6c-da1fa0c0633e"
+  }
+}

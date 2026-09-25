@@ -74,12 +74,13 @@ scaling.Dispose();                                 // Damage: 5
 
 ### 3. Use it in a scene
 
-Add an `EntityController` to a GameObject and use `controller.Instance` to reach its `Entity`; give it a profile (a JSON file or one authored in its Inspector) to set its starting stats. Load JSON StatBlocks with `StatBlockLinker`, connect entities (e.g. a sword to its owner) with `AttributeContextLinker`, and bind UI with `AttributeDisplayText` / `AttributeProgressBar`. See [Getting Started](Documentation/Getting%20Started.md) for a step-by-step walkthrough.
+Add an `EntityController` to a GameObject and use `controller.Instance` to reach its `Entity`; give it a profile (a JSON file or one authored in its Inspector) to set its starting stats. Load JSON StatBlocks with `StatBlockLinker`, connect entities (e.g. a sword to its owner) with `AttributeContextLinker`, and bind UI with `AttributeDisplayText` / `AttributeProgressBar`. See [Getting Started](Documentation/Getting%20Started.md) for a step-by-step walkthrough, and the [RPG Starter](Documentation/RPG%20Starter.md) sample for a small game built with it.
 
 ## **Documentation**
 
 * [Getting Started](Documentation/Getting%20Started.md) and [Semantic Keys](Documentation/Semantic%20Keys.md)
 * Core: [Entity](Documentation/Entity.md), [Attribute](Documentation/Attribute.md), [Resource Pools](Documentation/Resource%20Pools.md), [Attribute Modifiers](Documentation/Attribute%20Modifiers.md), [Modifier Logic](Documentation/Modifier%20Logic.md), [ValueSource](Documentation/ValueSource.md), [AttributeReference](Documentation/AttributeReference.md), [Attribute Pointers](Documentation/Attribute%20Pointers.md), [AttributeConnection](Documentation/AttributeConnection.md)
+* Example: [RPG Starter](Documentation/RPG%20Starter.md), a sample RPG you can import from the Package Manager
 * Data: [StatBlock](Documentation/StatBlock.md), [ActiveStatBlock](Documentation/ActiveStatBlock.md), [EntityProfile](Documentation/EntityProfile.md), [LinkGroup](Documentation/LinkGroup.md), [Fluent Builders](Documentation/Fluent%20Builders.md), [JSON Format](Documentation/JSON%20Format.md)
 * Unity: [EntityController](Documentation/EntityController.md), [StatBlockLinker](Documentation/StatBlockLinker.md), [AttributeContextLinker](Documentation/AttributeContextLinker.md), [AttributeUIBehaviour](Documentation/AttributeUIBehaviour.md)
 

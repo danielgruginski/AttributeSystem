@@ -1,0 +1,9 @@
+{
+  "profile": "Chain Mail",
+  "templates": ["RPGStarter/Templates/Armor"],
+  "baseAttributes": { "ArmorRating": 8, "Weight": 15 },
+  "keys": {
+    "ArmorRating": "b4e1f9eb-1bcc-49ef-aaf5-d55c5d615708",
+    "Weight": "6d456038-da30-4c11-96d0-a52c92072dc5"
+  }
+}

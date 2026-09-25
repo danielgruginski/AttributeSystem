@@ -1,0 +1,21 @@
+{
+  "profile": "Weapon",
+  "parentKey": "Owner",
+  "innateTags": ["Weapon"],
+  "innateStatBlocks": [
+    {
+      "statBlock": "Wielded",
+      "condition": { "hasTag": "Owner/Character" },
+      "modifiers": [
+        { "target": "Owner/AttackPower", "value": "Damage" }
+      ]
+    }
+  ],
+  "keys": {
+    "Owner": "d4e54e90-b55a-499e-a71d-cf05e6c4935f",
+    "Weapon": "2119e832-538b-4357-bc44-d3b3a52a06e9",
+    "Character": "cf0d52ba-d9ff-41ce-a2e2-f9fa0b9b7484",
+    "AttackPower": "d61b2749-7a12-44df-8748-cb3100762878",
+    "Damage": "dccb28f9-8c40-452f-991a-a585042406bd"
+  }
+}

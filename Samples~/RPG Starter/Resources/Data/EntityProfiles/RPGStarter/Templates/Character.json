@@ -1,0 +1,42 @@
+{
+  "profile": "Character",
+  "baseAttributes": {
+    "Level": 1,
+    "Strength": 10,
+    "Dexterity": 10,
+    "Intelligence": 10,
+    "Vitality": 10,
+    "MoveSpeed": 5
+  },
+  "pools": { "Health": "MaxHealth" },
+  "innateTags": ["Character"],
+  "innateStatBlocks": [
+    {
+      "statBlock": "Character Rules",
+      "modifiers": [
+        { "target": "MaxHealth", "linear": { "input": "Vitality", "coefficient": 10 } },
+        { "target": "MaxHealth", "linear": { "input": "Level", "coefficient": 5 } },
+        { "target": "AttackPower", "linear": { "input": "Strength", "coefficient": 2 } },
+        {
+          "target": "CritChance",
+          "diminishingReturns": { "input": "Dexterity", "maxBonus": 0.5, "softCap": 50 }
+        },
+        { "target": "HealthPercent", "ratio": { "dividend": "Health", "divisor": "MaxHealth" } }
+      ]
+    }
+  ],
+  "keys": {
+    "Level": "29ef14b1-dffd-4a15-83e4-2cb2178d5fe6",
+    "Strength": "9e256588-17ae-4ef0-b572-f1688003a231",
+    "Dexterity": "1db97840-ebb3-4850-b5b5-b7173754ba03",
+    "Intelligence": "7613c1c1-7183-4a90-99a5-36dabb004f0a",
+    "Vitality": "43f08865-e8c4-4c55-bfb3-00b61e59b8f9",
+    "MoveSpeed": "955ca18a-b7e0-4c37-81c3-51402ddd4457",
+    "Health": "0fb4fa22-7d58-465f-9c3c-7258a14b9149",
+    "MaxHealth": "21ded034-2146-470d-ad6c-da1fa0c0633e",
+    "Character": "cf0d52ba-d9ff-41ce-a2e2-f9fa0b9b7484",
+    "AttackPower": "d61b2749-7a12-44df-8748-cb3100762878",
+    "CritChance": "eab968c8-e357-4c0d-a79a-634b2a58cee8",
+    "HealthPercent": "9abad6c2-6d2e-4dff-a936-828a59f7f580"
+  }
+}

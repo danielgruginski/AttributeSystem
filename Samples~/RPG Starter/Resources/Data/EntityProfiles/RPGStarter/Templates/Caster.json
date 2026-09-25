@@ -1,0 +1,23 @@
+{
+  "profile": "Caster",
+  "templates": ["RPGStarter/Templates/Character"],
+  "baseAttributes": { "Intelligence": 14 },
+  "pools": { "Mana": "MaxMana" },
+  "innateTags": ["Caster"],
+  "innateStatBlocks": [
+    {
+      "statBlock": "Caster Rules",
+      "modifiers": [
+        { "target": "MaxMana", "linear": { "input": "Intelligence", "coefficient": 5 } },
+        { "target": "SpellPower", "linear": { "input": "Intelligence", "coefficient": 2 } }
+      ]
+    }
+  ],
+  "keys": {
+    "Intelligence": "7613c1c1-7183-4a90-99a5-36dabb004f0a",
+    "Mana": "3181edf0-d48e-443e-954b-5066d4cb22ef",
+    "MaxMana": "3edc201d-a87e-49d3-8983-6f06d015e647",
+    "Caster": "cd8ccf77-20f0-472d-b57f-c13eea18d0cc",
+    "SpellPower": "baaa3e21-3883-4291-ade4-85b357f1da51"
+  }
+}
