@@ -19,7 +19,8 @@ namespace ReactiveSolutions.AttributeSystem.Core
         public AttributeReference AttributeRef;
 
         // Stores the processor that 'owns' this source definition (e.g., the Weapon).
-        // This is not serialized; it is set at runtime when the StatBlock is applied.
+        // This is not serialized; it is set at runtime when the StatBlock is applied,
+        // on a per-application copy (see Clone) so shared asset data is never mutated.
         private Entity _bakedContext;
 
         public void BakeContext(Entity context)
@@ -29,7 +30,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
         // ---------------------------
 
         /// <summary>
-        /// Resolves the value into a reactive stream.
+        /// Returns a copy of this source (sharing the AttributeRef data) that can be baked independently.
+        /// </summary>
+        public ValueSource Clone() => (ValueSource)MemberwiseClone();
+
+        /// <summary>
+        /// Resolves the value into a reactive stream. A missing attribute or provider reads as 0.
         /// </summary>
         public IObservable<float> GetObservable(Entity localProcessor)
         {
@@ -41,7 +47,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
             // Use the structured reference.
             // .Switch() is used to hot-swap if the attribute instance changes (e.g. pointer).
-            return contextToUse.GetAttributeObservable(AttributeRef.Name, AttributeRef.Path)
+            return contextToUse.ObserveAttribute(AttributeRef.Name, AttributeRef.Path, emitNullIfMissing: true)
                 .Select(attr =>
                 {
                     // FIX: Handle NULL attribute (e.g. missing provider or broken pointer)

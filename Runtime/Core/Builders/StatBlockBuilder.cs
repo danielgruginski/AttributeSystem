@@ -37,7 +37,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
             _statBlock.ActivationCondition = new StatBlockCondition
             {
                 Type = mode,
-                Tag = tag != null ? tag : SemanticKey.None,
+                Tag = tag,
                 InvertTag = invert
             };
             return this;
@@ -64,11 +64,12 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
         }
 
         /// <summary>
-        /// Quick helper to add a multiplier modifier (+50% Damage = 0.5f).
+        /// Quick helper to add a percentage multiplier modifier (+50% Damage = 0.5f, -25% = -0.25f).
+        /// The attribute is multiplied by (1 + percentage).
         /// </summary>
         public StatBlockBuilder AddMultiplierModifier(SemanticKey targetAttr, float percentage)
         {
-            return AddModifier(targetAttr, sk.Modifiers.Static, ModifierType.Multiplicative, Const(percentage));
+            return AddModifier(targetAttr, sk.Modifiers.Static, ModifierType.Multiplicative, Const(1f + percentage));
         }
 
         public StatBlockBuilder AddTag(SemanticKey tag)

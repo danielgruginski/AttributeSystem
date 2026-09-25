@@ -183,7 +183,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
             Assert.AreEqual(_speedKey, spec.TargetAttribute);
             Assert.AreEqual(Modifiers.Static, spec.LogicType);
             Assert.AreEqual(ModifierType.Multiplicative, spec.Type);
-            Assert.AreEqual(0.25f, spec.Arguments[0].ConstantValue);
+            Assert.AreEqual(1.25f, spec.Arguments[0].ConstantValue); // +25% => x1.25
         }
 
         [Test]

@@ -11,10 +11,11 @@ namespace ReactiveSolutions.AttributeSystem.Core
 {
     /// <summary>
     /// The core engine for an entity in the attribute system.
-    /// (Tip: Rename this class to "Entity" using your IDE's refactor tool!)
     /// </summary>
     public class Entity : IDisposable
     {
+        public bool IsDisposed { get; private set; }
+
         private readonly ReactiveDictionary<SemanticKey, Attribute> _attributes = new();
         public IReadOnlyReactiveDictionary<SemanticKey, Attribute> Attributes => _attributes;
 
@@ -40,10 +41,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
         {
             if (profile == null) return;
 
+            // SemanticKey is a struct: unassigned entries are SemanticKey.None, never null.
+
             // 1. Base Attributes
             foreach (var entry in profile.BaseAttributes)
             {
-                if (entry.Attribute != null)
+                if (entry.Attribute != SemanticKey.None)
                 {
                     SetOrUpdateBaseValue(entry.Attribute, entry.BaseValue);
                 }
@@ -52,19 +55,19 @@ namespace ReactiveSolutions.AttributeSystem.Core
             // 2. Innate Tags
             foreach (var tag in profile.InnateTags)
             {
-                if (tag != null) AddTag(tag);
+                if (tag != SemanticKey.None) AddTag(tag);
             }
 
             // 3. Link Groups
             foreach (var groupKey in profile.LinkGroups)
             {
-                if (groupKey != null) GetOrCreateLinkGroup(groupKey);
+                if (groupKey != SemanticKey.None) GetOrCreateLinkGroup(groupKey);
             }
 
             // 4. Nested Entities (Recursive Composition)
             foreach (var nestedEntry in profile.NestedEntities)
             {
-                if (nestedEntry.ProviderKey != null && nestedEntry.Profile != null)
+                if (nestedEntry.ProviderKey != SemanticKey.None && nestedEntry.Profile != null)
                 {
                     var childEntity = new Entity();
                     childEntity.ApplyProfile(nestedEntry.Profile, modifierFactory);
@@ -77,7 +80,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
             // 5. Attribute Pointers
             foreach (var pointer in profile.Pointers)
             {
-                if (pointer.Alias != null && pointer.TargetAttribute != null)
+                if (pointer.Alias != SemanticKey.None && pointer.TargetAttribute != SemanticKey.None)
                 {
                     SetPointer(pointer.Alias, pointer.TargetAttribute, pointer.ProviderPath);
                 }
@@ -165,6 +168,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         public void RegisterExternalProvider(SemanticKey key, Entity processor)
         {
+            if (IsDisposed) return;
             Debug.Assert(processor != null, $"[Entity] Trying to register a null provider for key: {key}");
             _externalProviders[key] = processor;
             _onProviderRegistered.OnNext(key);
@@ -172,6 +176,7 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         public void UnregisterExternalProvider(SemanticKey key)
         {
+            if (IsDisposed) return;
             if (_externalProviders.ContainsKey(key))
             {
                 _externalProviders.Remove(key);
@@ -190,11 +195,30 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         // --- Retrieval ---
 
+        /// <summary>
+        /// Emits the attribute (and any replacement of it) once it exists.
+        /// Emits null while a provider on the path is missing.
+        /// </summary>
         public IObservable<Attribute> GetAttributeObservable(SemanticKey attributeName, List<SemanticKey> providerPath = null)
+            => ObserveAttribute(attributeName, providerPath, emitNullIfMissing: false);
+
+        /// <summary>
+        /// Emits the attribute's final value; nothing while the attribute (or a provider on the path) is missing.
+        /// </summary>
+        public IObservable<float> ObserveValue(SemanticKey attributeName, List<SemanticKey> providerPath = null)
+            => GetAttributeObservable(attributeName, providerPath)
+                .Select(attr => attr == null ? Observable.Empty<float>() : (IObservable<float>)attr.ObservableValue)
+                .Switch();
+
+        /// <summary>
+        /// Like GetAttributeObservable, but with emitNullIfMissing a missing LOCAL attribute also emits null,
+        /// so value lookups (modifier arguments, pointers, conditions) can read it as 0 instead of waiting.
+        /// </summary>
+        internal IObservable<Attribute> ObserveAttribute(SemanticKey attributeName, List<SemanticKey> providerPath, bool emitNullIfMissing)
         {
             if (providerPath == null || providerPath.Count == 0)
             {
-                return GetLocalAttributeObservable(attributeName);
+                return GetLocalAttributeObservable(attributeName, emitNullIfMissing);
             }
 
             SemanticKey nextProviderKey = providerPath[0];
@@ -205,18 +229,22 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 .Where(k => k == nextProviderKey)
                 .Select(_ => _externalProviders.TryGetValue(nextProviderKey, out var p) ? p : null)
                 .Select(p => p != null
-                    ? p.GetAttributeObservable(attributeName, remainingPath)
+                    ? p.ObserveAttribute(attributeName, remainingPath, emitNullIfMissing)
                     : Observable.Return<Attribute>(null))
                 .Switch();
         }
 
-        private IObservable<Attribute> GetLocalAttributeObservable(SemanticKey name)
+        private IObservable<Attribute> GetLocalAttributeObservable(SemanticKey name, bool emitNullIfMissing)
         {
             return Observable.Create<Attribute>(observer =>
             {
                 if (_attributes.TryGetValue(name, out var current))
                 {
                     observer.OnNext(current);
+                }
+                else if (emitNullIfMissing)
+                {
+                    observer.OnNext(null);
                 }
 
                 var updates = Observable.Merge(
@@ -267,6 +295,8 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         public IDisposable AddModifier(string sourceId, IAttributeModifier modifier, SemanticKey attributeName, List<SemanticKey> providerPath)
         {
+            if (IsDisposed) return Disposable.Empty;
+
             if (providerPath == null || providerPath.Count == 0)
             {
                 var attr = GetOrCreateAttribute(attributeName, 0f);
@@ -280,6 +310,9 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         public void Dispose()
         {
+            if (IsDisposed) return;
+            IsDisposed = true;
+
             // Clean up profile stat blocks
             _profileDisposables.Dispose();
 
@@ -289,6 +322,13 @@ namespace ReactiveSolutions.AttributeSystem.Core
                 nested.Dispose();
             }
             _nestedEntities.Clear();
+
+            // Stop every attribute pipeline, releasing its subscriptions to other entities.
+            // Attributes stay readable (last value) but no longer update.
+            foreach (var attribute in new List<Attribute>(_attributes.Values))
+            {
+                attribute.Dispose();
+            }
         }
     }
 }

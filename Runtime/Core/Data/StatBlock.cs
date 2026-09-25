@@ -80,21 +80,38 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
                 ? ConditionEvaluator.Observe(ActivationCondition, entity)
                 : Observable.Return(true);
 
+            // If applying or removing the content flips the condition itself (e.g. "while Health < 50: +100 Health"),
+            // there is no stable state; toggling would recurse until the stack overflows. Detect it and disable the block.
+            bool isTransitioning = false;
+            bool isFaulted = false;
+
             var subscription = conditionStream
                 .DistinctUntilChanged()
                 .Subscribe(isActive =>
                 {
-                    if (isActive)
+                    if (isFaulted) return;
+
+                    if (isTransitioning)
                     {
-                        // ACTIVATE: Apply everything and store the receipt in the SerialDisposable
-                        // This automatically disposes any previous receipt if it existed (though Distinct prevents thrashing)
-                        innerHandleSerial.Disposable = ApplyContent(entity, factory);
+                        isFaulted = true;
+                        Debug.LogError($"[StatBlock] '{BlockName}' was disabled: its activation condition depends on its own effects " +
+                                       "(applying or removing the block flips the condition).");
+                        return;
                     }
-                    else
+
+                    isTransitioning = true;
+                    try
                     {
-                        // DEACTIVATE: Dispose the inner content
-                        innerHandleSerial.Disposable = null;
+                        // ACTIVATE: Apply everything and store the receipt in the SerialDisposable.
+                        // DEACTIVATE: Dispose the inner content.
+                        innerHandleSerial.Disposable = isActive ? ApplyContent(entity, factory) : null;
                     }
+                    finally
+                    {
+                        isTransitioning = false;
+                    }
+
+                    if (isFaulted) innerHandleSerial.Disposable = null;
                 });
 
             activeBlockHandle.AddHandle(subscription);
