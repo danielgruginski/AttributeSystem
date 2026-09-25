@@ -84,8 +84,15 @@ namespace ReactiveSolutions.AttributeSystem.Editor
                 string path = Path.Combine(Application.dataPath, "Resources/Data/StatBlocks");
                 if (Directory.Exists(path))
                 {
-                    string[] files = Directory.GetFiles(path, "*.json");
-                    _cachedIds = files.Select(p => Path.GetFileNameWithoutExtension(p)).ToArray();
+                    // IDs are paths relative to the StatBlocks folder without extension (e.g. "Weapons/IronSword"),
+                    // which is what StatBlockJsonLoader expects. Slashes show as submenus in the popup.
+                    string root = Path.GetFullPath(path).Replace('\\', '/').TrimEnd('/') + "/";
+                    string[] files = Directory.GetFiles(path, "*.json", SearchOption.AllDirectories);
+                    _cachedIds = files
+                        .Select(p => Path.GetFullPath(p).Replace('\\', '/').Substring(root.Length))
+                        .Select(rel => rel.Substring(0, rel.Length - ".json".Length))
+                        .OrderBy(id => id)
+                        .ToArray();
                 }
                 else
                 {

@@ -14,13 +14,31 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         public EntityProfileSO _profileSO;
 
         private Entity _entity;
-        public Entity Instance => _entity;
+
+        /// <summary>
+        /// The entity driven by this controller. Created on first access, so other components can use it
+        /// from their own Awake regardless of script execution order.
+        /// </summary>
+        public Entity Instance
+        {
+            get
+            {
+                if (_entity == null) InitializeEntity();
+                return _entity;
+            }
+        }
 
         private IModifierFactory _modifierFactory;
 
         private void Awake()
         {
             InitializeEntity();
+        }
+
+        private void OnDestroy()
+        {
+            // Releases the entity's subscriptions to other entities (and its innate StatBlocks).
+            _entity?.Dispose();
         }
 
         public void InitializeEntity()

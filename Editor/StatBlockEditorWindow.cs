@@ -39,10 +39,6 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         {
             EnsureDirectory();
             if (_container == null) CreateNewContainer();
-
-            // FIX: Force ModifierFactory to initialize its static metadata.
-            // Without this, _parameterMetadata is empty until the game starts.
-            new ModifierFactory();
         }
 
         private void OnDisable()
@@ -56,7 +52,6 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             if (_container == null || _serializedObject == null || _serializedObject.targetObject == null)
             {
                 CreateNewContainer();
-                new ModifierFactory(); // Ensure factory metadata is ready
             }
 
             // Setup Styles
@@ -177,15 +172,17 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             string logicKey = GetLogicKeyString(logicProp);
 
             // -- Sync Arguments --
-            string[] paramNames = ModifierFactory.GetParameterNames(logicKey);
+            bool isKnownLogic = ModifierFactory.TryGetParameterNames(logicKey, out var paramNames);
+            if (!isKnownLogic) paramNames = new string[0];
             SerializedProperty argsProp = spec.FindPropertyRelative("Arguments");
 
-            // RESIZE SAFETY: Only resize if needed, and apply immediately
-            if (argsProp.arraySize != paramNames.Length)
+            // RESIZE SAFETY: only ever grow automatically (shrinking would delete data for logic types
+            // this editor session doesn't know); removing extras is an explicit button below.
+            if (isKnownLogic && argsProp.arraySize < paramNames.Length)
             {
                 argsProp.arraySize = paramNames.Length;
 
-                // FIX 3: Force apply so the new null elements exist in memory 
+                // FIX 3: Force apply so the new null elements exist in memory
                 // before the PropertyField tries to draw them below.
                 spec.serializedObject.ApplyModifiedProperties();
                 spec.serializedObject.Update();
@@ -201,18 +198,29 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             EditorGUILayout.EndHorizontal();
 
             // -- Arguments (Dynamic Labels) --
-            if (paramNames.Length > 0)
+            if (argsProp.arraySize > 0 || !isKnownLogic)
             {
                 EditorGUILayout.Space(5);
                 EditorGUILayout.LabelField("Parameters:", EditorStyles.miniBoldLabel);
 
+                if (!isKnownLogic)
+                {
+                    EditorGUILayout.HelpBox($"Unknown logic type '{logicKey}': arguments are kept as they are.", MessageType.Warning);
+                }
+                else if (argsProp.arraySize > paramNames.Length &&
+                         GUILayout.Button($"Remove {argsProp.arraySize - paramNames.Length} unused argument(s)"))
+                {
+                    argsProp.arraySize = paramNames.Length;
+                    spec.serializedObject.ApplyModifiedProperties();
+                    GUIUtility.ExitGUI(); // Layout changed mid-event; redraw from scratch.
+                }
+
                 EditorGUI.indentLevel++;
                 for (int j = 0; j < argsProp.arraySize; j++)
                 {
-                    if (j >= paramNames.Length) break;
-
                     SerializedProperty arg = argsProp.GetArrayElementAtIndex(j);
-                    string label = paramNames[j];
+                    string label = !isKnownLogic ? $"Argument {j}"
+                        : j < paramNames.Length ? paramNames[j] : $"Unused ({j})";
 
                     // Draw the ValueSource using its own drawer (ValueSourceSpecDrawer)
                     EditorGUILayout.PropertyField(arg, new GUIContent(label));
@@ -228,14 +236,10 @@ namespace ReactiveSolutions.AttributeSystem.Editor
 
         private string GetLogicKeyString(SerializedProperty semanticKeyProp)
         {
-            // Try to find the backing field "_value" or "Guid"
+            // The factory is keyed by the SemanticKey's string value ("_value"). Unset means Static, as at runtime.
             var valProp = semanticKeyProp.FindPropertyRelative("_value");
-            if (valProp != null) return valProp.stringValue;
-
-            var guidProp = semanticKeyProp.FindPropertyRelative("Guid");
-            if (guidProp != null) return guidProp.stringValue;
-
-            return "Static";
+            string key = valProp != null ? valProp.stringValue : null;
+            return string.IsNullOrEmpty(key) ? "Static" : key;
         }
 
         private void DrawHeader()
@@ -298,13 +302,16 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             }
 
             string path = Path.Combine(Application.dataPath, JSON_PATH);
+            // The name may include subfolders (e.g. "Weapons/IronSword"), matching StatBlockJsonLoader IDs.
             string fileName = _currentFileName.Replace(" ", "_") + ".json";
             string fullPath = Path.Combine(path, fileName);
+            Directory.CreateDirectory(Path.GetDirectoryName(fullPath));
 
             string json = JsonUtility.ToJson(_container.Data, true);
             File.WriteAllText(fullPath, json);
 
-            AssetDatabase.ImportAsset(fullPath);
+            // ImportAsset expects a project-relative path ("Assets/...").
+            AssetDatabase.ImportAsset($"Assets/{JSON_PATH}/{fileName}");
             _fullFilePath = fullPath;
             Debug.Log($"Saved StatBlock to {fileName}");
             Repaint();
@@ -327,12 +334,27 @@ namespace ReactiveSolutions.AttributeSystem.Editor
                 _serializedObject.Update();
 
                 _fullFilePath = filePath;
-                _currentFileName = Path.GetFileNameWithoutExtension(filePath);
+                _currentFileName = ToStatBlockId(filePath, path);
             }
             catch (Exception e)
             {
                 Debug.LogError($"Load failed: {e.Message}");
             }
+        }
+
+        /// <summary>
+        /// ".../Resources/Data/StatBlocks/Weapons/IronSword.json" -> "Weapons/IronSword" (the ID StatBlockJsonLoader expects).
+        /// </summary>
+        private static string ToStatBlockId(string filePath, string rootPath)
+        {
+            string full = Path.GetFullPath(filePath).Replace('\\', '/');
+            string root = Path.GetFullPath(rootPath).Replace('\\', '/').TrimEnd('/') + "/";
+            string relative = full.StartsWith(root, StringComparison.OrdinalIgnoreCase)
+                ? full.Substring(root.Length)
+                : Path.GetFileName(full);
+            return relative.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+                ? relative.Substring(0, relative.Length - ".json".Length)
+                : relative;
         }
     }
 }

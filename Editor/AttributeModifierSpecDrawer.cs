@@ -3,8 +3,6 @@ using ReactiveSolutions.AttributeSystem.Core.Data;
 using SemanticKeys;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
 using UnityEditor;
 using UnityEngine;
 
@@ -17,6 +15,25 @@ namespace ReactiveSolutions.AttributeSystem.Editor
     {
         private float LineH => EditorGUIUtility.singleLineHeight;
         private float Spacing => EditorGUIUtility.standardVerticalSpacing;
+
+        /// <summary>
+        /// The factory key for the spec's LogicType: the SemanticKey's string value ("_value"), e.g. "Linear".
+        /// </summary>
+        private static string GetLogicKey(SerializedProperty logicTypeProp)
+        {
+            var valueProp = logicTypeProp?.FindPropertyRelative("_value");
+            string key = valueProp != null ? valueProp.stringValue : null;
+            return string.IsNullOrEmpty(key) ? "Static" : key;
+        }
+
+        /// <summary>
+        /// A warning (unknown logic type) or a "remove unused arguments" button is shown above the arguments.
+        /// </summary>
+        private static bool HasArgumentsNotice(SerializedProperty argsProp, string logicKey)
+        {
+            if (!ModifierFactory.TryGetParameterNames(logicKey, out var names)) return true;
+            return argsProp.arraySize > names.Length;
+        }
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
@@ -50,6 +67,9 @@ namespace ReactiveSolutions.AttributeSystem.Editor
 
                 // Header "Parameters"
                 h += LineH + Spacing;
+
+                if (HasArgumentsNotice(argsProp, GetLogicKey(logicProp)))
+                    h += LineH + Spacing;
 
                 for (int i = 0; i < arraySize; i++)
                 {
@@ -97,12 +117,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
                     property.serializedObject.Update();
                 }
 
-                var logicValueProp = logicTypeProp.FindPropertyRelative("_value");
-                if (logicValueProp != null)
-                {
-                    currentLogic = logicValueProp.stringValue;
-                }
-                if (string.IsNullOrEmpty(currentLogic)) currentLogic = "Static";
+                currentLogic = GetLogicKey(logicTypeProp);
             }
 
             // --- 3. Target Section ---
@@ -140,11 +155,13 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             var argsProp = property.FindPropertyRelative("Arguments");
             if (argsProp != null)
             {
-                string[] paramNames = ModifierFactory.GetParameterNames(currentLogic);
-                if (paramNames == null) paramNames = new string[0];
+                bool isKnownLogic = ModifierFactory.TryGetParameterNames(currentLogic, out var paramNames);
+                if (!isKnownLogic) paramNames = new string[0];
 
-                // Check for resize need
-                if (argsProp.arraySize != paramNames.Length)
+                // Only ever GROW the list automatically. Shrinking here would silently delete serialized
+                // arguments whenever this editor session doesn't know the logic type (e.g. a custom modifier
+                // registered at runtime); removing extras is an explicit button below.
+                if (isKnownLogic && argsProp.arraySize < paramNames.Length)
                 {
                     // Resize immediately and Apply.
                     argsProp.arraySize = paramNames.Length;
@@ -158,15 +175,30 @@ namespace ReactiveSolutions.AttributeSystem.Editor
 
                 EditorGUI.LabelField(NextRect(LineH), "Parameters", EditorStyles.boldLabel);
 
+                if (!isKnownLogic)
+                {
+                    EditorGUI.HelpBox(NextRect(LineH), $"Unknown logic type '{currentLogic}': arguments are kept as they are.", MessageType.Warning);
+                }
+                else if (argsProp.arraySize > paramNames.Length)
+                {
+                    int unused = argsProp.arraySize - paramNames.Length;
+                    if (GUI.Button(NextRect(LineH), $"Remove {unused} unused argument(s)"))
+                    {
+                        argsProp.arraySize = paramNames.Length;
+                        property.serializedObject.ApplyModifiedProperties();
+                        EditorGUI.EndProperty();
+                        return;
+                    }
+                }
+
                 EditorGUI.indentLevel++;
                 for (int i = 0; i < argsProp.arraySize; i++)
                 {
-                    if (i >= paramNames.Length) break;
-
                     var element = argsProp.GetArrayElementAtIndex(i);
                     if (element != null)
                     {
-                        string paramLabel = paramNames[i];
+                        string paramLabel = !isKnownLogic ? $"Argument {i}"
+                            : i < paramNames.Length ? paramNames[i] : $"Unused ({i})";
                         float elHeight = EditorGUI.GetPropertyHeight(element, true);
                         EditorGUI.PropertyField(NextRect(elHeight), element, new GUIContent(paramLabel), true);
                     }
