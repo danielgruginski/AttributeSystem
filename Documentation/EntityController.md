@@ -43,6 +43,10 @@ Namespace: `ReactiveSolutions.AttributeSystem.Unity`.
 
 Both are read once, when the entity is created; changing them later has no effect on it. See [EntityProfile](EntityProfile.md).
 
+-   **Tick Status Effects** (`bool TickStatusEffects`, on by default)
+    
+    -   Advances the entity's [status effects](Status%20Effects.md) every frame, by `Time.deltaTime`, so their durations and ticks are in seconds. Turn it off to advance them yourself, e.g. once per turn with `Instance.TickStatusEffects(1)`.
+
 ## Public API
 
 ### Core Access

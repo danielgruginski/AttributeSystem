@@ -10,7 +10,7 @@ using UnityEngine;
 namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
 {
     /// <summary>
-    /// Writes StatBlocks, EntityProfiles and Effects in the format DataJsonReader reads: one property per builder call,
+    /// Writes StatBlocks, EntityProfiles, Effects and StatusEffects in the format DataJsonReader reads: one property per builder call,
     /// keys by name, and a "keys" table at the end with each name's GUID. Entries that do nothing (a tag or base
     /// value with no key) are left out, and so are logic fields that have their class's default value.
     /// </summary>
@@ -54,6 +54,15 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
             if (effect == null) throw new ArgumentNullException(nameof(effect));
             var writer = new DataJsonWriter(new KeyTableWriter(), roles: true);
             var root = writer.Effect(effect, "");
+            writer.AddKeyTable(root);
+            return JsonWriter.Write(root);
+        }
+
+        public static string WriteStatusEffect(StatusEffect status)
+        {
+            if (status == null) throw new ArgumentNullException(nameof(status));
+            var writer = new DataJsonWriter(new KeyTableWriter(), roles: true);
+            var root = writer.Status(status, "");
             writer.AddKeyTable(root);
             return JsonWriter.Write(root);
         }
@@ -212,7 +221,107 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
             }
             if (actions.Items.Count > 0) node.Add("actions", actions);
 
+            AddKeys(node, "removeStatuses", effect.RemoveStatusCategories);
+
+            var statuses = JsonNode.NewArray();
+            for (int i = 0; i < Count(effect.Statuses); i++)
+            {
+                var entry = effect.Statuses[i];
+                if (entry == null) continue;
+
+                string at = Index(Child(path, "statuses"), i);
+                if (string.IsNullOrEmpty(entry.StatusId))
+                {
+                    if (entry.Status == null) continue; // Not picked yet: it does nothing.
+                    throw Error(at, $"the status effect '{entry.Status.StatusName}' was built in code, and an effect file refers to " +
+                                    "status effects by ID: save it as its own file (StatusEffectJson) and use its ID");
+                }
+
+                var entryCondition = Condition(entry.Condition, Child(at, "condition"), topLevel: true);
+                bool always = entry.Chance == null || (entry.Chance.Mode == Core.ValueSource.SourceMode.Constant && entry.Chance.ConstantValue == 1f);
+                if (entry.To == EffectRole.Target && entryCondition == null && always)
+                {
+                    statuses.Add(JsonNode.From(entry.StatusId)); // Just the ID.
+                    continue;
+                }
+
+                var item = JsonNode.NewObject().Add("status", JsonNode.From(entry.StatusId));
+                if (entry.To != EffectRole.Target) item.Add("to", EnumNode(typeof(EffectRole), entry.To, Child(at, "to")));
+                if (entryCondition != null) item.Add("condition", entryCondition);
+                if (!always) item.Add("chance", ValueSource(entry.Chance, Child(at, "chance")));
+                statuses.Add(item);
+            }
+            if (statuses.Items.Count > 0) node.Add("statuses", statuses);
+
             return node;
+        }
+
+        /// <summary>An effect that does nothing: no name, condition, costs, actions or statuses (e.g. one not written yet).</summary>
+        private static bool IsEmpty(Effect effect) =>
+            effect == null ||
+            (string.IsNullOrEmpty(effect.EffectName) && IsAlways(effect.Condition) && Count(effect.Costs) == 0 && Count(effect.Actions) == 0 &&
+             Count(effect.RemoveStatusCategories) == 0 && Count(effect.Statuses) == 0);
+
+        /// <summary>A StatBlock that does nothing: no name, condition or content.</summary>
+        private static bool IsEmpty(StatBlock block) =>
+            block == null ||
+            (string.IsNullOrEmpty(block.BlockName) && IsAlways(block.ActivationCondition) && Count(block.Tags) == 0 &&
+             Count(block.RemoteTags) == 0 && Count(block.Pointers) == 0 && Count(block.BaseValues) == 0 && Count(block.Modifiers) == 0);
+
+        private static bool IsAlways(StatBlockCondition condition) => condition == null || condition.Type == StatBlockCondition.Mode.Always;
+
+        // ---------------------------------------------------------------- Status effects
+
+        private JsonNode Status(StatusEffect status, string path)
+        {
+            var node = JsonNode.NewObject();
+            node.Expanded = true;
+
+            if (!string.IsNullOrEmpty(status.StatusName)) node.Add("status", JsonNode.From(status.StatusName));
+            AddKeys(node, "categories", status.Categories);
+
+            var condition = Condition(status.Condition, Child(path, "condition"), topLevel: true);
+            if (condition != null) node.Add("condition", condition);
+
+            // No "duration": it lasts until removed. A formula not picked yet reads as 0, and null would read as no duration.
+            if (!status.LastsUntilRemoved)
+            {
+                var duration = ValueSource(status.Duration, Child(path, "duration"));
+                node.Add("duration", duration.Kind == JsonKind.Null ? JsonNode.From(0f) : duration);
+            }
+            if (status.Stacking != StatusStacking.Refresh) node.Add("stacking", EnumNode(typeof(StatusStacking), status.Stacking, Child(path, "stacking")));
+            if (status.MaxStacks != 0) node.Add("maxStacks", JsonNode.From(status.MaxStacks));
+
+            // A StatBlock file by ID, or the one written in the status. It applies to the entity, so its paths aren't roles.
+            if (!string.IsNullOrEmpty(status.StatBlockId)) node.Add("statBlock", JsonNode.From(status.StatBlockId));
+            else if (!IsEmpty(status.StatBlock)) node.Add("statBlock", new DataJsonWriter(_keys).StatBlock(status.StatBlock, Child(path, "statBlock")));
+
+            // Ticks without an effect do nothing, so they are left out.
+            var tick = status.TickInterval > 0f ? EffectEntry(status.TickEffect, Child(Child(path, "tick"), "effect")) : null;
+            if (tick != null) node.Add("tick", JsonNode.NewObject().Add("every", JsonNode.From(status.TickInterval)).Add("effect", tick));
+
+            AddEffectEntries(node, "onApply", status.OnApply, path);
+            AddEffectEntries(node, "onExpire", status.OnExpire, path);
+            return node;
+        }
+
+        /// <summary>An effect file's ID, the effect written in full, or null if it has neither.</summary>
+        private JsonNode EffectEntry(EffectEntry entry, string path)
+        {
+            if (entry == null) return null;
+            if (!string.IsNullOrEmpty(entry.EffectId)) return JsonNode.From(entry.EffectId);
+            return IsEmpty(entry.Effect) ? null : Effect(entry.Effect, path);
+        }
+
+        private void AddEffectEntries(JsonNode node, string name, List<EffectEntry> entries, string path)
+        {
+            var array = JsonNode.NewArray();
+            for (int i = 0; i < Count(entries); i++)
+            {
+                var item = EffectEntry(entries[i], Index(Child(path, name), i));
+                if (item != null) array.Add(item);
+            }
+            if (array.Items.Count > 0) node.Add(name, array);
         }
 
         private JsonNode Action(EffectAction action, string path)

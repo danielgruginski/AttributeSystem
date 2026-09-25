@@ -41,6 +41,9 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         private readonly Dictionary<SemanticKey, ResourcePool> _pools = new Dictionary<SemanticKey, ResourcePool>();
 
+        // Created when first needed: most entities (e.g. the temporary ones that effects read through) never have a status.
+        private StatusEffectHost _statusEffects;
+
         /// <summary>
         /// The key under which this entity reaches the entity it is nested in (e.g. Owner), from its profile's
         /// ParentKey; SemanticKey.None if its profile names none.
@@ -312,6 +315,42 @@ namespace ReactiveSolutions.AttributeSystem.Core
         /// <summary>This entity's pools.</summary>
         public IEnumerable<ResourcePool> Pools => _pools.Values;
 
+        // --- Status Effects ---
+
+        internal StatusEffectHost StatusEffectHost => _statusEffects ??= new StatusEffectHost(this);
+
+        /// <summary>
+        /// The status effects this entity has, in the order they were applied. Observe it (ObserveAdd, ObserveRemove)
+        /// to show them. Apply one with StatusEffect.Apply(source, target).
+        /// </summary>
+        public IReadOnlyReactiveCollection<ActiveStatusEffect> StatusEffects => StatusEffectHost.Active;
+
+        /// <summary>
+        /// Advances this entity's status effects by <paramref name="deltaTime"/>, in the units their durations use
+        /// (Time.deltaTime for seconds, or 1 per turn): their ticks, and the ones that run out. An EntityController does
+        /// this every frame.
+        /// </summary>
+        /// <param name="random">Rolls the chances of their tick and on-expire effects; a shared one if null.</param>
+        public void TickStatusEffects(float deltaTime, System.Random random = null) => _statusEffects?.Tick(deltaTime, random);
+
+        /// <summary>The instance of <paramref name="status"/> this entity has (the first one, for an Independent status), or null.</summary>
+        public ActiveStatusEffect GetStatusEffect(StatusEffect status) =>
+            _statusEffects?.Active.FirstOrDefault(active => active.Status.IsSameAs(status));
+
+        /// <summary>Removes every instance of <paramref name="status"/>, and returns how many. Their on-expire effects aren't applied.</summary>
+        public int RemoveStatusEffect(StatusEffect status) =>
+            _statusEffects?.Remove(active => active.Status.IsSameAs(status)) ?? 0;
+
+        /// <summary>
+        /// Removes every status effect in <paramref name="category"/> (e.g. Debuff): a cleanse. Returns how many were
+        /// removed. Their on-expire effects aren't applied.
+        /// </summary>
+        public int RemoveStatusEffects(SemanticKey category) =>
+            _statusEffects?.Remove(active => active.Status.Categories != null && active.Status.Categories.Contains(category)) ?? 0;
+
+        /// <summary>Removes every status effect, and returns how many.</summary>
+        public int RemoveStatusEffects() => _statusEffects?.Remove(_ => true) ?? 0;
+
         // --- External Providers ---
 
         public void RegisterExternalProvider(SemanticKey key, Entity processor)
@@ -497,6 +536,9 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
             // Clean up profile stat blocks
             _profileDisposables.Dispose();
+
+            // Status effects end (Removed), releasing their StatBlocks.
+            _statusEffects?.Dispose();
 
             foreach (var pool in _pools.Values)
             {

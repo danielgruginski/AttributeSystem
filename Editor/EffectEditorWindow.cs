@@ -52,6 +52,11 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             EditorGUILayout.Space(15);
             EditorGUILayout.LabelField("Actions", HeaderStyle);
             DrawActions(data.FindPropertyRelative("Actions"));
+
+            EditorGUILayout.Space(15);
+            EditorGUILayout.LabelField("Status Effects", HeaderStyle);
+            EditorGUILayout.PropertyField(data.FindPropertyRelative("RemoveStatusCategories"), new GUIContent("Remove (Categories)"), true);
+            EditorGUILayout.PropertyField(data.FindPropertyRelative("Statuses"), new GUIContent("Apply"), true);
         }
 
         private void DrawActions(SerializedProperty list)

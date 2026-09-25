@@ -64,6 +64,8 @@ This goes for action targets, costs, the inputs of formulas and conditions (`{ "
     
 3.  **The actions, in order.** Each one checks its own condition, rolls its chance, computes its amount and changes its attribute. An action sees the changes made by the ones before it.
     
+4.  **Status effects.** The effect removes from the target the status effects in its `removeStatuses` categories (a cleanse), then applies its `statuses` (see [Status Effects](Status%20Effects.md#applying-them-from-effects)).
+    
 
 Amounts are computed when the effect is applied, from the attributes as they are then. Applying an effect doesn't change it, so one effect can be applied any number of times, to any entities.
 
@@ -124,6 +126,7 @@ That is AttackPower x 100 / (Defense + 100): an attack of 40 against a Defense o
 | ----- | ----- |
 | `Status`, `Applied` | `Applied`, `ConditionNotMet` or `CannotPay`. `Applied` is `Status == EffectStatus.Applied`. |
 | `UnpaidCost` | The cost that couldn't be paid (e.g. Source/Mana), when `Status` is `CannotPay`. |
+| `Statuses`, `StatusesRemoved` | The status effects it applied (as their entities now have them), and how many it removed. |
 | `Changes` | Every change, in order: first the costs (`IsCost`), then the actions. Each has `Entity`, `Attribute`, `Before`, `After` and `Amount` (`After - Before`). |
 | `ChangeOf(entity, attribute)` | The total change of one attribute: `-result.ChangeOf(goblin, Stats.Health)` is the damage dealt. |
 | `Effect`, `Source`, `Target` | What was applied, and from whom to whom. |
@@ -161,6 +164,8 @@ Effect files live in `Resources/Data/Effects`. `EffectJsonLoader.Load("Spells/Fi
 | `condition` | `SetCondition(condition)` | The effect only happens if this holds (see [Conditions](JSON%20Format.md#conditions)). |
 | `costs` | `AddCost(resource, amount)` | `{ "Source/Mana": 15 }` |
 | `actions` | `AddAction(...)` | The actions, in order. |
+| `removeStatuses` | `RemoveStatuses(category)` | Categories of status effects to remove from the target: `["Debuff"]`. |
+| `statuses` | `ApplyStatus(...)` | Status effects to apply, by ID: `["Debuffs/Poison"]`, or `{ "status": "Debuffs/Poison", "to": "Source", "condition": ..., "chance": 0.3 }`. |
 | `keys` | | The key table (see [Keys](JSON%20Format.md#keys)). |
 
 An action:
@@ -183,6 +188,6 @@ actions[0].target: in an effect, "Health" must start with Source or Target, the 
 
 -   **Lasting changes are StatBlocks.** "+20 MaxHealth while blessed" is a StatBlock. An effect changes base values and pools for good, so use it for damage, healing, costs and permanent gains (a level, a point of Strength from a tome).
     
--   **Over time.** Effects don't have a duration or ticks of their own yet. For damage over time, apply an effect on a timer: the [RPG Starter](RPG%20Starter.md)'s poison applies a Poison Tick effect every second.
+-   **Over time.** What lasts, or ticks, is a [status effect](Status%20Effects.md): a poison is a status whose tick applies a Poison Tick effect every second.
     
 -   **How paths work.** An effect reads its formulas and conditions through a temporary entity whose providers are the source and the target. That is why paths start with Source or Target, and why everything that works in a StatBlock (paths, pointers, link groups, formulas) works in an effect too.

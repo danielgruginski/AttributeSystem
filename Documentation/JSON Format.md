@@ -2,7 +2,7 @@
 
 ## Overview
 
-StatBlocks, entity profiles and [effects](Effects.md) are saved as JSON files in a format of their own, which describes them the way the [Fluent Builders](Fluent%20Builders.md) build them: each property of a file is a builder call. Loading a file makes those calls; saving writes what they need.
+StatBlocks, entity profiles, [effects](Effects.md) and [status effects](Status%20Effects.md) are saved as JSON files in a format of their own, which describes them the way the [Fluent Builders](Fluent%20Builders.md) build them: each property of a file is a builder call. Loading a file makes those calls; saving writes what they need.
 
 ```json
 {
@@ -39,7 +39,7 @@ StatBlockBuilder.Create("Iron Sword")
     .Build();
 ```
 
-The **Stat Block Editor**, the **Entity Profile Editor** and the **Effect Editor** write these files (see [StatBlock](StatBlock.md), [EntityProfile](EntityProfile.md) and [Effects](Effects.md)), and the loaders read them. They are plain text, so you can also write and edit them by hand, and review them in version control.
+The **Stat Block Editor**, the **Entity Profile Editor**, the **Effect Editor** and the **Status Effect Editor** write these files (see [StatBlock](StatBlock.md), [EntityProfile](EntityProfile.md), [Effects](Effects.md) and [Status Effects](Status%20Effects.md)), and the loaders read them. They are plain text, so you can also write and edit them by hand, and review them in version control.
 
 ## Keys
 
@@ -51,7 +51,7 @@ The body names keys by name: `"Damage"`, `"Owner/Strength"` (the steps of a path
     
 -   **Writing by hand:** a name that isn't in the table is an error when the file is loaded in the game. Load and save the file in its editor window: the window looks the name up in your KeyDomains and adds it to the table. If keys in several domains have that name, write it with the domain's name, e.g. `"Tags.Poison"`.
     
--   **In code**, `StatBlockJson.FromJson(json, findKey)`, `EntityProfileJson.FromJson(json, findKey)` and `EffectJson.FromJson(json, findKey)` take a function that finds the keys missing from the table (return `SemanticKey.None` for a name you don't know). For example, a game that loads files written by modders can resolve names with its own table of keys.
+-   **In code**, `StatBlockJson.FromJson(json, findKey)`, `EntityProfileJson.FromJson(json, findKey)`, `EffectJson.FromJson(json, findKey)` and `StatusEffectJson.FromJson(json, findKey)` take a function that finds the keys missing from the table (return `SemanticKey.None` for a name you don't know). For example, a game that loads files written by modders can resolve names with its own table of keys.
     
 
 ## StatBlock Files
@@ -213,6 +213,29 @@ An effect file lists what an effect does to its source and its target: `effect`,
 }
 ```
 
+## Status Effect Files
+
+A status effect file describes a condition that lasts on an entity: `status`, `categories`, `condition`, `duration`, `stacking`, `maxStacks`, `statBlock`, `tick`, `onApply`, `onExpire` and `keys`. Paths in its condition, its duration and its effects start with `Source` or `Target`, as in an effect file. Its StatBlock applies to the entity that has the status, so the StatBlock's paths are the entity's own. See [Status Effects](Status%20Effects.md#files-and-the-status-effect-editor).
+
+```json
+{
+  "status": "Haste",
+  "categories": ["Buff"],
+  "duration": 10,
+  "statBlock": {
+    "tags": ["Hasted"],
+    "modifiers": [
+      { "target": "MoveSpeed", "type": "Multiplicative", "value": 1.5 }
+    ]
+  },
+  "keys": {
+    "Buff": "5e7a9c1b-3d5f-4a7b-9c1d-3e5f7a9b1c3d",
+    "Hasted": "7a9c1e3b-5d7f-4b9a-8c1e-3f5a7b9c1d3e",
+    "MoveSpeed": "9c1e3a5b-7d9f-4a1b-8c3e-5a7b9c1d3e5f"
+  }
+}
+```
+
 ## Reading and Writing in Code
 
 ```csharp
@@ -226,9 +249,12 @@ EntityProfile goblin = EntityProfileJson.FromJson(profileJson);
 
 string effectJson = EffectJson.ToJson(fireball);
 Effect fireballCopy = EffectJson.FromJson(effectJson);
+
+string statusJson = StatusEffectJson.ToJson(poison);
+StatusEffect poisonCopy = StatusEffectJson.FromJson(statusJson);
 ```
 
-`StatBlockJsonLoader.Load(id)`, `EntityProfileJsonLoader.Load(id)` and `EffectJsonLoader.Load(id)` read files by ID from `Resources/Data/StatBlocks`, `Resources/Data/EntityProfiles` and `Resources/Data/Effects`; see [StatBlock](StatBlock.md), [EntityProfile](EntityProfile.md) and [Effects](Effects.md).
+`StatBlockJsonLoader.Load(id)`, `EntityProfileJsonLoader.Load(id)`, `EffectJsonLoader.Load(id)` and `StatusEffectJsonLoader.Load(id)` read files by ID from `Resources/Data/StatBlocks`, `Resources/Data/EntityProfiles`, `Resources/Data/Effects` and `Resources/Data/StatusEffects`; see [StatBlock](StatBlock.md), [EntityProfile](EntityProfile.md), [Effects](Effects.md) and [Status Effects](Status%20Effects.md).
 
 ## Errors
 

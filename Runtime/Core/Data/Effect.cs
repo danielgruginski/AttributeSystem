@@ -3,7 +3,6 @@ using SemanticKeys;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using UniRx;
 using UnityEngine;
 
 namespace ReactiveSolutions.AttributeSystem.Core.Data
@@ -45,6 +44,59 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         public ValueSource Chance = ValueSource.Const(1f);
     }
 
+    /// <summary>A role of an effect: the entity it comes from, or the one it is applied to.</summary>
+    public enum EffectRole
+    {
+        Target,
+        Source
+    }
+
+    /// <summary>
+    /// A status effect that an effect applies after its actions, e.g. the poison of a venomous blade. Effect files
+    /// refer to status effects by ID.
+    /// </summary>
+    [Serializable]
+    public class EffectStatusEntry
+    {
+        [Tooltip("The status effect JSON file (under Resources/Data/StatusEffects).")]
+        [StatusEffectID]
+        public string StatusId;
+
+        /// <summary>
+        /// A status effect built in code, used instead of StatusId. Not serialized, and not saved in effect files: save
+        /// the status as its own file and refer to it by ID.
+        /// </summary>
+        [NonSerialized]
+        public StatusEffect Status;
+
+        [Tooltip("Who gets it: the Target (e.g. a poisoned blade) or the Source (e.g. a self-buff).")]
+        public EffectRole To = EffectRole.Target;
+
+        [Tooltip("It is only applied if this holds. Paths start with Source or Target.")]
+        public StatBlockCondition Condition = new StatBlockCondition();
+
+        [Tooltip("The probability that it is applied, from 0 to 1 (e.g. 0.3). 1 is always.")]
+        public ValueSource Chance = ValueSource.Const(1f);
+
+        [NonSerialized] private StatusEffect _loaded;
+        [NonSerialized] private string _loadedId;
+
+        /// <summary>The status to apply: the one built in code, or the file's (loaded once, null if it can't be).</summary>
+        internal StatusEffect Resolve()
+        {
+            if (Status != null) return Status;
+            if (string.IsNullOrEmpty(StatusId)) return null;
+
+            if (_loadedId != StatusId)
+            {
+                // The loader logs an error if the file can't be loaded.
+                _loaded = StatusEffectJsonLoader.Load(StatusId);
+                _loadedId = StatusId;
+            }
+            return _loaded;
+        }
+    }
+
     /// <summary>A cost of an effect: an amount of a resource (e.g. 15 of the Source's Mana), paid before anything else.</summary>
     [Serializable]
     public class EffectCost
@@ -63,8 +115,8 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
     /// <para>
     /// Everything an effect reads or changes is reached through its <see cref="EffectRoles"/>: "Source/AttackPower",
     /// "Target/Health". Applying it checks its <see cref="Condition"/>, pays its <see cref="Costs"/> (all of them, or
-    /// nothing happens), then runs its <see cref="Actions"/> in order. The effect itself is never modified, so one
-    /// effect can be applied any number of times, to any entities.
+    /// nothing happens), runs its <see cref="Actions"/> in order, then removes and applies status effects. The effect
+    /// itself is never modified, so one effect can be applied any number of times, to any entities.
     /// </para>
     /// </summary>
     [Serializable]
@@ -83,6 +135,12 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         [Tooltip("What the effect does, in order: each action sees the changes made by the ones before it.")]
         public List<EffectAction> Actions = new List<EffectAction>();
 
+        [Tooltip("After the actions, removes from the target the status effects in these categories (e.g. Debuff): a cleanse.")]
+        public List<SemanticKey> RemoveStatusCategories = new List<SemanticKey>();
+
+        [Tooltip("After the actions and removals, applies these status effects from the source (e.g. a poison).")]
+        public List<EffectStatusEntry> Statuses = new List<EffectStatusEntry>();
+
         /// <summary>
         /// An attribute of the effect's source, e.g. <c>Effect.Source(Stats.AttackPower)</c>, or of an entity reached
         /// from it: <c>Effect.Source(Stats.Damage, Links.MainHand)</c> is the Damage of the source's MainHand.
@@ -100,13 +158,10 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
         public EffectResult Apply(Entity source, Entity target, System.Random random = null)
         {
             // The roles are the providers of a temporary entity, so paths, formulas and conditions work as anywhere else.
-            var context = new Entity { Name = EffectName };
+            var context = RoleContext.Create(EffectName, source, target);
             try
             {
-                if (source != null && !source.IsDisposed) context.RegisterExternalProvider(EffectRoles.Source, source);
-                if (target != null && !target.IsDisposed) context.RegisterExternalProvider(EffectRoles.Target, target);
-
-                if (!Holds(Condition, context)) return new EffectResult(this, source, target, EffectStatus.ConditionNotMet);
+                if (!RoleContext.Holds(Condition, context)) return new EffectResult(this, source, target, EffectStatus.ConditionNotMet);
 
                 // 1. Costs: all of them, or nothing happens. Costs of the same resource are checked together.
                 var costs = new List<(Entity payer, EffectCost cost, float amount)>();
@@ -115,7 +170,7 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
                     if (cost == null || cost.Resource.Name == SemanticKey.None) continue;
                     if (!IsReached(cost.Resource, "cost")) continue;
 
-                    float amount = Read(cost.Amount, context);
+                    float amount = RoleContext.Read(cost.Amount, context);
                     if (!(amount > 0f) || float.IsInfinity(amount)) continue;
 
                     var payer = Reach(context, cost.Resource.Path);
@@ -154,17 +209,43 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
                     }
                     if (!IsReached(action.Target, "action")) continue;
 
-                    if (!Holds(action.Condition, context)) continue;
+                    if (!RoleContext.Holds(action.Condition, context)) continue;
                     if (!Rolls(action.Chance, context, random)) continue;
 
                     var entity = Reach(context, action.Target.Path);
                     if (entity == null) continue;
 
-                    float amount = ReadNow(action.Logic.Observe(context));
+                    float amount = RoleContext.ReadNow(action.Logic.Observe(context));
                     changes.Add(Change(entity, action.Target.Name, action.Type, amount, isCost: false));
                 }
 
-                return new EffectResult(this, source, target, EffectStatus.Applied, changes);
+                // 3. Status effects: the cleanses, then the new ones.
+                int removed = 0;
+                var targetEntity = Reach(context, new List<SemanticKey> { EffectRoles.Target });
+                if (targetEntity != null)
+                {
+                    foreach (var category in RemoveStatusCategories ?? new List<SemanticKey>())
+                    {
+                        if (category != SemanticKey.None) removed += targetEntity.RemoveStatusEffects(category);
+                    }
+                }
+
+                var statuses = new List<ActiveStatusEffect>();
+                foreach (var entry in Statuses ?? new List<EffectStatusEntry>())
+                {
+                    if (entry == null) continue;
+                    if (!RoleContext.Holds(entry.Condition, context)) continue;
+                    if (!Rolls(entry.Chance, context, random)) continue;
+
+                    var status = entry.Resolve();
+                    var recipient = Reach(context, new List<SemanticKey> { entry.To == EffectRole.Source ? EffectRoles.Source : EffectRoles.Target });
+                    if (status == null || recipient == null) continue;
+
+                    var applied = status.Apply(source, recipient, random);
+                    if (applied != null) statuses.Add(applied);
+                }
+
+                return new EffectResult(this, source, target, EffectStatus.Applied, changes, statuses: statuses, statusesRemoved: removed);
             }
             finally
             {
@@ -208,33 +289,14 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data
             return entity;
         }
 
-        private static bool Holds(StatBlockCondition condition, Entity context)
-        {
-            if (condition == null || condition.Type == StatBlockCondition.Mode.Always) return true;
-
-            bool holds = false;
-            ConditionEvaluator.Observe(condition, context).Take(1).Subscribe(value => holds = value).Dispose();
-            return holds;
-        }
-
         private static bool Rolls(ValueSource chance, Entity context, System.Random random)
         {
             if (chance == null) return true;
 
-            float probability = Read(chance, context);
+            float probability = RoleContext.Read(chance, context);
             if (probability >= 1f) return true;
             if (!(probability > 0f)) return false;
             return random.NextDouble() < probability;
-        }
-
-        private static float Read(ValueSource value, Entity context) => value == null ? 0f : ReadNow(value.GetObservable(context));
-
-        /// <summary>The current value of a stream that emits it on subscribe (as attributes and logic do).</summary>
-        private static float ReadNow(IObservable<float> stream)
-        {
-            float value = 0f;
-            stream.Take(1).Subscribe(v => value = v).Dispose();
-            return value;
         }
 
         /// <summary>The amount held: a pool's amount, or the attribute's base value (0 if the entity doesn't have it).</summary>

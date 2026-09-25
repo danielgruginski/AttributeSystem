@@ -211,11 +211,26 @@ Methods for establishing relationships between entities.
     -   Return the entity's `LinkGroup` for that key (e.g., `Groups.Inventory`). `GetLinkGroup` returns `null` if the group doesn't exist. See [LinkGroup](LinkGroup.md).
         
 
-### 8. Lifecycle
+### 8. Status Effects
+
+-   **`StatusEffects`**
+    
+    -   The status effects the entity has (poisoned, hasted), in the order they were applied: a reactive collection of `ActiveStatusEffect` (`ObserveAdd`, `ObserveRemove`). Apply one with `status.Apply(source, entity)`. See [Status Effects](Status%20Effects.md).
+        
+-   **`TickStatusEffects(float deltaTime, System.Random random = null)`**
+    
+    -   Advances them: their ticks, and the ones that run out. `deltaTime` is in the units their durations use: `Time.deltaTime` for seconds (an `EntityController` does this every frame), or 1 per turn.
+        
+-   **`GetStatusEffect(StatusEffect status)`**, **`RemoveStatusEffect(StatusEffect status)`**, **`RemoveStatusEffects(SemanticKey category)`**, **`RemoveStatusEffects()`**
+    
+    -   Find an instance, or remove the instances of a status, the statuses in a category (a cleanse, e.g. `Tags.Debuff`) or all of them. The `Remove` methods return how many were removed.
+        
+
+### 9. Lifecycle
 
 -   **`void Dispose()`** / **`bool IsDisposed`**
     
-    -   Disposes the innate StatBlocks and nested entities created by `ApplyProfile`, and all attributes: they keep their last value but stop updating and release their subscriptions to other entities.
+    -   Disposes the innate StatBlocks and nested entities created by `ApplyProfile`, removes its status effects, and disposes all attributes: they keep their last value but stop updating and release their subscriptions to other entities.
         
     -   A disposed entity ignores new modifiers and provider (un)registrations. `EntityController` disposes its entity automatically in `OnDestroy`.
         

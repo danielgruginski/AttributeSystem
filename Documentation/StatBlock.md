@@ -6,7 +6,7 @@ The `StatBlock` is the primary data container for defining an entity's statistic
 
 A `StatBlock` does not contain game logic itself. Instead, it is a blueprint that, when applied to an `Entity`, instantiates the appropriate attributes, modifiers, tags, and pointers. Applying it never modifies the `StatBlock`, so a single instance (for example one loaded from a JSON file, or authored in an `EntityController`'s profile) can be applied to any number of entities.
 
-A StatBlock changes attributes while it is applied. For one-off changes, such as damage, healing, a spell's Mana cost or a level up, use an [Effect](Effects.md).
+A StatBlock changes attributes while it is applied. For one-off changes, such as damage, healing, a spell's Mana cost or a level up, use an [Effect](Effects.md). For changes that last a while and then end on their own, such as a poison or a buff, use a [status effect](Status%20Effects.md), which applies a StatBlock for its duration.
 
 ## Key Features
 

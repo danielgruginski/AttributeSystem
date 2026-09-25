@@ -82,7 +82,43 @@ namespace ReactiveSolutions.AttributeSystem.Core.Builders
         public EffectBuilder Set(AttributeReference target, ValueSource amount, StatBlockCondition condition = null, ValueSource chance = null)
             => AddAction(target, EffectActionType.Set, ToLogic(amount), condition, chance);
 
+        /// <summary>
+        /// After the actions, removes from the target the status effects in <paramref name="category"/> (e.g.
+        /// Tags.Debuff): a cleanse.
+        /// </summary>
+        public EffectBuilder RemoveStatuses(SemanticKey category)
+        {
+            _effect.RemoveStatusCategories.Add(category);
+            return this;
+        }
+
+        /// <summary>
+        /// After the actions, applies a status effect file (by ID) from the source: to the target, or with
+        /// <paramref name="to"/> Source, to the source. With a <paramref name="condition"/> and a <paramref name="chance"/>
+        /// like an action's: <c>ApplyStatus("Debuffs/Poison", chance: 0.3f)</c>.
+        /// </summary>
+        public EffectBuilder ApplyStatus(string statusId, EffectRole to = EffectRole.Target, StatBlockCondition condition = null,
+            ValueSource chance = null)
+            => ApplyStatus(new EffectStatusEntry { StatusId = statusId }, to, condition, chance);
+
+        /// <summary>
+        /// After the actions, applies <paramref name="status"/> from the source. A status built in code can't be saved in
+        /// an effect file: to save the effect, save the status as its own file and use its ID.
+        /// </summary>
+        public EffectBuilder ApplyStatus(StatusEffect status, EffectRole to = EffectRole.Target, StatBlockCondition condition = null,
+            ValueSource chance = null)
+            => ApplyStatus(new EffectStatusEntry { Status = status }, to, condition, chance);
+
         public Effect Build() => _effect;
+
+        private EffectBuilder ApplyStatus(EffectStatusEntry entry, EffectRole to, StatBlockCondition condition, ValueSource chance)
+        {
+            entry.To = to;
+            entry.Condition = condition ?? StatBlockCondition.Always();
+            if (chance != null) entry.Chance = chance;
+            _effect.Statuses.Add(entry);
+            return this;
+        }
 
         /// <summary>A formula is used as it is; a number or an attribute becomes a Value logic.</summary>
         private static ModifierLogic ToLogic(ValueSource amount)
