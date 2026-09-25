@@ -39,3 +39,9 @@ MonoBehaviour:
   - _name: Poisoned
     _guid: b95b7004-6b13-4df1-91c7-873aa465f875
     _description: 
+  - _name: Venomous
+    _guid: 9e56228c-943b-4550-bc40-ac935bfe8c87
+    _description: 
+  - _name: Debuff
+    _guid: a6b3791f-f010-4321-97ba-f622c610871f
+    _description: 

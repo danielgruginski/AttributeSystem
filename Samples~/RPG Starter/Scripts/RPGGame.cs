@@ -11,13 +11,13 @@ namespace RPGStarter
     /// <summary>
     /// The game code a project writes on top of the Attribute System: spawning characters from their profiles,
     /// combat, equipment, inventory, the party, leveling up and a poison. The rules and numbers are in the data (the
-    /// JSON files under Resources/Data/.../RPGStarter): templates, characters, items, StatBlocks and effects.
+    /// JSON files under Resources/Data/.../RPGStarter): templates, characters, items, StatBlocks, effects and status effects.
     /// Plain C#, so tests can run it too; RPGStarterDemo drives it from a MonoBehaviour.
     /// </summary>
     public sealed class RPGGame : IDisposable
     {
         /// <summary>
-        /// The folder of the sample's data, inside Data/EntityProfiles, Data/StatBlocks and Data/Effects.
+        /// The folder of the sample's data, inside Data/EntityProfiles, Data/StatBlocks, Data/Effects and Data/StatusEffects.
         /// </summary>
         public const string Data = "RPGStarter/";
 
@@ -33,25 +33,19 @@ namespace RPGStarter
 
         private readonly List<Entity> _spawned = new List<Entity>();
         private readonly CompositeDisposable _disposables = new CompositeDisposable();
-        private readonly Dictionary<Entity, Poisoning> _poisoned = new Dictionary<Entity, Poisoning>();
         private IDisposable _blessing;
 
-        // What happens is data: each effect's condition, costs, formulas and chances are in its JSON file.
+        // What happens is data: each effect's condition, costs, formulas and chances are in its JSON file, and so are
+        // the poison's duration, stacks and ticks.
         private readonly Effect _weaponHit = EffectJsonLoader.Load(Data + "Combat/WeaponHit");
         private readonly Effect _fireball = EffectJsonLoader.Load(Data + "Spells/Fireball");
         private readonly Effect _healingPotion = EffectJsonLoader.Load(Data + "Consumables/HealingPotion");
-        private readonly Effect _poisonTick = EffectJsonLoader.Load(Data + "Debuffs/PoisonTick");
+        private readonly Effect _antidote = EffectJsonLoader.Load(Data + "Consumables/Antidote");
         private readonly Effect _levelUp = EffectJsonLoader.Load(Data + "Progression/LevelUp");
+        private readonly StatusEffect _poison = StatusEffectJsonLoader.Load(Data + "Debuffs/Poison");
         private readonly System.Random _random;
 
-        private sealed class Poisoning
-        {
-            public ActiveStatBlock Debuff;
-            public float SecondsLeft;
-            public float UntilTick;
-        }
-
-        /// <param name="random">Rolls the critical hits. Pass one with a seed to make a game repeatable.</param>
+        /// <param name="random">Rolls the critical hits and the venom. Pass one with a seed to make a game repeatable.</param>
         public RPGGame(System.Random random = null)
         {
             _random = random ?? new System.Random();
@@ -79,6 +73,16 @@ namespace RPGStarter
 
             var health = entity.GetPool(RPGStats.Health);
             if (health != null) _disposables.Add(health.Depleted.Subscribe(_ => Log($"{entity.Name} falls.")));
+
+            // Status effects end on their own: when they run out, when their condition stops holding, or when removed.
+            _disposables.Add(entity.StatusEffects.ObserveAdd().Subscribe(added =>
+            {
+                var status = added.Value;
+                status.Ended.Subscribe(reason => Log(
+                    reason == StatusEndReason.Expired ? $"The {status.Name} on {entity.Name} wears off. {HealthText(entity)}" :
+                    reason == StatusEndReason.Removed ? $"The {status.Name} on {entity.Name} is cured." :
+                    $"The {status.Name} on {entity.Name} ends."));
+            }));
             return entity;
         }
 
@@ -92,7 +96,8 @@ namespace RPGStarter
 
         /// <summary>
         /// A weapon attack (the Weapon Hit effect): the attacker's AttackPower reduced by the target's Defense, and on a
-        /// critical hit (the attacker's CritChance), the same damage again. Returns the damage dealt.
+        /// critical hit (the attacker's CritChance), the same damage again. A Venomous weapon (the Rusty Dagger) poisons
+        /// 30% of the time. Returns the damage dealt.
         /// </summary>
         public float Attack(Entity attacker, Entity target)
         {
@@ -102,6 +107,7 @@ namespace RPGStarter
             float dealt = -hit.ChangeOf(target, RPGStats.Health);
             string critical = hit.Changes.Count > 1 ? " (critical hit)" : "";
             Log($"{attacker.Name} hits {target.Name} for {dealt:0.#}{critical}. {HealthText(target)}");
+            LogStatuses(hit.Statuses);
             return dealt;
         }
 
@@ -119,6 +125,13 @@ namespace RPGStarter
             float dealt = -fireball.ChangeOf(target, RPGStats.Health);
             Log($"{caster.Name}'s fireball burns {target.Name} for {dealt:0.#}. {HealthText(target)}");
             return true;
+        }
+
+        /// <summary>The Antidote effect: removes the drinker's Debuffs, such as the Poison.</summary>
+        public void DrinkAntidote(Entity drinker)
+        {
+            var antidote = _antidote.Apply(drinker, drinker);
+            if (antidote.Applied) Log($"{drinker.Name} drinks an antidote.");
         }
 
         /// <summary>The Healing Potion effect: +40 Health, never above MaxHealth. Returns the Health restored.</summary>
@@ -174,25 +187,13 @@ namespace RPGStarter
         }
 
         /// <summary>
-        /// Poisons the target for a while: the Poison StatBlock (the Poisoned tag, slower movement) while it lasts, and
-        /// the Poison Tick effect (3 damage) every second, in <see cref="Tick"/>. Poisoning a poisoned target restarts
-        /// the timer.
+        /// Applies the Poison status effect: for 5 seconds, the Poison StatBlock (the Poisoned tag, slower movement) and
+        /// 3 damage a second. Poisoning again adds a stack (up to 3), each one as much again, and restarts the 5 seconds.
         /// </summary>
-        public void Poison(Entity target, float seconds)
+        public void Poison(Entity target)
         {
-            if (!IsAlive(target)) return;
-
-            if (!_poisoned.TryGetValue(target, out var poisoning))
-            {
-                poisoning = new Poisoning
-                {
-                    Debuff = StatBlockJsonLoader.Load(Data + "Debuffs/Poison").ApplyToEntity(target),
-                    UntilTick = 1f
-                };
-                _poisoned.Add(target, poisoning);
-            }
-            poisoning.SecondsLeft = seconds;
-            Log($"{target.Name} is poisoned for {seconds:0.#} seconds.");
+            var poison = _poison?.Apply(null, target, _random);
+            if (poison != null) LogStatuses(new[] { poison });
         }
 
         /// <summary>The party's Blessing (+MaxHealth) on or off. Health pools keep their percentage.</summary>
@@ -213,37 +214,19 @@ namespace RPGStarter
 
         public bool IsBlessed => _blessing != null;
 
-        /// <summary>Advances time: poison ticks, and poisons wearing off.</summary>
+        /// <summary>Advances time (in seconds): the entities' status effects tick, and run out.</summary>
         public void Tick(float deltaTime)
         {
-            foreach (var pair in _poisoned.ToList())
+            foreach (var entity in _spawned.ToArray())
             {
-                var target = pair.Key;
-                var poisoning = pair.Value;
-
-                // A tick every whole second the poison lasts.
-                poisoning.UntilTick -= Math.Min(deltaTime, poisoning.SecondsLeft);
-                while (poisoning.UntilTick <= 0f && IsAlive(target))
-                {
-                    _poisonTick.Apply(null, target);
-                    poisoning.UntilTick += 1f;
-                }
-
-                poisoning.SecondsLeft -= deltaTime;
-                if (poisoning.SecondsLeft <= 0f || !IsAlive(target))
-                {
-                    poisoning.Debuff.Dispose();
-                    _poisoned.Remove(target);
-                    Log($"The poison on {target.Name} wears off. {HealthText(target)}");
-                }
+                entity.TickStatusEffects(deltaTime, _random);
             }
         }
 
         public void Dispose()
         {
+            Logged = null; // Nothing to report while the game is taken down.
             _blessing?.Dispose();
-            foreach (var poisoning in _poisoned.Values) poisoning.Debuff.Dispose();
-            _poisoned.Clear();
             _disposables.Dispose();
             foreach (var entity in _spawned) entity.Dispose();
             _spawned.Clear();
@@ -257,8 +240,20 @@ namespace RPGStarter
             return health == null ? "" : $"({entity.Name}: {health.Current:0.#}/{health.Max:0.#} Health)";
         }
 
+        /// <summary>The status effects an entity has, e.g. "Poison x2 (3.5 left)".</summary>
+        public static string StatusText(Entity entity) =>
+            entity.StatusEffects.Count == 0 ? "none" : string.Join(", ", entity.StatusEffects.Select(status => status.ToString()));
+
         public static string WeightText(Entity entity) =>
             $"(Carrying {Get(entity, RPGStats.CarriedWeight):0.#}/{Get(entity, RPGStats.CarryCapacity):0.#})";
+
+        private void LogStatuses(IEnumerable<ActiveStatusEffect> statuses)
+        {
+            foreach (var status in statuses)
+            {
+                Log($"{status.Target.Name} is affected by {status.Name}{(status.Stacks > 1 ? $" ({status.Stacks} stacks)" : "")}.");
+            }
+        }
 
         private void Log(string message) => Logged?.Invoke(message);
     }

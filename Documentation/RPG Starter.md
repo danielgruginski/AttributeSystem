@@ -1,14 +1,15 @@
 # RPG Starter
 
-The package comes with a sample RPG: import it with **Window > Package Manager > Attribute System > Samples > RPG Starter > Import**, add the **RPG Starter Demo** component to an empty GameObject, and press Play. A Knight and a Mage fight a Goblin; buttons let you attack, cast, drink potions, swap weapons, carry an anvil, poison the Knight, level up and bless the party.
+The package comes with a sample RPG: import it with **Window > Package Manager > Attribute System > Samples > RPG Starter > Import**, add the **RPG Starter Demo** component to an empty GameObject, and press Play. A Knight and a Mage fight a Goblin; buttons let you attack, cast, drink potions, swap weapons, carry an anvil, poison the Knight and cure him, level up and bless the party.
 
-This page shows how it is built. The rules and numbers are data: JSON files in the sample's `Resources/Data/EntityProfiles/RPGStarter`, `Resources/Data/StatBlocks/RPGStarter` and `Resources/Data/Effects/RPGStarter` folders. The code (`Scripts/RPGGame.cs`) only spawns characters, applies effects, moves items around and counts time. Key tables are left out of the excerpts below.
+This page shows how it is built. The rules and numbers are data: JSON files in the `RPGStarter` folders of the sample's `Resources/Data/EntityProfiles`, `StatBlocks`, `Effects` and `StatusEffects`. The code (`Scripts/RPGGame.cs`) only spawns characters, applies effects, moves items around and counts time. Key tables are left out of the excerpts below.
 
 | Piece | Data | Package feature |
 | ----- | ----- | ----- |
 | Stats and formulas every character shares | `Templates/Character` | [Templates](EntityProfile.md#templates), [Modifier Logic](Modifier%20Logic.md) |
 | Health and Mana | `Templates/Character`, `Templates/Caster` | [Resource Pools](Resource%20Pools.md) |
 | Hits, spells, potions, poison ticks and leveling up | `Combat/WeaponHit`, `Spells/Fireball`, `Consumables/HealingPotion`, `Debuffs/PoisonTick`, `Progression/LevelUp` | [Effects](Effects.md) |
+| The poison, the venomous dagger and the antidote | `Debuffs/Poison` (a status effect), the Weapon Hit's `statuses`, `Consumables/Antidote` | [Status Effects](Status%20Effects.md) |
 | Weapons and armor that add to their owner | `Templates/Weapon`, `Templates/Armor` | Parent keys, [conditions](JSON%20Format.md#conditions) |
 | Inventory and encumbrance | `Templates/InventoryHolder` | [Link groups and group totals](LinkGroup.md#4-totals-over-a-group) |
 | The party's aura | `Auras/Leadership` | [LinkGroup](LinkGroup.md) |
@@ -87,6 +88,13 @@ A weapon hit is an effect from the attacker (its source) to its target:
         "divisor": { "linear": { "input": "Target/Defense", "addend": 100 } }
       }
     }
+  ],
+  "statuses": [
+    {
+      "status": "RPGStarter/Debuffs/Poison",
+      "condition": { "hasTag": "Source/MainHand/Venomous" },
+      "chance": 0.3
+    }
   ]
 }
 ```
@@ -94,6 +102,7 @@ A weapon hit is an effect from the attacker (its source) to its target:
 -   **The condition:** neither of them has fallen.
 -   **The first action** deals the attacker's AttackPower, reduced by the target's Defense (AttackPower x 100 / (Defense + 100)).
 -   **The second action** is a critical hit: the same damage again, as often as the attacker's CritChance (8% for the Knight).
+-   **The status:** a Venomous weapon poisons 30% of the time. The Goblin's Rusty Dagger has the Venomous tag, so its hits poison, and so do the Knight's once he wields the dagger.
 
 The game code applies it and reports what it did:
 
@@ -108,10 +117,11 @@ The other effects work the same way:
 
 -   **Fireball** costs 15 of the caster's Mana (`"costs": { "Source/Mana": 15 }`) and deals 1.5 x SpellPower. Without the Mana, it does nothing and `Status` is `CannotPay`, so the game logs "Mage doesn't have the Mana for a fireball."
 -   **Healing Potion** adds 40 Health, never above MaxHealth.
--   **Poison Tick** deals 3 damage.
+-   **Poison Tick** deals 3 damage (the poison applies it every second).
+-   **Antidote** removes the drinker's Debuffs (`"removeStatuses": ["Debuff"]`).
 -   **Level Up** adds 1 to Level.
 
-`RPGGame` takes a `System.Random` for the critical hits, so a seeded game (or a test) is repeatable.
+`RPGGame` takes a `System.Random` for the critical hits and the venom, so a seeded game (or a test) is repeatable.
 
 ## Gear Adds to Its Owner
 
@@ -190,9 +200,37 @@ The Goblin has an innate StatBlock that reacts to its own state:
 }
 ```
 
-## What the Sample Does by Hand
+## The Poison Is a Status Effect
 
-The poison applies its StatBlock (the Poisoned tag and slower movement) and, every second, its Poison Tick effect. Its duration and the seconds between ticks are counted in `RPGGame.Tick`: the package doesn't have timed effects yet.
+```json
+{
+  "status": "Poison",
+  "categories": ["Debuff"],
+  "condition": { "compare": ["Target/Health", ">", 0] },
+  "duration": 5,
+  "stacking": "Stack",
+  "maxStacks": 3,
+  "statBlock": "RPGStarter/Debuffs/Poison",
+  "tick": { "every": 1, "effect": "RPGStarter/Debuffs/PoisonTick" }
+}
+```
+
+-   **While it lasts:** for 5 seconds, the Poison StatBlock applies to the poisoned character (the Poisoned tag and -20% MoveSpeed), and the Poison Tick effect deals 3 damage every second.
+-   **Stacking:** poisoning again adds a stack, up to 3. Each stack slows and damages as much again, and restarts the 5 seconds.
+-   **The condition:** it ends as soon as its character falls.
+-   **The category:** Debuff, which the Antidote removes.
+
+The game code only advances time, and applies the poison when the button asks for it:
+
+```csharp
+// RPGGame.Tick, every frame:
+foreach (var entity in _spawned.ToArray()) entity.TickStatusEffects(deltaTime, _random);
+
+// RPGGame.Poison, when the button is pressed:
+var poison = _poison.Apply(null, target, _random);
+```
+
+The demo panel lists each character's status effects ("Poison x2 (3.5 left)"), and the log reports when one wears off or is cured: `RPGGame` watches each character's `StatusEffects` and the `Ended` of each status.
 
 ## Make It Yours
 
@@ -201,3 +239,4 @@ The poison applies its StatBlock (the Poisoned tag and slower movement) and, eve
 -   **A new monster:** its templates, its numbers, and a StatBlock for how it fights (like the Goblin's frenzy).
 -   **A new rule for everyone:** add a modifier to the Character Rules, e.g. Defense from Vitality.
 -   **A new spell:** an effect file, with its costs and its formula (e.g. a Heal that restores 2 x SpellPower for 10 Mana), and a line in `RPGGame` that applies it.
+-   **A new status:** a Regeneration status that Adds 2 Health every second for 10 seconds, and a potion whose effect applies it (`"statuses": ["RPGStarter/Buffs/Regeneration"]`).

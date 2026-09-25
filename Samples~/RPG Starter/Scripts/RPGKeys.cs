@@ -39,6 +39,8 @@ namespace RPGStarter
         public static readonly SemanticKey Enraged = new SemanticKey("699c7a12-3f4f-4daf-a1ae-153bb185f3d2", "Enraged", "b1dac926-dcc5-426c-9a2c-baa00d6792f5");
         public static readonly SemanticKey Encumbered = new SemanticKey("57e604d9-7bd6-4bcc-ad99-4e33853526ed", "Encumbered", "b1dac926-dcc5-426c-9a2c-baa00d6792f5");
         public static readonly SemanticKey Poisoned = new SemanticKey("b95b7004-6b13-4df1-91c7-873aa465f875", "Poisoned", "b1dac926-dcc5-426c-9a2c-baa00d6792f5");
+        public static readonly SemanticKey Venomous = new SemanticKey("9e56228c-943b-4550-bc40-ac935bfe8c87", "Venomous", "b1dac926-dcc5-426c-9a2c-baa00d6792f5");
+        public static readonly SemanticKey Debuff = new SemanticKey("a6b3791f-f010-4321-97ba-f622c610871f", "Debuff", "b1dac926-dcc5-426c-9a2c-baa00d6792f5");
     }
 
     public static class RPGLinks

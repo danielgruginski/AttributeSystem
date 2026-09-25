@@ -2,8 +2,10 @@
   "profile": "Rusty Dagger",
   "templates": ["RPGStarter/Templates/Weapon"],
   "baseAttributes": { "Damage": 4, "Weight": 1 },
+  "innateTags": ["Venomous"],
   "keys": {
     "Damage": "dccb28f9-8c40-452f-991a-a585042406bd",
-    "Weight": "6d456038-da30-4c11-96d0-a52c92072dc5"
+    "Weight": "6d456038-da30-4c11-96d0-a52c92072dc5",
+    "Venomous": "9e56228c-943b-4550-bc40-ac935bfe8c87"
   }
 }

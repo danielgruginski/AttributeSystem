@@ -1,0 +1,9 @@
+{
+  "effect": "Antidote",
+  "condition": { "compare": ["Target/Health", ">", 0] },
+  "removeStatuses": ["Debuff"],
+  "keys": {
+    "Health": "0fb4fa22-7d58-465f-9c3c-7258a14b9149",
+    "Debuff": "a6b3791f-f010-4321-97ba-f622c610871f"
+  }
+}
