@@ -37,11 +37,15 @@ Namespace: `ReactiveSolutions.AttributeSystem.Core.Data`. Keys such as `Links.Ri
 
 ## JSON Files and IDs
 
-Profiles are saved under `Assets/Resources/Data/EntityProfiles/`. A profile's ID is its path in that folder without the extension: `Assets/Resources/Data/EntityProfiles/Monsters/Goblin.json` is `"Monsters/Goblin"`. StatBlocks work the same way under `Assets/Resources/Data/StatBlocks/`.
+Profiles are JSON files in a `Resources/Data/EntityProfiles/` folder: `Assets/Resources/Data/EntityProfiles/` for new ones, or the same folder in any other Resources folder (the RPG Starter has its own). A profile's ID is its path in that folder without the extension: `.../Resources/Data/EntityProfiles/Monsters/Goblin.json` is `"Monsters/Goblin"`. StatBlocks work the same way in `Resources/Data/StatBlocks/`.
 
--   **Entity Profile Editor** (**Window > Attribute System > Entity Profile Editor**): **New**, **Load** and **Save** profile files, with the same fields as the Inspector. Type a file name such as `Monsters/Goblin` to save into a subfolder.
+-   **Entity Profile Editor** (**Tools > Attribute System > Entity Profile Editor**): **New**, **Open** (a menu of the project's profiles) and **Save**, with the same fields as the Inspector. **Save** writes back to the file you opened. The **ID** field names the file: type `Monsters/Goblin` to save into a subfolder. A new ID saves a new file, and the one you opened stays.
     
--   **ID fields** (an `EntityController`'s **Profile Id**, **Templates**, a nested entity's **Profile Id**, **Innate Stat Block Ids**) are dropdowns of the files in those folders. An ID whose file doesn't exist shows as "(missing)".
+-   **Create menu:** **Assets > Create > Attribute System > Entity Profile** starts a new profile in the window. It is saved in the folder selected in the Project window if that is a `Resources/Data/EntityProfiles` folder (or a folder in one), and in `Assets/Resources/Data/EntityProfiles/` otherwise.
+    
+-   **Double-click** a profile file in the Project window to open it in the window. **Edit as Text** opens it in your code editor.
+    
+-   **ID fields** (an `EntityController`'s **Profile Id**, **Templates**, a nested entity's **Profile Id**, **Innate Stat Block Ids**) are dropdowns of the files. **Edit**, next to a picked file, opens it in its window. An ID whose file doesn't exist shows as "(missing)".
     
 -   **In code**, `EntityProfileJsonLoader.Load("Monsters/Goblin")` returns the profile, or `null` (and logs an error) if the file can't be loaded. `"Monsters/Goblin.json"` and `"Data/EntityProfiles/Monsters/Goblin"` work too.
     
@@ -58,7 +62,7 @@ A file describes the profile the way `ProfileBuilder` builds it, e.g. `"baseAttr
 
 ## Templates
 
-A template is a profile that other profiles build on. Every character can build on a `Character` template for its stats and formulas, casters on a `Caster` template that itself builds on `Character`, and so on. A template is an ordinary profile file (these ones are in `Resources/Data/EntityProfiles/Templates/`), edited in the same window. A profile lists its templates under **Templates**, and `ProfileBuilder.AddTemplate(...)` adds them in code. (Key tables are left out of these examples.)
+A template is a profile that other profiles build on. Every character can build on a `Character` template for its stats and formulas, casters on a `Caster` template that itself builds on `Character`, and so on. A template is an ordinary profile file (these ones are in `Resources/Data/EntityProfiles/Templates/`), edited in the same window: open it with **Open**, or click **Edit** next to it in a profile's **Templates**. A profile lists its templates under **Templates**, and `ProfileBuilder.AddTemplate(...)` adds them in code. To make a template, create a profile (e.g. with **Assets > Create > Attribute System > Entity Profile** in a `Templates` folder) and add it to other profiles' **Templates**. (Key tables are left out of these examples.)
 
 ```json
 {

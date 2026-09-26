@@ -167,7 +167,7 @@ namespace ReactiveSolutions.AttributeSystem.Tests
         [TestCase("{ \"actions\": [{ \"target\": \"Target/Health\", \"value\": 1, \"linear\": {} }] }",
             "actions[0].linear: an action has one logic, but this one has both 'value' and 'linear'")]
         [TestCase("{ \"action\": [] }",
-            "action: unknown property 'action'. The properties here are: effect, condition, costs, actions, keys")]
+            "action: unknown property 'action'. The properties here are: effect, condition, costs, actions, removeStatuses, statuses, keys")]
         [TestCase("{ \"modifiers\": [] }",
             "modifiers: unknown property 'modifiers' (is this a StatBlock file?)")]
         [TestCase("{ \"actions\": [{ \"target\": \"Target/Health\", \"type\": \"Damage\", \"value\": 1 }] }",

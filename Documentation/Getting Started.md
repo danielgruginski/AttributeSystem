@@ -13,9 +13,9 @@ Welcome! This guide will walk you through setting up a basic character, creating
 
 First, let's create a Game Object that can hold stats.
 
-1.  Create a new Empty GameObject in your scene and name it **"Player"**.
+1.  Choose **GameObject > Attribute System > Entity**, and name the new GameObject **"Player"**. It is an empty GameObject with an `EntityController` component.
     
-2.  Add the `EntityController` component to it. Leave **Profile Id** and **Profile** empty for this guide: the script below sets the stats.
+2.  Leave the `EntityController`'s **Profile Id** and **Profile** empty for this guide: the script below sets the stats.
     
 3.  Create a new C# script named `PlayerSetup.cs` and attach it to the Player.
     
@@ -51,9 +51,9 @@ public class PlayerSetup : MonoBehaviour
 
 We will use the visual editor to create our Sword's stats.
 
-1.  Open the editor: Go to **Window > Attribute System > Stat Block Editor (Unified)**.
+1.  Open the editor: Go to **Tools > Attribute System > Stat Block Editor**.
     
-2.  The window opens with an unsaved new block (click **New** to start over). In the **Filename (No ext)** field, type **"Weapons/IronSword"**, and set **Block Name** to "Iron Sword" (block names and each modifier's optional **Source Id** show up in logs and in the Attribute Debugger).
+2.  The window opens with an unsaved new block (click **New** to start over). In the **ID** field, type **"Weapons/IronSword"** (the file's path, without `.json`), and set **Block Name** to "Iron Sword" (block names and each modifier's optional **Source Id** show up in logs and in the Attribute Debugger).
     
 3.  **Add Base Damage:**
     
@@ -154,13 +154,15 @@ Finally, let's see the result.
 
 ## Next Steps
 
--   **Profiles:** Instead of setting stats in a script, save them as a JSON profile with **Window > Attribute System > Entity Profile Editor** and pick it in the `EntityController`'s **Profile Id**. Stats and formulas that many entities share go in a template (e.g. `Templates/Character`) that their profiles build on (see [EntityProfile](EntityProfile.md#templates)).
+-   **Profiles:** Instead of setting stats in a script, save them as a JSON profile with **Tools > Attribute System > Entity Profile Editor** and pick it in the `EntityController`'s **Profile Id**. Stats and formulas that many entities share go in a template (e.g. `Templates/Character`) that their profiles build on (see [EntityProfile](EntityProfile.md#templates)).
     
 -   **Health Bars:** Make Health a pool up to MaxHealth (see [Resource Pools](Resource%20Pools.md)): damage and healing then stay between 0 and MaxHealth. Use `AttributeProgressBar` to display "Health" / "MaxHealth".
     
--   **Hits, Spells and Potions:** Write what an attack or a spell does as an effect, with **Window > Attribute System > Effect Editor**: its cost, its formula over the attacker's and the target's stats, and a chance to crit. Then apply it with `effect.Apply(attacker, target)` (see [Effects](Effects.md)).
+-   **Poisons and Buffs:** A status effect lasts on an entity: a StatBlock while it lasts, an effect every tick, and stacking rules (see [Status Effects](Status%20Effects.md)). An `EntityController` advances them every frame.
     
--   **A Whole Game:** Import the RPG Starter sample (**Window > Package Manager > Attribute System > Samples**) to see templates, pools, effects, gear, inventory weight and a party working together (see [RPG Starter](RPG%20Starter.md)).
+-   **Hits, Spells and Potions:** Write what an attack or a spell does as an effect, with **Tools > Attribute System > Effect Editor**: its cost, its formula over the attacker's and the target's stats, and a chance to crit. Then apply it with `effect.Apply(attacker, target)` (see [Effects](Effects.md)).
+    
+-   **A Whole Game:** Import the RPG Starter sample (**Window > Package Manager > Attribute System > Samples**) to see templates, pools, effects, status effects, gear, inventory weight and a party working together (see [RPG Starter](RPG%20Starter.md)).
     
 -   **Your Own Logic:** Write a small `[Serializable]` class to compute a modifier's value; it shows up in the **Logic** dropdown (see [Modifier Logic](Modifier%20Logic.md)).
     

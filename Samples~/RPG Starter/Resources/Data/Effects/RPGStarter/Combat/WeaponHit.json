@@ -22,10 +22,19 @@
       }
     }
   ],
+  "statuses": [
+    {
+      "status": "RPGStarter/Debuffs/Poison",
+      "condition": { "hasTag": "Source/MainHand/Venomous" },
+      "chance": 0.3
+    }
+  ],
   "keys": {
     "Health": "0fb4fa22-7d58-465f-9c3c-7258a14b9149",
     "AttackPower": "d61b2749-7a12-44df-8748-cb3100762878",
     "Defense": "ce8f7ca3-3a79-4411-8b98-0be06c78cd1a",
-    "CritChance": "eab968c8-e357-4c0d-a79a-634b2a58cee8"
+    "CritChance": "eab968c8-e357-4c0d-a79a-634b2a58cee8",
+    "MainHand": "af0b9161-f594-4631-8350-0a4534a97994",
+    "Venomous": "9e56228c-943b-4550-bc40-ac935bfe8c87"
   }
 }

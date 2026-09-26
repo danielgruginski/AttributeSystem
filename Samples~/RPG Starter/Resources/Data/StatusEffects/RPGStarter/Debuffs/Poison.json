@@ -1,0 +1,14 @@
+{
+  "status": "Poison",
+  "categories": ["Debuff"],
+  "condition": { "compare": ["Target/Health", ">", 0] },
+  "duration": 5,
+  "stacking": "Stack",
+  "maxStacks": 3,
+  "statBlock": "RPGStarter/Debuffs/Poison",
+  "tick": { "every": 1, "effect": "RPGStarter/Debuffs/PoisonTick" },
+  "keys": {
+    "Debuff": "a6b3791f-f010-4321-97ba-f622c610871f",
+    "Health": "0fb4fa22-7d58-465f-9c3c-7258a14b9149"
+  }
+}

@@ -34,7 +34,7 @@ Namespace: `ReactiveSolutions.AttributeSystem.Unity`.
 
 -   **Profile Id** (`string ProfileId`)
     
-    -   A profile JSON file under `Resources/Data/EntityProfiles`, picked from a dropdown (create them with **Window > Attribute System > Entity Profile Editor**). Applied first. If the file can't be loaded, an error is logged and only the inline profile is applied.
+    -   A profile JSON file under `Resources/Data/EntityProfiles`, picked from a dropdown (create them with **Tools > Attribute System > Entity Profile Editor**, and click **Edit** next to the dropdown to open the picked one). Applied first. If the file can't be loaded, an error is logged and only the inline profile is applied.
         
 -   **Profile** (`EntityProfile Profile`)
     
@@ -42,6 +42,10 @@ Namespace: `ReactiveSolutions.AttributeSystem.Unity`.
         
 
 Both are read once, when the entity is created; changing them later has no effect on it. See [EntityProfile](EntityProfile.md).
+
+-   **Tick Status Effects** (`bool TickStatusEffects`, on by default)
+    
+    -   Advances the entity's [status effects](Status%20Effects.md) every frame, by `Time.deltaTime`, so their durations and ticks are in seconds. Turn it off to advance them yourself, e.g. once per turn with `Instance.TickStatusEffects(1)`.
 
 ## Public API
 

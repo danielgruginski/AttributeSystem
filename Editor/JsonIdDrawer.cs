@@ -1,25 +1,25 @@
 using UnityEngine;
 using UnityEditor;
-using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 
 namespace ReactiveSolutions.AttributeSystem.Editor
 {
     /// <summary>
-    /// Base for dropdowns that pick a JSON data file by ID: its path under a Resources folder without the
-    /// extension (e.g. "Weapons/IronSword"), which is what the JSON loaders expect. Slashes show as submenus.
+    /// Base for dropdowns that pick a JSON data file by ID: its path in its data folder without the extension (e.g.
+    /// "Weapons/IronSword"), which is what the JSON loaders expect. The dropdown lists the files of every Resources
+    /// folder, and slashes show as submenus. Edit opens the picked file in its editor window: a profile's template in
+    /// the Entity Profile Editor, a StatBlock in the Stat Block Editor, and so on.
     /// </summary>
     public abstract class JsonIdDrawer : PropertyDrawer
     {
-        /// <summary>The folder with the JSON files, relative to Assets (e.g. "Resources/Data/StatBlocks").</summary>
-        protected abstract string Folder { get; }
+        private const float EditWidth = 38f;
+        private static readonly GUIContent EditContent = new GUIContent("Edit", "Open this file in its editor window.");
+
+        /// <summary>The kind of file picked.</summary>
+        internal abstract DataKind Kind { get; }
 
         /// <summary>The string property holding the ID (the property itself, or a field of it).</summary>
         protected virtual SerializedProperty GetIdProperty(SerializedProperty property) => property;
-
-        private static readonly Dictionary<string, (string[] ids, float time)> _cache = new Dictionary<string, (string[], float)>();
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
@@ -30,26 +30,35 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             // Draw Label
             position = EditorGUI.PrefixLabel(position, GUIUtility.GetControlID(FocusType.Passive), label);
 
-            string[] ids = GetIds(Folder);
+            var files = DataFiles.Find(Kind.ResourcesPath);
             string currentId = idProperty.stringValue;
 
-            var displayOptions = new List<string> { "None" };
-            displayOptions.AddRange(ids);
-
-            int selectedIndex = 0;
-            if (!string.IsNullOrEmpty(currentId))
+            // Edit, when the ID names a file. It opens once this GUI pass is over, since the file may replace what is being drawn.
+            string currentPath = DataFiles.PathOf(Kind.ResourcesPath, currentId);
+            if (currentPath != null)
             {
-                int index = Array.IndexOf(ids, currentId);
-                if (index >= 0)
+                var button = new Rect(position.xMax - EditWidth, position.y, EditWidth, EditorGUIUtility.singleLineHeight);
+                position.width -= EditWidth + 2f;
+                if (GUI.Button(button, EditContent, EditorStyles.miniButton))
                 {
-                    selectedIndex = index + 1;
+                    var kind = Kind;
+                    EditorApplication.delayCall += () => kind.Open(currentPath);
                 }
-                else
-                {
-                    // Keep showing an ID whose file is gone (or not created yet) instead of "None".
-                    displayOptions.Add($"{currentId} (missing)");
-                    selectedIndex = displayOptions.Count - 1;
-                }
+            }
+
+            var displayOptions = new List<string> { "None" };
+            int selectedIndex = 0;
+            for (int i = 0; i < files.Count; i++)
+            {
+                displayOptions.Add(files[i].Id);
+                if (files[i].Id == currentId) selectedIndex = i + 1;
+            }
+
+            if (!string.IsNullOrEmpty(currentId) && selectedIndex == 0)
+            {
+                // Keep showing an ID whose file is gone (or not created yet) instead of "None".
+                displayOptions.Add($"{currentId} (missing)");
+                selectedIndex = displayOptions.Count - 1;
             }
 
             int newIndex = EditorGUI.Popup(position, selectedIndex, displayOptions.ToArray());
@@ -57,33 +66,10 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             if (newIndex != selectedIndex)
             {
                 if (newIndex == 0) idProperty.stringValue = "";
-                else if (newIndex <= ids.Length) idProperty.stringValue = ids[newIndex - 1];
+                else if (newIndex <= files.Count) idProperty.stringValue = files[newIndex - 1].Id;
             }
 
             EditorGUI.EndProperty();
-        }
-
-        private static string[] GetIds(string folder)
-        {
-            if (_cache.TryGetValue(folder, out var cached) && Time.realtimeSinceStartup - cached.time <= 5f)
-            {
-                return cached.ids;
-            }
-
-            string[] ids = new string[0];
-            string path = Path.Combine(Application.dataPath, folder);
-            if (Directory.Exists(path))
-            {
-                string root = Path.GetFullPath(path).Replace('\\', '/').TrimEnd('/') + "/";
-                ids = Directory.GetFiles(path, "*.json", SearchOption.AllDirectories)
-                    .Select(p => Path.GetFullPath(p).Replace('\\', '/').Substring(root.Length))
-                    .Select(rel => rel.Substring(0, rel.Length - ".json".Length))
-                    .OrderBy(id => id)
-                    .ToArray();
-            }
-
-            _cache[folder] = (ids, Time.realtimeSinceStartup);
-            return ids;
         }
     }
 }

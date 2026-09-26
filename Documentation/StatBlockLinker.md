@@ -34,7 +34,7 @@ Namespace: `ReactiveSolutions.AttributeSystem.Unity`. Adding the component also 
     
     -   The IDs of the JSON files to load (e.g., "Weapons/IronSword"), applied in list order.
         
-    -   _Note:_ The custom drawer for each element scans `Assets/Resources/Data/StatBlocks` (including subfolders) to populate a dropdown.
+    -   _Note:_ Each element is a dropdown of the StatBlock files in every `Resources/Data/StatBlocks` folder (including subfolders). **Edit** opens the picked one in the Stat Block Editor.
         
 -   **`Controller`**
     

@@ -56,8 +56,11 @@ namespace ReactiveSolutions.AttributeSystem.Core
     {
         private static readonly EffectChange[] NoChanges = new EffectChange[0];
 
+        private static readonly ActiveStatusEffect[] NoStatuses = new ActiveStatusEffect[0];
+
         internal EffectResult(Effect effect, Entity source, Entity target, EffectStatus status,
-            IReadOnlyList<EffectChange> changes = null, AttributeReference unpaidCost = default)
+            IReadOnlyList<EffectChange> changes = null, AttributeReference unpaidCost = default,
+            IReadOnlyList<ActiveStatusEffect> statuses = null, int statusesRemoved = 0)
         {
             Effect = effect;
             Source = source;
@@ -65,6 +68,8 @@ namespace ReactiveSolutions.AttributeSystem.Core
             Status = status;
             Changes = changes ?? NoChanges;
             UnpaidCost = unpaidCost;
+            Statuses = statuses ?? NoStatuses;
+            StatusesRemoved = statusesRemoved;
         }
 
         /// <summary>The effect applied.</summary>
@@ -90,6 +95,12 @@ namespace ReactiveSolutions.AttributeSystem.Core
 
         /// <summary>The changes, in order: the costs, then the actions that happened.</summary>
         public IReadOnlyList<EffectChange> Changes { get; }
+
+        /// <summary>The status effects it applied, as their entities now have them (new, refreshed or stacked).</summary>
+        public IReadOnlyList<ActiveStatusEffect> Statuses { get; }
+
+        /// <summary>How many status effects it removed from the target (see Effect.RemoveStatusCategories).</summary>
+        public int StatusesRemoved { get; }
 
         /// <summary>
         /// How much <paramref name="attribute"/> of <paramref name="entity"/> changed in total: <c>-result.ChangeOf(target,

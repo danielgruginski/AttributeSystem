@@ -60,7 +60,8 @@ namespace RPGStarter
                 if (carriesAnvil) _game.Drop(_game.Knight, _anvil);
                 else _game.PickUp(_game.Knight, _anvil);
             }
-            if (GUILayout.Button("Poison the Knight (5 s)")) _game.Poison(_game.Knight, 5f);
+            if (GUILayout.Button("Poison the Knight")) _game.Poison(_game.Knight);
+            if (GUILayout.Button("Knight drinks an antidote")) _game.DrinkAntidote(_game.Knight);
             if (GUILayout.Button("Level up the Knight")) _game.LevelUp(_game.Knight);
             if (GUILayout.Button(_game.IsBlessed ? "End the Blessing" : "Bless the party")) _game.ToggleBlessing();
             GUILayout.EndHorizontal();
@@ -97,6 +98,7 @@ namespace RPGStarter
 
             var tags = character.Tags.Select(tag => tag.Key.Value).OrderBy(name => name);
             GUILayout.Label("Tags: " + string.Join(", ", tags));
+            GUILayout.Label("Status effects: " + RPGGame.StatusText(character));
             GUILayout.EndVertical();
         }
 

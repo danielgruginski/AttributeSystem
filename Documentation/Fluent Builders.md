@@ -1,11 +1,11 @@
 ﻿
 # Fluent Builders
 
-The Fluent Builder API provides a powerful, code-driven way to generate `StatBlock` POCOs (Plain Old C# Objects), `EntityProfile`s and `Effect`s.
+The Fluent Builder API provides a powerful, code-driven way to generate `StatBlock` POCOs (Plain Old C# Objects), `EntityProfile`s, `Effect`s and `StatusEffect`s.
 
 While the Unity Inspector is great for visually tweaking single entities, it quickly becomes tedious when managing hundreds of items, characters, or procedurally generated content. The Fluent Builders allow you to define complex relational data, nested entities, and reactive modifiers entirely in C#, giving you compile-time safety, auto-complete, and the ability to use loops and variables to mass-generate content.
 
-The builders are also how JSON files are read: each property of a StatBlock, profile or effect file is a builder call (`"tags": ["Magical"]` is `AddTag(Tags.Magical)`). See [JSON Format](JSON%20Format.md).
+The builders are also how JSON files are read: each property of a StatBlock, profile, effect or status effect file is a builder call (`"tags": ["Magical"]` is `AddTag(Tags.Magical)`). See [JSON Format](JSON%20Format.md).
 
 ## 1. StatBlockBuilder
 
@@ -179,8 +179,26 @@ EffectResult result = fireball.Apply(mage, goblin);
     
 -   A path that doesn't start with the source or the target throws an `ArgumentException`.
     
+-   `ApplyStatus("Debuffs/Poison", chance: 0.3f)` applies a status effect after the actions, and `RemoveStatuses(Tags.Debuff)` cleanses.
+    
 
-## 5. Integration Workflow (The Data/Asset Split)
+## 5. StatusEffectBuilder
+
+The `StatusEffectBuilder` creates [Status Effects](Status%20Effects.md): conditions that last on an entity, with a StatBlock while they last and effects when they tick, start and run out.
+
+```csharp
+StatusEffect poison = StatusEffectBuilder.Create("Poison")
+    .AddCategory(Tags.Debuff)                         // RemoveStatusEffects(Tags.Debuff) cleanses it
+    .SetDuration(5f)                                  // Without it, it lasts until removed
+    .SetStacking(StatusStacking.Stack, maxStacks: 3)
+    .SetStatBlock("Debuffs/Poison")                   // Applied to the entity, once per stack
+    .SetTick(1f, "Debuffs/PoisonTick")                // Every second, from the source to the entity
+    .Build();
+
+ActiveStatusEffect active = poison.Apply(goblin, hero);
+```
+
+## 6. Integration Workflow (The Data/Asset Split)
 
 The builders create their objects in memory: `StatBlockBuilder` outputs a plain, serializable `StatBlock`, and `ProfileBuilder` a plain, serializable `EntityProfile`. You can use these built objects in two primary ways:
 
@@ -192,7 +210,7 @@ The builders create their objects in memory: `StatBlockBuilder` outputs a plain,
     
     ```
     
-2.  **Editor Generation Scripts:** Write a custom Unity Editor script that builds the data in code and saves it as JSON files with `StatBlockJson.ToJson`, `EntityProfileJson.ToJson` and `EffectJson.ToJson`. The editor windows and the ID dropdowns (such as an `EntityController`'s **Profile Id**) then pick them up. An ID is the file's path in its folder without the extension.
+2.  **Editor Generation Scripts:** Write a custom Unity Editor script that builds the data in code and saves it as JSON files with `StatBlockJson.ToJson`, `EntityProfileJson.ToJson`, `EffectJson.ToJson` and `StatusEffectJson.ToJson`. The editor windows and the ID dropdowns (such as an `EntityController`'s **Profile Id**) then pick them up. An ID is the file's path in its folder without the extension.
     
     ```csharp
     // Example inside an Editor script:

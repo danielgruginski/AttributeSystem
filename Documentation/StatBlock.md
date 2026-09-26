@@ -6,7 +6,7 @@ The `StatBlock` is the primary data container for defining an entity's statistic
 
 A `StatBlock` does not contain game logic itself. Instead, it is a blueprint that, when applied to an `Entity`, instantiates the appropriate attributes, modifiers, tags, and pointers. Applying it never modifies the `StatBlock`, so a single instance (for example one loaded from a JSON file, or authored in an `EntityController`'s profile) can be applied to any number of entities.
 
-A StatBlock changes attributes while it is applied. For one-off changes, such as damage, healing, a spell's Mana cost or a level up, use an [Effect](Effects.md).
+A StatBlock changes attributes while it is applied. For one-off changes, such as damage, healing, a spell's Mana cost or a level up, use an [Effect](Effects.md). For changes that last a while and then end on their own, such as a poison or a buff, use a [status effect](Status%20Effects.md), which applies a StatBlock for its duration.
 
 ## Key Features
 
@@ -180,7 +180,7 @@ This is the main entry point for using a StatBlock at runtime. It can be called 
 
 ## JSON Files
 
-A StatBlock can be saved as a `.json` file. The **Stat Block Editor** (**Window > Attribute System > Stat Block Editor (Unified)**) saves these files to `Assets/Resources/Data/StatBlocks/`, and `StatBlockJsonLoader` reads them from there. A file describes the block the way `StatBlockBuilder` builds it, one property per builder call, and names keys by name, with a table of their GUIDs at the end (see [JSON Format](JSON%20Format.md)):
+A StatBlock can be saved as a `.json` file. The **Stat Block Editor** (**Tools > Attribute System > Stat Block Editor**) saves new files to `Assets/Resources/Data/StatBlocks/` (and a file it opened back where it was), and `StatBlockJsonLoader` reads them from the `Data/StatBlocks` folder of any Resources folder. **Assets > Create > Attribute System > Stat Block** starts a new one, and double-clicking a file opens it. A file describes the block the way `StatBlockBuilder` builds it, one property per builder call, and names keys by name, with a table of their GUIDs at the end (see [JSON Format](JSON%20Format.md)):
 
 ```json
 {

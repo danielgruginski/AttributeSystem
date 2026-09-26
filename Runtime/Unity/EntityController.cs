@@ -9,12 +9,16 @@ namespace ReactiveSolutions.AttributeSystem.Unity
 {
     public class EntityController : MonoBehaviour
     {
-        [Tooltip("A profile saved as JSON under Resources/Data/EntityProfiles (see Window > Attribute System > Entity Profile Editor). Applied first.")]
+        [Tooltip("A profile saved as JSON under Resources/Data/EntityProfiles (see Tools > Attribute System > Entity Profile Editor). Applied first.")]
         [EntityProfileID]
         public string ProfileId;
 
         [Tooltip("A profile authored here. Applied after the Profile Id's, so its base values win. Leave it empty to use only the Profile Id.")]
         public EntityProfile Profile = new EntityProfile();
+
+        [Tooltip("Advances the entity's status effects every frame by Time.deltaTime (their durations and ticks in seconds). " +
+                 "Turn it off to advance them yourself, e.g. once per turn with Instance.TickStatusEffects(1).")]
+        public bool TickStatusEffects = true;
 
         private Entity _entity;
 
@@ -34,6 +38,11 @@ namespace ReactiveSolutions.AttributeSystem.Unity
         private void Awake()
         {
             InitializeEntity();
+        }
+
+        private void Update()
+        {
+            if (TickStatusEffects) _entity?.TickStatusEffects(Time.deltaTime);
         }
 
         private void OnDestroy()

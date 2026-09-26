@@ -11,8 +11,8 @@ using UnityEngine;
 namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
 {
     /// <summary>
-    /// Builds StatBlocks, EntityProfiles and Effects from JSON by calling their builders: each property of the file is
-    /// a builder call ("tags": ["Magical"] is AddTag(Magical), a modifier is AddModifier(...)). Keys are written by
+    /// Builds StatBlocks, EntityProfiles, Effects and StatusEffects from JSON by calling their builders: each property of
+    /// the file is a builder call ("tags": ["Magical"] is AddTag(Magical), a modifier is AddModifier(...)). Keys are written by
     /// name and resolved with the file's "keys" table. Every error says where it is: its path in the file, line
     /// and column. See Documentation/JSON Format.md.
     /// </summary>
@@ -25,7 +25,11 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
             "profile", "templates", "parentKey", "baseAttributes", "pools", "innateTags", "linkGroups", "nestedEntities",
             "pointers", "innateStatBlocks", "keys"
         };
-        private static readonly string[] EffectProperties = { "effect", "condition", "costs", "actions", "keys" };
+        private static readonly string[] EffectProperties = { "effect", "condition", "costs", "actions", "removeStatuses", "statuses", "keys" };
+        private static readonly string[] StatusProperties =
+        {
+            "status", "categories", "condition", "duration", "stacking", "maxStacks", "statBlock", "tick", "onApply", "onExpire", "keys"
+        };
         private static readonly string[] ModifierProperties = { "target", "type", "priority", "source" };
         private static readonly string[] ActionProperties = { "target", "type", "condition", "chance" };
         private static readonly string[] ConditionKinds = { "hasTag", "lacksTag", "compare", "all", "any" };
@@ -60,7 +64,13 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
         public static Effect ReadEffect(string json, Func<string, SemanticKey> findKey)
         {
             var root = JsonParser.Parse(json);
-            return Create(root, findKey, roles: true).Effect(root, "");
+            return Create(root, findKey, roles: true).Effect(root, "", isRoot: true);
+        }
+
+        public static StatusEffect ReadStatusEffect(string json, Func<string, SemanticKey> findKey)
+        {
+            var root = JsonParser.Parse(json);
+            return Create(root, findKey, roles: true).Status(root, "");
         }
 
         private static DataJsonReader Create(JsonNode root, Func<string, SemanticKey> findKey, bool roles = false)
@@ -314,12 +324,13 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
             if (kind != "StatBlock" && Match(property, StatBlockProperties) != null) kinds.Add("a StatBlock");
             if (kind != "profile" && Match(property, ProfileProperties) != null) kinds.Add("an entity profile");
             if (kind != "effect" && Match(property, EffectProperties) != null) kinds.Add("an effect");
+            if (kind != "status effect" && Match(property, StatusProperties) != null) kinds.Add("a status effect");
             return kinds.Count == 0 ? "" : $" (is this {string.Join(" or ", kinds)} file?)";
         }
 
         // ---------------------------------------------------------------- Effects
 
-        private Effect Effect(JsonNode node, string path)
+        private Effect Effect(JsonNode node, string path, bool isRoot)
         {
             ExpectObject(node, path, "an effect");
             CheckDuplicates(node, path);
@@ -335,7 +346,10 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
                 switch (Match(property.Key, EffectProperties))
                 {
                     case "effect":
+                        break;
+
                     case "keys":
+                        if (!isRoot) throw Error(value, at, "the \"keys\" table belongs at the top level of the file");
                         break;
 
                     case "condition":
@@ -358,8 +372,22 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
                         }
                         break;
 
+                    case "removeStatuses":
+                        foreach (var (item, itemPath) in Array(value, at, "an array of status effect categories, e.g. [\"Debuff\"]"))
+                        {
+                            builder.RemoveStatuses(Key(item, itemPath));
+                        }
+                        break;
+
+                    case "statuses":
+                        foreach (var (item, itemPath) in Array(value, at, "an array of status effects, e.g. [\"Debuffs/Poison\"]"))
+                        {
+                            StatusEntry(builder, item, itemPath);
+                        }
+                        break;
+
                     default:
-                        throw UnknownProperty(property, at, EffectProperties, FileKindHint(property.Key, "effect"));
+                        throw UnknownProperty(property, at, EffectProperties, isRoot ? FileKindHint(property.Key, "effect") : "");
                 }
             }
 
@@ -417,6 +445,183 @@ namespace ReactiveSolutions.AttributeSystem.Core.Data.Json
             }
 
             builder.AddAction(target, type, logic, condition, chance);
+        }
+
+        /// <summary>A status effect an effect applies: its file's ID, or { "status": ID, "to", "condition", "chance" }.</summary>
+        private void StatusEntry(EffectBuilder builder, JsonNode node, string path)
+        {
+            const string Expected = "a status effect ID such as \"Debuffs/Poison\", or { \"status\": \"Debuffs/Poison\", \"chance\": 0.3 }";
+            if (node.Kind == JsonKind.String)
+            {
+                builder.ApplyStatus(node.Text);
+                return;
+            }
+            ExpectObject(node, path, Expected);
+            CheckDuplicates(node, path);
+
+            var names = new[] { "status", "to", "condition", "chance" };
+            string id = null;
+            var to = EffectRole.Target;
+            StatBlockCondition condition = null;
+            ValueSource chance = null;
+
+            foreach (var property in node.Properties)
+            {
+                string at = Child(path, property.Key);
+                var value = property.Value;
+                switch (Match(property.Key, names))
+                {
+                    case "status":
+                        if (value.Kind == JsonKind.Object)
+                        {
+                            throw Error(value, at, "an effect refers to a status effect by its file's ID, e.g. \"Debuffs/Poison\": save the status as its own file");
+                        }
+                        id = String(value, at, "a status effect ID such as \"Debuffs/Poison\"");
+                        break;
+                    case "to":
+                        to = (EffectRole)Enum(typeof(EffectRole), value, at);
+                        break;
+                    case "condition":
+                        condition = Condition(value, at);
+                        break;
+                    case "chance":
+                        chance = ValueSource(value, at);
+                        break;
+                    default:
+                        throw UnknownProperty(property, at, names, "");
+                }
+            }
+
+            if (string.IsNullOrEmpty(id)) throw Error(node, path, "a status entry needs a \"status\": the ID of a status effect file");
+            builder.ApplyStatus(id, to, condition, chance);
+        }
+
+        // ---------------------------------------------------------------- Status effects
+
+        private StatusEffect Status(JsonNode node, string path)
+        {
+            ExpectObject(node, path, "a status effect");
+            CheckDuplicates(node, path);
+
+            var name = node.Find("status");
+            var builder = StatusEffectBuilder.Create(name != null ? String(name, Child(path, "status")) ?? "" : "");
+            var stacking = StatusStacking.Refresh;
+            int maxStacks = 0;
+
+            foreach (var property in node.Properties)
+            {
+                string at = Child(path, property.Key);
+                var value = property.Value;
+                string matched = Match(property.Key, StatusProperties);
+
+                switch (matched)
+                {
+                    case "status":
+                    case "keys":
+                        break;
+
+                    case "categories":
+                        foreach (var (item, itemPath) in Array(value, at, "an array of categories, e.g. [\"Debuff\"]"))
+                        {
+                            builder.AddCategory(Key(item, itemPath));
+                        }
+                        break;
+
+                    case "condition":
+                        builder.SetCondition(Condition(value, at));
+                        break;
+
+                    case "duration":
+                        // No duration (or null) lasts until removed.
+                        if (value.Kind != JsonKind.Null) builder.SetDuration(ValueSource(value, at));
+                        break;
+
+                    case "stacking":
+                        stacking = (StatusStacking)Enum(typeof(StatusStacking), value, at);
+                        break;
+
+                    case "maxStacks":
+                        maxStacks = (int)Integer(value, at, typeof(int));
+                        if (maxStacks < 0) throw Error(value, at, "the most stacks can't be negative (0 is no limit)");
+                        break;
+
+                    case "statBlock":
+                        if (value.Kind == JsonKind.Object)
+                        {
+                            // Applied to the entity that has the status: its paths are the entity's own, not roles.
+                            builder.SetStatBlock(new DataJsonReader(_keys, roles: false).StatBlock(value, at, isRoot: false));
+                        }
+                        else if (value.Kind != JsonKind.Null)
+                        {
+                            builder.SetStatBlock(String(value, at, "a StatBlock ID such as \"Debuffs/Poison\", or a StatBlock object"));
+                        }
+                        break;
+
+                    case "tick":
+                        // null: no ticks.
+                        if (value.Kind == JsonKind.Null) break;
+                        var (every, effect) = Tick(value, at);
+                        builder.SetTick(every, effect);
+                        break;
+
+                    case "onApply":
+                    case "onExpire":
+                        foreach (var (item, itemPath) in Array(value, at, "an array of effect IDs and effects"))
+                        {
+                            var entry = EffectEntry(item, itemPath);
+                            if (matched == "onApply") builder.AddOnApply(entry);
+                            else builder.AddOnExpire(entry);
+                        }
+                        break;
+
+                    default:
+                        throw UnknownProperty(property, at, StatusProperties, FileKindHint(property.Key, "status effect"));
+                }
+            }
+
+            builder.SetStacking(stacking, maxStacks);
+            return builder.Build();
+        }
+
+        /// <summary>A status's ticks: { "every": 1, "effect": "Debuffs/PoisonTick" }.</summary>
+        private (float every, EffectEntry effect) Tick(JsonNode node, string path)
+        {
+            ExpectObject(node, path, "a tick, e.g. { \"every\": 1, \"effect\": \"Debuffs/PoisonTick\" }");
+            CheckDuplicates(node, path);
+
+            var names = new[] { "every", "effect" };
+            float? every = null;
+            EffectEntry effect = null;
+            foreach (var property in node.Properties)
+            {
+                string at = Child(path, property.Key);
+                switch (Match(property.Key, names))
+                {
+                    case "every":
+                        every = Float(property.Value, at);
+                        if (!(every > 0f)) throw Error(property.Value, at, "the time between ticks must be more than 0");
+                        break;
+                    case "effect":
+                        effect = EffectEntry(property.Value, at);
+                        break;
+                    default:
+                        throw UnknownProperty(property, at, names, "");
+                }
+            }
+
+            if (every == null || effect == null)
+            {
+                throw Error(node, path, "a tick needs \"every\" (the time between ticks) and \"effect\" (what each tick does)");
+            }
+            return (every.Value, effect);
+        }
+
+        /// <summary>An effect a status applies: its file's ID, or an effect written in full.</summary>
+        private EffectEntry EffectEntry(JsonNode node, string path)
+        {
+            if (node.Kind == JsonKind.String) return new EffectEntry { EffectId = node.Text };
+            if (node.Kind == JsonKind.Object) return new EffectEntry { Effect = Effect(node, path, isRoot: false) };
+            throw Error(node, path, $"expected an effect ID such as \"Debuffs/PoisonTick\", or an effect object, found {node.Describe()}");
         }
 
         // ---------------------------------------------------------------- Modifiers and logic

@@ -24,10 +24,12 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             "path with one of them (the keys of the Effect Roles domain). Health with the path Target is the target's Health; " +
             "AttackPower with the path Source is the source's.");
 
-        [MenuItem("Window/Attribute System/Effect Editor")]
-        public static void ShowWindow() => GetWindow<EffectEditorWindow>("Effect Editor");
+        [MenuItem("Tools/Attribute System/Effect Editor", false, 3)]
+        public static void ShowWindow() => Open();
 
-        protected override string JsonFolder => "Resources/" + EffectJsonLoader.ResourcesPath;
+        internal static EffectEditorWindow Open() => GetWindow<EffectEditorWindow>("Effect Editor");
+
+        protected override string ResourcesPath => EffectJsonLoader.ResourcesPath;
         protected override string DataLabel => "Effect";
 
         protected override ScriptableObject CreateContainer() => CreateInstance<EffectContainer>();
@@ -52,6 +54,11 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             EditorGUILayout.Space(15);
             EditorGUILayout.LabelField("Actions", HeaderStyle);
             DrawActions(data.FindPropertyRelative("Actions"));
+
+            EditorGUILayout.Space(15);
+            EditorGUILayout.LabelField("Status Effects", HeaderStyle);
+            EditorGUILayout.PropertyField(data.FindPropertyRelative("RemoveStatusCategories"), new GUIContent("Remove (Categories)"), true);
+            EditorGUILayout.PropertyField(data.FindPropertyRelative("Statuses"), new GUIContent("Apply"), true);
         }
 
         private void DrawActions(SerializedProperty list)

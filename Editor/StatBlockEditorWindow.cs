@@ -17,12 +17,14 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             public StatBlock Data = new StatBlock();
         }
 
-        [MenuItem("Window/Attribute System/Stat Block Editor (Unified)")]
-        public static void ShowWindow() => GetWindow<StatBlockEditorWindow>("StatBlock Editor");
+        [MenuItem("Tools/Attribute System/Stat Block Editor", false, 2)]
+        public static void ShowWindow() => Open();
 
-        protected override string JsonFolder => "Resources/" + StatBlockJsonLoader.ResourcesPath;
+        internal static StatBlockEditorWindow Open() => GetWindow<StatBlockEditorWindow>("Stat Block Editor");
+
+        protected override string ResourcesPath => StatBlockJsonLoader.ResourcesPath;
         protected override string DataLabel => "StatBlock";
-        protected override string Title => "Unified StatBlock Editor";
+        protected override string Title => "Stat Block Editor";
 
         protected override ScriptableObject CreateContainer() => CreateInstance<StatBlockContainer>();
         protected override object GetData(ScriptableObject container) => ((StatBlockContainer)container).Data;
