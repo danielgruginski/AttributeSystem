@@ -15,7 +15,7 @@ namespace ReactiveSolutions.AttributeSystem.Editor
         private Vector2 _scrollPosition;
         private bool _autoRefresh = true;
 
-        [MenuItem("Window/Attribute System/Attribute Debugger")]
+        [MenuItem("Tools/Attribute System/Attribute Debugger", false, 20)]
         public static void ShowWindow()
         {
             GetWindow<AttributeDebuggerWindow>("Attribute Debugger");

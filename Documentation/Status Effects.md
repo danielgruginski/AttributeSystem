@@ -158,7 +158,7 @@ Effect venomousHit = EffectBuilder.Create("Venomous Hit")
 
 Status effect files live in `Resources/Data/StatusEffects`. `StatusEffectJsonLoader.Load("Debuffs/Poison")` loads `Resources/Data/StatusEffects/Debuffs/Poison.json`. If it can't, it logs an error and returns null.
 
--   **Window > Attribute System > Status Effect Editor** creates and edits them.
+-   **Tools > Attribute System > Status Effect Editor** creates and edits them. **Assets > Create > Attribute System > Status Effect** starts a new one, and double-clicking a file opens it.
 -   A string field marked `[StatusEffectID]` shows a dropdown of them.
 -   In code, `StatusEffectJson.ToJson(status)` and `StatusEffectJson.FromJson(json)` convert statuses to and from JSON.
 

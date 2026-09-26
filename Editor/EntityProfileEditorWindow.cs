@@ -8,8 +8,9 @@ using System.Linq;
 namespace ReactiveSolutions.AttributeSystem.Editor
 {
     /// <summary>
-    /// Creates and edits EntityProfile JSON files under Resources/Data/EntityProfiles. An EntityController
-    /// (Profile Id) or a nested entity entry (Profile Id) picks them by ID; EntityProfileJsonLoader loads them.
+    /// Creates and edits EntityProfile JSON files (in Resources/Data/EntityProfiles folders), templates included: a
+    /// template is a profile that others build on. An EntityController (Profile Id), a template entry or a nested entity
+    /// entry picks them by ID; EntityProfileJsonLoader loads them.
     /// </summary>
     public class EntityProfileEditorWindow : JsonDataEditorWindow
     {
@@ -19,10 +20,12 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             public EntityProfile Data = new EntityProfile();
         }
 
-        [MenuItem("Window/Attribute System/Entity Profile Editor")]
-        public static void ShowWindow() => GetWindow<EntityProfileEditorWindow>("Entity Profile Editor");
+        [MenuItem("Tools/Attribute System/Entity Profile Editor", false, 1)]
+        public static void ShowWindow() => Open();
 
-        protected override string JsonFolder => "Resources/" + EntityProfileJsonLoader.ResourcesPath;
+        internal static EntityProfileEditorWindow Open() => GetWindow<EntityProfileEditorWindow>("Entity Profile Editor");
+
+        protected override string ResourcesPath => EntityProfileJsonLoader.ResourcesPath;
         protected override string DataLabel => "EntityProfile";
 
         protected override ScriptableObject CreateContainer() => CreateInstance<EntityProfileContainer>();
@@ -46,8 +49,14 @@ namespace ReactiveSolutions.AttributeSystem.Editor
                   "and refer to it by ID.";
         }
 
+        private const string TemplatesHelp =
+            "A template is a profile that others build on (e.g. Templates/Character), edited here like any profile: open it " +
+            "with Open, or click Edit next to it under Templates.";
+
         protected override void DrawData(SerializedProperty data)
         {
+            EditorGUILayout.HelpBox(TemplatesHelp, MessageType.Info);
+
             // Every field of EntityProfile in declaration order, with its [Header]s and tooltips.
             SerializedProperty property = data.Copy();
             SerializedProperty end = data.GetEndProperty();

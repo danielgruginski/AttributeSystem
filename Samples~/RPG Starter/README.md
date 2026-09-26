@@ -29,7 +29,7 @@ A small RPG built with the Attribute System. The rules and numbers are JSON data
 
 ## Good to Know
 
--   The editor windows (Stat Block, Entity Profile, Effect and Status Effect) and the ID dropdowns show the files under `Assets/Resources/Data`. To edit the sample's files with them, move the sample's `RPGStarter` folders from `Resources/Data/EntityProfiles`, `StatBlocks`, `Effects` and `StatusEffects` there (the IDs stay the same), or edit them as text.
+-   The editor windows (**Tools > Attribute System**) and the ID dropdowns list the sample's files with your own. Open one with a window's **Open** menu, by double-clicking it, or with **Edit** next to an ID (e.g. the Knight's template, `RPGStarter/Templates/Character`). **Save** writes back to the sample's file.
 -   `RPGGame.Tick` advances the characters' status effects: the demo calls it every frame with `Time.deltaTime`.
 
 The package's documentation walks through the sample: see `Documentation/RPG Starter.md`.

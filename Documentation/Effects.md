@@ -154,7 +154,7 @@ Effect fireball = EffectBuilder.Create("Fireball")
 
 Effect files live in `Resources/Data/Effects`. `EffectJsonLoader.Load("Spells/Fireball")` loads `Resources/Data/Effects/Spells/Fireball.json`. If it can't, it logs an error and returns an effect that does nothing.
 
--   **Window > Attribute System > Effect Editor** creates and edits them.
+-   **Tools > Attribute System > Effect Editor** creates and edits them. **Assets > Create > Attribute System > Effect** starts a new one, and double-clicking a file opens it.
 -   A string field marked `[EffectID]` shows a dropdown of them: `[EffectID] public string Attack;`.
 -   In code, `EffectJson.ToJson(effect)` and `EffectJson.FromJson(json)` convert effects to and from JSON.
 

@@ -2,7 +2,7 @@
 
 The package comes with a sample RPG: import it with **Window > Package Manager > Attribute System > Samples > RPG Starter > Import**, add the **RPG Starter Demo** component to an empty GameObject, and press Play. A Knight and a Mage fight a Goblin; buttons let you attack, cast, drink potions, swap weapons, carry an anvil, poison the Knight and cure the poison, level up and bless the party.
 
-This page shows how it is built. The rules and numbers are data: JSON files in the `RPGStarter` folders of the sample's `Resources/Data/EntityProfiles`, `StatBlocks`, `Effects` and `StatusEffects`. The code (`Scripts/RPGGame.cs`) only spawns characters, applies effects, moves items around and counts time. Key tables are left out of the excerpts below.
+This page shows how it is built. The rules and numbers are data: JSON files in the `RPGStarter` folders of the sample's `Resources/Data/EntityProfiles`, `StatBlocks`, `Effects` and `StatusEffects`. The code (`Scripts/RPGGame.cs`) only spawns characters, applies effects, moves items around and counts time. Key tables are left out of the excerpts below. To see or change a file in its editor window, double-click it, or pick it in the window's **Open** menu (e.g. **Tools > Attribute System > Entity Profile Editor**, then **Open > RPGStarter > Templates > Character**).
 
 | Piece | Data | Package feature |
 | ----- | ----- | ----- |

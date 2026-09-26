@@ -61,4 +61,4 @@ The Attribute System compares keys by **GUID**, so it survives renames: attribut
 
 **JSON files** (StatBlocks and entity profiles) name keys by name, and list each name's GUID in a `keys` table at the end of the file (see [JSON Format](JSON%20Format.md#keys)). The GUID in the table is what counts: a name listed with another GUID is a *different* key that merely shares the name.
 
-After a key is renamed, JSON files still show its old name until they are saved again. That doesn't affect the game, since keys match by GUID. To refresh a file, load it in its editor window (Stat Block Editor or Entity Profile Editor) and save it: loading gives renamed keys their current names.
+After a key is renamed, JSON files still show its old name until they are saved again. That doesn't affect the game, since keys match by GUID. To refresh a file, open it in its editor window (double-click it) and save it: opening gives renamed keys their current names.

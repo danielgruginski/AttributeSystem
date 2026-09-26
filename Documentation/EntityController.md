@@ -34,7 +34,7 @@ Namespace: `ReactiveSolutions.AttributeSystem.Unity`.
 
 -   **Profile Id** (`string ProfileId`)
     
-    -   A profile JSON file under `Resources/Data/EntityProfiles`, picked from a dropdown (create them with **Window > Attribute System > Entity Profile Editor**). Applied first. If the file can't be loaded, an error is logged and only the inline profile is applied.
+    -   A profile JSON file under `Resources/Data/EntityProfiles`, picked from a dropdown (create them with **Tools > Attribute System > Entity Profile Editor**, and click **Edit** next to the dropdown to open the picked one). Applied first. If the file can't be loaded, an error is logged and only the inline profile is applied.
         
 -   **Profile** (`EntityProfile Profile`)
     

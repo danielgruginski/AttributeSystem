@@ -19,7 +19,7 @@ A reactive attribute management system designed for scalability and maintainabil
 * **Status Effects**: Poisons, buffs and stuns that last: a StatBlock while they last, effects when they tick, start and end, durations in seconds or turns, stacking rules and cleanses by category.  
 * **Templates**: Profiles build on shared templates (a `Character` template for every character, `Caster` on top of it), applied once per entity; each profile overrides the template values it needs to.  
 * **Data-Driven**: Author StatBlocks, entity profiles, effects and status effects in their editor windows or right in the Inspector. They are saved as readable JSON files that mirror the builder calls (`{ "target": "Damage", "value": 5 }`), easy to review, diff and edit by hand.  
-* **Custom Editor Tools**: Includes StatBlock, Entity Profile, Effect and Status Effect editor windows, an Attribute Debugger and custom property drawers for an improved designer workflow.  
+* **Custom Editor Tools**: Includes StatBlock, Entity Profile, Effect and Status Effect editor windows and an Attribute Debugger (**Tools > Attribute System**), a **Create > Attribute System** menu, and property drawers that pick data files from dropdowns and open them for editing.  
 * **No Magic Strings**: Attribute names, tags and aliases are GUID-backed [Semantic Keys](Documentation/Semantic%20Keys.md).  
 * **Loose Coupling**: Easily integrates with existing projects (like TopDown Engine) without creating rigid dependencies.
 

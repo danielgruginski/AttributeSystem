@@ -24,10 +24,12 @@ namespace ReactiveSolutions.AttributeSystem.Editor
             "Target (who has it): start their paths with one of them. The StatBlock applies to the entity that has the status, " +
             "so its paths are that entity's own.";
 
-        [MenuItem("Window/Attribute System/Status Effect Editor")]
-        public static void ShowWindow() => GetWindow<StatusEffectEditorWindow>("Status Effect Editor");
+        [MenuItem("Tools/Attribute System/Status Effect Editor", false, 4)]
+        public static void ShowWindow() => Open();
 
-        protected override string JsonFolder => "Resources/" + StatusEffectJsonLoader.ResourcesPath;
+        internal static StatusEffectEditorWindow Open() => GetWindow<StatusEffectEditorWindow>("Status Effect Editor");
+
+        protected override string ResourcesPath => StatusEffectJsonLoader.ResourcesPath;
         protected override string DataLabel => "StatusEffect";
 
         protected override ScriptableObject CreateContainer() => CreateInstance<StatusEffectContainer>();

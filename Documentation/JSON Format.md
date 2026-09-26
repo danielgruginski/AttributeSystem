@@ -39,7 +39,7 @@ StatBlockBuilder.Create("Iron Sword")
     .Build();
 ```
 
-The **Stat Block Editor**, the **Entity Profile Editor**, the **Effect Editor** and the **Status Effect Editor** write these files (see [StatBlock](StatBlock.md), [EntityProfile](EntityProfile.md), [Effects](Effects.md) and [Status Effects](Status%20Effects.md)), and the loaders read them. They are plain text, so you can also write and edit them by hand, and review them in version control.
+The **Stat Block Editor**, the **Entity Profile Editor**, the **Effect Editor** and the **Status Effect Editor** (**Tools > Attribute System**) write these files (see [StatBlock](StatBlock.md), [EntityProfile](EntityProfile.md), [Effects](Effects.md) and [Status Effects](Status%20Effects.md)), and the loaders read them. They are plain text, so you can also write and edit them by hand, and review them in version control.
 
 ## Keys
 

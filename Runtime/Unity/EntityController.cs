@@ -9,7 +9,7 @@ namespace ReactiveSolutions.AttributeSystem.Unity
 {
     public class EntityController : MonoBehaviour
     {
-        [Tooltip("A profile saved as JSON under Resources/Data/EntityProfiles (see Window > Attribute System > Entity Profile Editor). Applied first.")]
+        [Tooltip("A profile saved as JSON under Resources/Data/EntityProfiles (see Tools > Attribute System > Entity Profile Editor). Applied first.")]
         [EntityProfileID]
         public string ProfileId;
 
